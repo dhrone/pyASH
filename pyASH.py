@@ -1002,59 +1002,20 @@ class ControllerInterface():
 
 
     def process_directive(self, directive):
-        if not check_dict_keys(directive, ['directive', 'header']) or \
-            not check_dict_keys(directive, ['directive', 'payload']):
-            raise ValueError('Received invalid directive')
+		d = Directive(directive)
 
-        self.directive = directive['directive']
-        self.payload = self.directive['payload']
+        if d.namespace not in VALID_VARIABLES:
+            raise ValueError('{0} is not a valid namespace'.format(d.namespace))
 
+        if d.name not in VALID_DIRECTIVES[self.namespace]:
+            raise ValueError('{0} is not a valid directive for {1}'.format(d.name, d.namespace))
 
-        self.header = self.directive['header']
-        # Load header variables
-        try:
-            self.namespace = self.header['namespace']
-            self.name = self.header['name']
-            self.payloadVersion = self.header['payloadVersion']
-            self.messageId = self.header['messageId']
-        except KeyError as err:
-            raise ValueError('{0} missing from header'.format(err))
+        if (d.namespace,d.name) not in self.callbacks:
+            raise KeyError('[{0}][{1}] does not have a callback handler'.format(d.namespace, d.name))
 
-        if self.namespace == 'Alexa.Authorization':
-            if not check_dict_keys(self.payload, ['grantee','token']):
-                raise ValueError('Token missing from Authorization directive')
-            if not check_dict_keys(self.directive, ['payload','grant','type']) or \
-                not check_dict_keys(self.directive,['payload', 'grant', 'code']):
-                raise ValueError('Grant information missing from Authorization directive')
-            if self.directive['payload']['grant']['type'] != 'OAuth2.AuthorizationCode':
-                raise ValueError('{0} is not a valid authorization type'.format(str(self.directive['payload']['grant']['type'])))
-
-        if 'endpoint' in self.directive:
-            self.endpoint = self.directive['endpoint']
-            # Load endpoint variables
-            try:
-                self.endpointId = self.endpoint['endpointId']
-            except KeyError as err:
-                raise ValueError('{0} missing from endpoint'.format(err))
-
-            if 'scope' in self.endpoint:
-                try:
-                    self.token = self.endpoint['scope']['token']
-                except KeyError:
-                    raise ValueError('Received scope without token')
-
-        if self.namespace not in VALID_VARIABLES:
-            raise ValueError('{0} is not a valid namespace'.format(self.namespace))
-
-        if self.name not in VALID_DIRECTIVES[self.namespace]:
-            raise ValueError('{0} is not a valid directive for {1}'.format(self.name, self.namespace))
-
-        if (self.namespace,self.name) not in self.callbacks:
-            raise KeyError('[{0}][{1}] does not have a callback handler'.format(self.namespace, self.name))
-
-        res = self.callbacks[(self.namespace, self.name)](directive)
+        res = self.callbacks[(d.namespace, d.name)](directive)
         if not isinstance(res, Response) and not isinstance(res, ErrorResponse):
-            raise TypeError('Callback [{0}][{1}] returned an invalid response.  Type returned was {2}'.format(self.namespace, self.name, str(type(res))))
+            raise TypeError('Callback [{0}][{1}] returned an invalid response.  Type returned was {2}'.format(d.namespace, d.name, str(type(res))))
 
         return res
 
