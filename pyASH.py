@@ -114,14 +114,26 @@ class ASHclass(object):
         return json.dumps(json, indent=4)
 
 class Brightness(ASHclass):
-    def __init__(self, value):
+    def __init__(self, value=None, json=None):
         super(Brightness, self).__init__()
+
+        if type(json) == dict:
+            value = json.get('value')
+
+        if type(value) != int:
+            raise TypeError('Brightness value must be an integer.  Received a '+str(type(value)))
         self.name = 'brightness'
         self.value = value
 
 class Channel(ASHclass):
-    def __init__(self, number, callSign, affiliateCallSign,uri=''):
+    def __init__(self, number=None, callSign=None, affiliateCallSign=None,uri=None,json=None):
         super(Channel, self).__init__()
+
+        if type(json) == dict:
+            number = json.get('number')
+            callSign = json.get('callSign')
+            affiliateCallSign = json.get('affiliateCallSign')
+            uri = json.get('uri')
 
         if type(number) != str:
             raise TypeError('Channel number must be a string.  Received a {0}'.format(str(type(number))))
@@ -129,11 +141,15 @@ class Channel(ASHclass):
             raise TypeError('Channel callSign must be a string.  Received a {0}'.format(str(type(callSign))))
         if type(affiliateCallSign) != str:
             raise TypeError('Channel affiliateCallSign must be a string.  Received a {0}'.format(str(type(affiliateCallSign))))
+        if uri:
+            if type(uri) != str:
+                raise TypeError('Uri if provided must be a string.  Received a {0}'.format(str(type(uri))))
 
         self.name = 'channel'
         self.number = number
         self.callSign = callSign
         self.affiliateCallSign = affiliateCallSign
+        self.uri = uri
 
         self.value = { 'number': number, 'callSign': callSign, 'affiliateCallSign': affiliateCallSign}
         if uri:
@@ -163,8 +179,12 @@ class Color(ASHclass):
         self.value = { 'hue': hue, 'saturation': saturation, 'brightness': brightness}
 
 class ColorTemperatureInKelvin(ASHclass):
-    def __init__(self, value):
+    def __init__(self, value=None, json=None):
         super(ColorTemperatureInKelvin, self).__init__()
+
+        if type(json) == dict:
+            value = json.get('value')
+
         if type(value) != int:
             raise TypeError('ColorTemperatureInKelvin value must be an integer.  Received a {0}'.format(str(type(value))))
         self.name = 'colorTemperatureInKelvin'
@@ -187,24 +207,36 @@ class CookingMode(ASHclass):
         self.value = value.upper()
 
 class CookingHolding(ASHclass):
-    def __init__(self, value):
+    def __init__(self, value=None, json=None):
         super(CookingHolding, self).__init__()
+
+        if type(json) == dict:
+            value = json.get('value')
+
         if type(value) != bool:
             raise TypeError('CookingHolding must be a boolean value.  Received a '+str(type(value)))
         self.name = 'isHolding'
         self.value = value
 
 class CookingPreset(ASHclass):
-    def __init__(self, value):
+    def __init__(self, value=None, json=None):
         super(CookingHolding, self).__init__()
+
+        if type(json) == dict:
+            value = json.get('value')
+
         if type(value) != str:
             raise TypeError('CookingPreset must be a string value.  Received a '+str(type(value)))
         self.name = 'presetName'
         self.value = value
 
 class Connectivity(ASHclass):
-    def __init__(self, value):
+    def __init__(self, value=None, json=None):
         super(Connectivity, self).__init__()
+
+        if type(json) == dict:
+            value = json.get('value')
+
         if type(value) != str:
             raise TypeError('Connectivity must be a string value.  Received a '+str(type(value)))
         if value.upper() not in VALID_CONNECTIVITY:
@@ -213,7 +245,11 @@ class Connectivity(ASHclass):
         self.value = { 'value': value.upper() }
 
 class DateTime(ASHclass):
-    def __init__(self, value, name):
+    def __init__(self, value=None, name=None, json=None):
+
+        if type(json) == dict:
+            value = json.get('value')
+            name = json.get('name')
         if not type(value) is datetime:
             raise TypeError('Datetime must be a UTC datetime value.  Received a '+str(type(value)))
         if name not in VALID_TIMETYPE:
@@ -224,6 +260,9 @@ class DateTime(ASHclass):
         self.value = value.isoformat().split('.')[0]+'Z'
 
 class Duration(ASHclass):
+
+    # ACTION: add json functionality
+
     def __init__(self, value, name):
         super(Duration, self).__init__()
         if not type(value) is timedelta:
@@ -262,7 +301,7 @@ class Duration(ASHclass):
 
 
 class FoodQuantity():
-    def __init__(self, type=None, value=None, size=None, unit=None, json = None):
+    def __init__(self, type=None, value=None, size=None, unit=None, json=None):
 
         if type(json) == dict:
             self.value = json.get('value')
@@ -346,28 +385,36 @@ class FoodItem(ASHclass):
             self.value['foodQuantity'] = self.foodQuantity.get_json()
 
 
-class CookCompletionTimeEstimated(ASHclass):
-    def __init__(self, value):
+class IsCookCompletionTimeEstimated(ASHclass):
+    def __init__(self, value=None, json=None):
         super(CookCompletionTimeEstimated, self).__init__()
 
+        if type(json) == dict:
+            value = json.get('value')
+        if type(value) != bool:
+            raise TypeError('IsCookCompletionTimeEstimated must be a boolean value.  Received a '+str(type(value)))
         self.name = 'isCookCompletionTimeEstimated'
         self.value = value
 
 
 class Input(ASHclass):
-    def __init__(self, value):
+    def __init__(self, value=None, json=None):
         super(Input, self).__init__()
+
+        if type(json) == dict:
+            value = json.get('value')
         if type(value) != str:
             raise TypeError('Input must be a string value.  Received a '+str(type(value)))
-#        if not value.upper() in VALID_INPUTS:
-#            raise ValueError(value.upper() + ' is not a valid input value')
         self.name = 'input'
         self.value = value.upper()
 
 
 class LockState(ASHclass):
-    def __init__(self, value):
+    def __init__(self, value=None, json=None):
         super(LockState, self).__init__()
+
+        if type(json) == dict:
+            value = json.get('value')
         if type(value) != str:
             raise TypeError('LockState must be a string value.  Received a '+str(type(value)))
         if value.upper() not in VALID_LOCKSTATES:
@@ -377,24 +424,33 @@ class LockState(ASHclass):
 
 
 class MuteState(ASHclass):
-    def __init__(self, value):
+    def __init__(self, value=None, json=None):
         super(MuteState, self).__init__()
+
+        if type(json) == dict:
+            value = json.get('value')
         if type(value) != bool:
             raise TypeError('MuteState must be a boolean value.  Received a '+str(type(value)))
         self.name = 'muted'
         self.value = value
 
 class Percentage(ASHclass):
-    def __init__(self, value):
+    def __init__(self, value=None, json=None):
         super(Percentage, self).__init__()
+
+        if type(json) == dict:
+            value = json.get('value')
         if type(value) != int:
             raise TypeError('Percentage must be an integer value.  Received a '+str(type(value)))
         self.name = 'percentage'
         self.value = value
 
 class PowerState(ASHclass):
-    def __init__(self, value):
+    def __init__(self, value=None, json=None):
         super(PowerState, self).__init__()
+
+        if type(json) == dict:
+            value = json.get('value')
         if type(value) != str:
             if type(value) != bool:
                 raise TypeError('PowerState must be a string or boolean value.  Received a '+str(type(value)))
@@ -451,8 +507,13 @@ class IntegralPowerLevel():
 
 
 class Temperature(ASHclass):
-    def __init__(self, value, scale, name):
+    def __init__(self, value=None, scale=None, name=None, json=None):
         super(Temperature, self).__init__()
+
+        if type(json) == dict:
+            value = json.get('value')
+            scale = json.get('scale')
+            name = json.get('name')
 
         if not type(value) == int and not type(value) == float:
             raise TypeError('Temperature value must be a number.  Received a '+str(type(value)))
@@ -494,8 +555,11 @@ class ThermostatMode(ASHclass):
             }
 
 class VolumeLevel(ASHclass):
-    def __init__(self, value):
+    def __init__(self, value=None, json=None):
         super(VolumeLevel, self).__init__()
+
+        if type(json) == dict:
+            value = json.get('value')
         if type(value) != int:
             raise TypeError('VolumeLevel must be an integer value.  Received a '+str(type(value)))
         self.name = 'volume'
@@ -953,28 +1017,6 @@ class ThermostatModeProperty(Property):
         pe = ThermostatMode(value, customName)
         super(ThermostatModeProperty, self).__init__('Alexa.ThermostatController', pe, timeOfSample, uncertaintyInMilliseconds)
 
-class DiscoveryInterface():
-    def __init__(self):
-        self.header = Header('Alexa.Discovery', 'Discover.Response', get_uuid(), payloadVersion='3').get_json()
-        self.endpoints = []
-
-    def add_endpoint(self,endpoint):
-        if isinstance(endpoint, Endpoint):
-            endpoint = endpoint.get_json()
-        self.endpoints.append(endpoint)
-
-    def get_json(self):
-        self.json = {
-            'event': {
-                'header': self.header,
-                'payload': {
-                    'endpoints': self.endpoints
-                }
-            }
-        }
-        return self.json
-
-
 class ControllerInterface():
     def __init__(self, acceptgranthandler, discoverhandler):
         self.callbacks = {}
@@ -1406,56 +1448,6 @@ class Response(ResponseAttribute):
 
 
 
-class AcceptGrantResponse(Response):
-    def __init__(self, payloadVersion='3'):
-        super(AcceptGrantResponse, self).__init__()
-
-        self.header = Header('Alexa.Authorization', 'AcceptGrant.Response', payloadVersion = payloadVersion)
-        self.json = { 'event': { 'header': self.header.get_json(), 'payload': {} }}
-
-class DiscoverResponse(Response):
-    def __init__(self, header, payload):
-        super(DiscoverResponse, self).__init__()
-
-        if isinstance(header, Header):
-            header = header.get_json()
-        if isinstance(payload, Payload):
-            payload = payload.get_json()
-
-        self.json = {
-            'event': {
-                'header': header,
-                'payload': payload
-            }
-        }
-
-class NormalResponse(Response):
-    def __init__(self, context, event):
-        super(NormalResponse, self).__init__()
-
-        if isinstance(context, Context):
-            context = context.get_json()
-        if isinstance(event, Event):
-            event = event.get_json()
-
-        self.json = {
-            'context': context,
-            'event': event
-        }
-
-class CalendarResponse(Response):
-    def __init__(self, organizerName, calendarEventId, correlationToken):
-        super(CalendarResponse, self).__init__()
-
-        self.json = {
-            'event': {
-                'header': Header('Alexa.Calendar', 'Response', correlationToken = correlationToken).get_json(),
-                'payload': {
-                    'organizerName': organizerName,
-                    'calendarEventId': calendarEventId
-                }
-            }
-        }
 
 class ErrorResponse(ResponseAttribute):
     def __init__(self, namespace, type, reason, correlationToken='', endpoint={}, min={}, max={}):
@@ -1488,80 +1480,6 @@ class ErrorResponse(ResponseAttribute):
                 'minimumValue': min,
                 'maximumValue': max
             }
-
-
-class response_reportstate_synchronous():
-
-    skill_interfaces = []
-    response = {}
-    values = {}
-
-
-    def __init__(self, request, interfaces = []):
-        if not check_dict_keys(request, ['directive','endpoint','endpointId']):
-            raise ValueError('Request did not contain an endpointId')
-
-        for item in interfaces:
-            if item in VALID_INTERFACES:
-                self.skills_interfaces.append(item)
-                self.values[item] = { }
-            else:
-                raise ValueError(str(item) + ' not a valid interface')
-
-    def add_interface_data(self, interface, varname, value):
-
-        if interface not in VALID_INTERFACES:
-            raise ValueError(str(interface) + ' is not a valid interface')
-
-        if varname not in VALID_VARIABLES[interface]:
-            raise ValueError(str(varname) + ' is not a valid variable for '+interface)
-
-        values[interface][varname] = value
-
-
-    def get_header_object(self, namespace, name, correlationToken = ''):
-        item = {
-            'messageId': get_uuid(),
-            'namespace':namespace,
-            'name':name,
-            'payloadVersion':'3'
-        }
-        if correlationToken:
-            item['correlationToken'] = correlationToken
-        return item
-
-    def get_event_object(self, request, name, scope={}):
-        ct = {}
-        if check_dict_keys(request, ['directive','header','correlationToken']):
-            ct = request['directive']['header']['correlationToken']
-
-        item = {
-            'header': self.get_header_object('Alexa', name, ct),
-            "endpoint": self.get_endpoint_object(request, scope),
-            "payload": {}
-        }
-        return item
-
-    def get_endpoint_object(self, request, scope={}):
-        ep = {}
-        if scope:
-            ep['scope'] = scope
-
-        epi = ''
-        if check_dict_keys(request, ['directive','endpoint','endpointId']):
-            epi = request["directive"]["endpoint"]["endpointId"]
-
-        if not epi:
-            logger.warn('get_endpoint_object: No endpointId received')
-            return { }
-
-        ep['endpointId'] = epi
-
-        if check_dict_keys(request, ['directive','endpoint']):
-            if 'cookie' in request['directive']['endpoint']:
-                ep['cookie'] = request['directive']['endpoint']['cookie']
-
-        return ep
 
 class Directive():
     def __init__(self, directive):
@@ -1636,96 +1554,154 @@ def get_utc_timestamp(seconds=None):
 def get_uuid():
     return str(uuid.uuid4())
 
-def get_directive_version(request):
-    try:
-        return request["directive"]["header"]["payloadVersion"]
-    except:
-        try:
-            return request["header"]["payloadVersion"]
-        except:
-            return "-1"
-
-def check_dict_keys(inputdict, values=[]):
-    if not values:
-        return False
-    cd = inputdict
-    for i in values:
-        if i not in cd:
-            return False
-        cd = cd[i]
-    return True
-
+# Examples
 def EXAMPLEacceptgranthandler(directive):
-    if check_dict_keys(directive, ['directive','header','correlationToken']):
+
+    if pyASH.check_dict_keys(directive, ['directive','header','correlationToken']):
         correlationToken = directive['directive']['header']['correlationToken']
     else:
         correlationToken = ''
 
-    return ErrorResponse('Alexa', 'ACCEPT_GRANT_FAILED', 'Failed to handle the AcceptGrant directive because ...', correlationToken=correlationToken)
+    return pyASH.Response(directive)
+
+
+def EXAMPLEcalendarhandler(directive):
+
+    # Here is where you would call to get information about meeting
+    # for this example sample data is being provided
+    organizerName = "John Smith"
+    calendarEventId = '1234567890'
+
+    return pyASH.Response(directive, { 'organizerName': organizerName, 'calendarEventId': calendarEventId })
+
+def EXAMPLEcamerastreamhandler(directive):
+
+    c = pyASH.CameraStream('RTSP',pyASH.Resolution(1920,1080), 'BASIC', 'H264', 'AAC', "rtsp://username:password@link.to.video:443/feed1.mp4", "2017-02-03T16:20:50.52Z", 30)
+    cs = pyASH.CameraStreams(c)
+    csp = pyASH.CameraStreamsPayload(cs, 'https://username:password@link.to.image/image.jpg')
+
+    return pyASH.Response(directive, csp)
+
 
 def EXAMPLEdiscoverhandler(directive):
 
-    header = Header('Alexa.Discovery','Discover.Response').get_json()
+    header = pyASH.Header('Alexa.Discovery','Discover.Response').get_json()
     payload = {
         'endpoints': [ ]
     }
 
+    endpoints = pyASH.Endpoints()
     # Add appliance-001
     cps = []
-    cps.append( Capability('Alexa.Speaker', Properties_supported('volume', True, True), '1') )
-    cps.append( Capability('Alexa.Speaker', Properties_supported('muted', True, True), '1') )
-    ep = Endpoint("appliance-001", "Sample Manufacturer", "Living Room Sound System", "Smart Speaker by Sample Manufacturer", ["SPEAKER"], \
+    cps.append( pyASH.Capability('Alexa.ColorTemperatureController', pyASH.Properties_supported('colorTemperatureInKelvin', True, True), '3') )
+    cps.append( pyASH.Capability('Alexa.EndpointHealth', pyASH.Properties_supported('connectivity', True, True), '3') )
+    cps.append( pyASH.Capability('Alexa', version='3') )
+    cps.append( pyASH.Capability('Alexa.ColorController', pyASH.Properties_supported('color', True, True), '3') )
+    cps.append( pyASH.Capability('Alexa.PowerController', pyASH.Properties_supported('powerState', True, True), '3') )
+    cps.append( pyASH.Capability('Alexa.BrightnessController', pyASH.Properties_supported('brightness', True, True), '3') )
+    ep = pyASH.Endpoint("appliance-001", "Sample Manufacturer", "Living Room Light", "Smart Light by Sample Manufacturer", ["LIGHT"], \
         cookie = { \
            "extraDetail1":"optionalDetailForSkillAdapterToReferenceThisDevice", \
            "extraDetail2":"There can be multiple entries", \
            "extraDetail3":"but they should only be used for reference purposes", \
            "extraDetail4":"This is not a suitable place to maintain current device state" \
-        }, capabilities = cps).get_json()
-    payload['endpoints'].append(ep)
+        }, capabilities = cps)
+    endpoints.add(ep)
 
     # Add appliance-002
     cps = []
-    cps.append( Capability('Alexa.ColorTemperatureController', Properties_supported('colorTemperatureInKelvin', True, True), '1').get_json() )
-    cps.append( Capability('Alexa.ColorController', Properties_supported('color', True, True), '1') )
-    cps.append( Capability('Alexa.BrightnessController', Properties_supported('brightness', True, True), '1') )
-    cps.append( Capability('Alexa.PowerController', Properties_supported('powerState', True, True), '1') )
-    cps.append( Capability('Alexa.EndpointHealth', Properties_supported('connectivity', True, True), '1') )
-    ep = Endpoint("appliance-002", "Sample Manufacturer", "Living Room Light", "Smart Light by Sample Manufacturer", ["LIGHT"], capabilities = cps).get_json()
-    payload['endpoints'].append(ep)
+    cps.append( pyASH.Capability('Alexa', version='3') )
+    cps.append( pyASH.Capability('Alexa.ThermostatController', pyASH.Properties_supported(['lowerSetpoint','targetSetpoint', 'upperSetpoint', 'thermostatMode'], True, True), '3') )
+    cps.append( pyASH.Capability('Alexa.TemperatureSensor', pyASH.Properties_supported('temperature', False, True), '3') )
+    ep = pyASH.Endpoint("appliance-002", "Sample Manufacturer", "Hallway Thermostat", "Smart Thermostat by Sample Manufacturer", ["THERMOSTAT"], cookie = {}, capabilities = cps)
+    endpoints.add(ep)
 
-    return DiscoverResponse(header, payload)
+    # Add appliance-003
+    cps = []
+    cps.append( pyASH.Capability('Alexa.LockController', pyASH.Properties_supported('lockState', True, True), '3') )
+    cps.append( pyASH.Capability('Alexa.EndpointHealth', pyASH.Properties_supported('connectivity', True, True), '3') )
+    ep = pyASH.Endpoint("appliance-003", "Sample Manufacturer", "Front Door", "Smart Lock by Sample Manufacturer", ["SMARTLOCK"], cookie = {}, capabilities = cps)
+    endpoints.add(ep)
 
-def EXAMPLESpeakerHandler(directive):
-    name = directive['directive']['header']['name']
-    endpoint_id = directive['directive']['endpoint']['endpointId']
-    correlationToken = directive['directive']['header']['correlationToken']
+    # Add appliance-004
+    cps = []
+    cps.append( pyASH.Capability('Alexa.SceneController', version='3', proactivelyReported=True, supportsDeactivation = False))
+    ep = pyASH.Endpoint("appliance-004", "Sample Manufacturer", "Goodnight", "Smart Scene by Sample Manufacturer", ["SCENE_TRIGGER"], cookie = {}, capabilities = cps)
+    endpoints.add(ep)
 
-    if name == 'SetVolume':
-        volume = directive['directive']['payload']['volume']
-        print ('Sending SetVolume[{0}] to device [{1}]'.format(volume,endpoint_id))
-    if name == 'AdjustVolume':
-        volume = directive['directive']['payload']['volume']
-        print ('Sending AdjustVolume[{0}] to device [{1}]'.format(volume,endpoint_id))
-    if name == 'SetMute':
-        mute = directive['directive']['payload']['mute']
-        print ('Sending SetMute[{0}] to device [{1}]'.format(mute,endpoint_id))
+    # Add appliance-005
+    cps = []
+    cps.append( pyASH.Capability('Alexa', version='3') )
+    cps.append( pyASH.Capability('Alexa.SceneController', version='3', proactivelyReported=True, supportsDeactivation = True))
+    cps.append( pyASH.Capability('Alexa.EndpointHealth', pyASH.Properties_supported('connectivity', True, True), '3') )
+    ep = pyASH.Endpoint("appliance-005", "Sample Manufacturer", "Watch TV", "Smart Activity by Sample Manufacturer", ["ACTIVITY_TRIGGER"], cookie = {}, capabilities = cps)
+    endpoints.add(ep)
 
-    # Lookup current state of endpoint_id
+    # Add appliance-006
+    cps = []
+    cscs = pyASH.CameraStreamConfigurations()
+    csc = pyASH.CameraStreamConfiguration('RTSP', [pyASH.Resolution(1920,1080),pyASH.Resolution(1280,720)], 'BASIC', ['H264','MPEG2'],'G711')
+    cscs.add(csc)
+    csc = pyASH.CameraStreamConfiguration('RTSP', [pyASH.Resolution(1920,1080),pyASH.Resolution(1280,720)], 'NONE', 'H264','AAC')
+    cscs.add(csc)
 
-    ts = get_utc_timestamp()
-    volume_property = SpeakerVolumeProperty(50, ts, 0)
-    mute_property = SpeakerMuteProperty(False, ts, 0)
+    cps.append( pyASH.Capability('Alexa', version='3') )
+    cps.append( pyASH.Capability('Alexa.CameraStreamController', cameraStreamConfigurations=cscs.value, version='3') )
+    cps.append( pyASH.Capability('Alexa.PowerController', pyASH.Properties_supported('powerState', True, True), '3') )
+    cps.append( pyASH.Capability('Alexa.EndpointHealth', pyASH.Properties_supported('connectivity', True, True), '3') )
+    ep = pyASH.Endpoint("appliance-006", "Sample Manufacturer", "Back Door Camera", "Smart Camera by Sample Manufacturer", ["CAMERA"], cookie = {}, capabilities = cps)
+    endpoints.add(ep)
 
-    context = Context()
-    context.add_property(volume_property)
-    context.add_property(mute_property)
+    return pyASH.Response(directive, endpoints)
 
-    header = Header('Alexa','Response', correlationToken = correlationToken )
-    endpoint = Endpoint(endpoint_id)
-    payload = Payload()
-    event = Event(header, endpoint, payload)
+def EXAMPLEreportstatehandler(directive):
+    d = pyASH.Directive(directive)
+    ts = pyASH.get_utc_timestamp()
+    properties = pyASH.Properties()
 
-    return NormalResponse(context, event)
+
+    ephp = pyASH.EndpointHealthProperty('OK', ts, 200)
+    properties.add(ephp)
+    tsp = pyASH.ThermostatTargetSetpointProperty(25, 'CELSIUS', ts, 200)
+    properties.add(tsp)
+    tmp = pyASH.ThermostatModeProperty('AUTO', '', ts, 200)
+    properties.add(tmp)
+    tp = pyASH.TemperatureProperty(20, 'CELSIUS', ts, 200)
+    properties.add(tp)
+
+
+    return pyASH.Response(directive, properties)
+
+def EXAMPLEgenerichandler(directive):
+
+    d = pyASH.Directive(directive)
+    ts = pyASH.get_utc_timestamp()
+    properties = pyASH.Properties()
+    if d.namespace == 'Alexa.BrightnessController':
+        property = pyASH.BrightnessProperty(42, ts, 1000)
+        properties.add(property)
+    elif d.namespace == 'Alexa.Speaker':
+        if d.name == 'SetVolume':
+            volume = d.payload['volume']
+            print ('Sending SetVolume[{0}] to device [{1}]'.format(volume,d.endpointId))
+        if d.name == 'AdjustVolume':
+            volume = d.payload['volume']
+            print ('Sending AdjustVolume[{0}] to device [{1}]'.format(volume,d.endpointId))
+        if d.name == 'SetMute':
+            mute = d.payload['mute']
+            print ('Sending SetMute[{0}] to device [{1}]'.format(mute,d.endpointId))
+        volume_property = pyASH.SpeakerVolumeProperty(50, ts, 0)
+        mute_property = pyASH.SpeakerMuteProperty(False, ts, 0)
+        properties.add(volume_property)
+        properties.add(mute_property)
+    elif d.namespace == 'Alexa.ChannelController':
+        property = pyASH.ChannelProperty(d.channel.number,d.channel.callSign,d.channel.affiliateCallSign,ts,0)
+        properties.add(property)
+    elif d.namespace == 'Alexa.PlaybackController':
+        pass
+
+    return pyASH.Response(directive, properties)
+
 
 if __name__ == u'__main__':
 
