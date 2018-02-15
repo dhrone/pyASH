@@ -202,6 +202,179 @@ class receiver_serial_controller():
 			else:
 				self.ser.write('P1M0\n')
 
+class receiver_serial_controller():
+	# Communicates with receiver over serial interface
+	# Updates receiver state variables when command received through input queue
+
+
+	def __init__(self, port, baud, projectordata={}, deviceShadowHandler=''):
+#		threading.Thread.__init__(self)
+
+#		self.daemon = True
+		self.deviceShadowHandler = deviceShadowHandler
+		self.projectordata = projectordata
+
+		self.ser = serial.Serial(port, baud, timeout=0.25)
+
+		# Maps from db to 0-10 volume scale
+		self.sources = {
+			'30':'HDMI1',
+			'A0':'HDMI2',
+			'41':'VIDEO',
+			'42':'S-VIDEO'
+		}
+
+		self.allowedcommands = {'source','power'}
+
+		# Send requests for status to receiver
+		self.ser.write('PWR?\n')
+
+		# Parse responses
+		self.readupdates()
+
+#	def run(self):
+#		logging.debug(u'Receiver monitor starting')
+
+#		while not exitapp[0]:
+#			self.readupdates()
+
+
+	def readupdates(self):
+		# Need to specifically detect when a message comes in that might be confused with a
+		# a command that needs to be monitored but is otherwise not interesting
+
+		instr = 'dummy'
+		while not instr == '':
+			instr = self.ser.readline().strip()
+			if instr[0:1] == ':':
+				instr = instr[1:]
+			if len(instr) > 0:
+				print 'readupdates: received ['+instr+']'
+
+			# Power for Zone 1 status
+			if instr[0:3] == 'PWR':
+				pwrstr = int(instr[3:])
+				if pwrstr > 0:
+					self.receiverdata['power'] = True
+					# On power-on, query for other status variables
+					self.ser.write('P1VM?\n')
+					self.ser.write('P1S?\n')
+
+					# System always starts with Mute off
+					self.receiverdata['mute'] = False
+				else:
+					self.receiverdata['power'] = False
+				print 'readupdates: updated power to ' + pwrstr
+				continue
+
+			# Volume for Zone 1 status
+			if instr[0:4] == 'P1VM':
+				volstr = instr[4:]
+				try:
+					rawvol = float(volstr)
+				except ValueError:
+					return
+
+				for i in range(len(self.volarray)):
+					if rawvol <= self.volarray[i]:
+						self.receiverdata['volume'] = i
+						break
+				else:
+					# volume greater than max array value
+					self.receiverdata['volume'] = len(volstr)
+
+				print 'readupdates: updated volume to ' + str(i)
+				continue
+
+			# Mute status
+			if instr[0:3] == 'P1M':
+				mutestr = instr[3:]
+				if mutestr == '1':
+					self.receiverdata['mute'] = True
+				else:
+					self.receiverdata['mute'] = False
+
+				print 'readupdates: updated mute to ' + mutestr
+				continue
+
+			# Current source status
+			if instr[0:3] == 'P1S':
+				srcstr = instr[3:]
+				try:
+					self.receiverdata['source'] = self.sources[srcstr]
+				except KeyError:
+					self.receiverdata['source'] = 'Unknown'
+
+				print 'readupdates: updated source to ' + srcstr
+
+
+	def sendupdate(self, command, value):
+		# Ignore bad commands
+
+		print 'sendupdate: received command ['+str(command)+'] value ['+str(value)+']'
+
+		if command.lower() not in self.allowedcommands:
+			logging.debug(u'sendupdate: received bad command '+command)
+			return
+
+		if command == 'volume':
+
+			# if value is not an int, end update
+			if type(value) != type(1):
+				logging.debug(u'sendupdate: volume update not an int.  Instead received '+str(type(value)))
+				return
+
+			# bounds correct value
+			value = 0 if value < 0 else value
+			value = len(self.volarray) if value > len(self.volarray) else value
+
+			self.ser.write('P1VM'+str(self.volarray[value])+'\n')
+
+		elif command == 'source':
+			print 'sendupdate: command == source'
+			if type(value) != type('a') and type(value) != type(u'a'):
+				logging.debug(u'sendupdate: source update not a string.  Instead received '+str(type(value)))
+				print 'sendupdate: source update not a string.  Instead received '+str(type(value))
+				return
+
+			for item in self.sources:
+				if value == self.sources[item]:
+					print 'sendupdate: sending '+'P1S'+item
+					self.ser.write('P1S'+item+'\n')
+					return
+			else:
+				logging.debug(u'sendupdate: source update with invalid source.  Received '+value)
+				print u'sendupdate: source update with invalid source.  Received '+value
+				return
+
+		elif command == 'power':
+
+			if type(value) != type(False):
+				logging.debug(u'sendupdate: power update not a boolean.  Instead received '+str(type(value)))
+				return
+
+			if value:
+				self.ser.write('P1P1\n')
+				# If power is coming on, make sure to cause the tracked variables to report their values
+				self.ser.write('P1VM?\n')
+				self.ser.write('P1S?\n')
+				# System always starts with Mute off
+				self.receiverdata['mute'] = False
+
+			else:
+				self.ser.write('P1P0\n')
+
+		elif command == 'mute':
+
+			if type(value) != type(False):
+				logging.debug(u'sendupdate: mute update not a boolean.  Instead received '+str(type(value)))
+				return
+
+			if value:
+				self.ser.write('P1M1\n')
+			else:
+				self.ser.write('P1M0\n')
+
 # Custom Shadow callback
 def customShadowCallback_Delta(payload, responseStatus, token):
 	# payload is a JSON string ready to be parsed using json.loads(...)
