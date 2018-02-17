@@ -24,7 +24,7 @@ class serial_controller(object):
     # Communicates with receiver over serial interface
     # Updates receiver state variables when command received through input queue
 
-    def __init__(self, port, baud, q_sc==None, cmdack = b'', cmdtimeout = 20):
+    def __init__(self, port, baud, q_sc=None, cmdack = b'', cmdtimeout = 20):
         self.serial_t = threading.Thread(target=self.run)
         self.serial_t.daemon = True
 
@@ -99,7 +99,7 @@ class serial_controller(object):
     def iot_to_serial(self, attribute, value):
         # Ignore bad commands
 
-        print 'Received IOT update ['+str(attribute)+'] value ['+str(value)+']'
+        print ('Received IOT update ['+str(attribute)+'] value ['+str(value)+']')
 
         if attribute not in self.iot_to_serial_db:
             logging.debug(u'{0} is not a valid IOT attribute for this device'.format(attribute))
@@ -165,7 +165,7 @@ class serial_controller(object):
     def serial_to_iot(self, data_from_serial):
 
         if len(data_from_serial) > 0:
-            print 'From serial, received ['+data_from_serial+']'
+            print ('From serial, received ['+data_from_serial+']')
 
         for item in self.serial_to_iot_db:
             (regex_match, regex_cmd, translate_function) = self.serial_to_iot_db[item]
@@ -344,12 +344,12 @@ def customShadowCallback_Delta(payload, responseStatus, token):
     print("++++++++DELTA++++++++++")
 #    print("property: " + str(payloadDict["state"]["property"]))
 #    print("version: " + str(payloadDict["version"])
-    print payloadDict
+    print (payloadDict)
     print("+++++++++++++++++++++++\n\n")
 
     update_needed = False
     for item in payloadDict['state']:
-        print 'customShadowCallback_Delta: processing item ' + str(item)
+        print ('customShadowCallback_Delta: processing item ' + str(item))
         if item not in rc.allowedcommands:
             # Ignore attributes that are not valid valid commands
             logging.debug(u'customShadowCallback_Delta: invalid command received in payload.  Value was '+str(item))
@@ -386,7 +386,7 @@ def customShadowCallback_Update(payload, responseStatus, token):
         print("~~~~~~~~~~~~~~UPDATE~~~~~~~~~~~~~~~")
 #        print("Update request with token: " + token + " accepted!")
 #        print("update: " + str(payloadDict["state"]["desired"]))
-        print payloadDict
+        print (payloadDict)
         print("~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~\n\n")
     if responseStatus == "rejected":
         print("Update request " + token + " rejected!")
