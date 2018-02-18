@@ -24,7 +24,7 @@ class serial_controller(object):
     # Communicates with receiver over serial interface
     # Updates receiver state variables when command received through input queue
 
-    def __init__(self, port, baud, q_sc=None, cmdack = b'', cmdtimeout = 20):
+    def __init__(self, port, baud, q_sc=None, cmdack = b'', cmdtimeout = 20, name = 'serial'):
         self.serial_t = threading.Thread(target=self.run)
         self.serial_t.daemon = True
 
@@ -32,6 +32,7 @@ class serial_controller(object):
         self.iot_to_serial_db = { } # Format { iotvariable: [serialcommand, i2s_func] }
         self.device_queries = { } # Format { iotvariable: querystring }
         self.port = port
+        self.name = name
         self.baud = baud
         self.cmdack = cmdack
         self.cmdtimeout = cmdtimeout
@@ -71,6 +72,8 @@ class serial_controller(object):
             res = self.serial_to_iot(instr)
             self.q_sc.put(res)
 
+        print('serial controller thread exiting...')
+
         self.close()
 
     def get_input(self, delimiter=b'\n', timeout=0):
@@ -106,7 +109,7 @@ class serial_controller(object):
             return None
 
         (serialcommand, i2s_func) = self.iot_to_serial_db[attribute]
-        buffer = serialcommand.format(value)
+        buffer = serialcommand.format(i2s_func(value))
         self.send_serial(buffer.encode(), self.cmdack, self.cmdtimeout)
 
     def send_serial(self, value, ack=b'', timeout=20):
@@ -146,7 +149,7 @@ class serial_controller(object):
             instr = self.send_serial(qval, self.cmdack, self.cmdtimeout).strip()
             if not self.listenerstarted:
                 res = self.serial_to_iot(instr)
-                return { value: res }
+                return res
             else:
                 return { }
 
@@ -159,7 +162,7 @@ class serial_controller(object):
                 instr = self.send_serial(qval, self.cmdack, self.cmdtimeout).strip()
                 if not self.listenerstarted:
                     res = self.serial_to_iot(instr)
-                    results[item] = res
+                    results = {**results, **res}
             return results
         else:
             logging.warn('{0} is not a valid query attribute for this device'.format(value))
@@ -168,7 +171,7 @@ class serial_controller(object):
     def serial_to_iot(self, data_from_serial):
 
         if len(data_from_serial) > 0:
-            print ('From serial, received [{0}]'.format(data_from_serial.decode()))
+            print ('From {0}, received [{1}]'.format(self.name, data_from_serial.decode()))
 
         results = { }
         for item in self.serial_to_iot_db:
@@ -210,7 +213,7 @@ class serial_controller(object):
 class AVM20_serial_controller(serial_controller):
 
     def __init__(self, port, baud, q_sc):
-        super(AVM20_serial_controller, self).__init__(port, baud, q_sc, cmdtimeout=5)
+        super(AVM20_serial_controller, self).__init__(port, baud, q_sc, cmdtimeout=5, name='AVM20')
 
         # Maps from db to 0-10 volume scale
         self.volarray = [-50, -35, -25, -21, -18, -12, -8, -4, 0, 5, 10 ]
@@ -295,7 +298,7 @@ class EPSON1080UB_serial_controller(serial_controller):
     # The Epson works purely on challenge response.  No need for multi-threading
 
     def __init__(self, port, baud):
-        super(EPSON1080UB_serial_controller, self).__init__(port, baud, q_sc=None, cmdack=b':', cmdtimeout=20)
+        super(EPSON1080UB_serial_controller, self).__init__(port, baud, q_sc=None, cmdack=b':', cmdtimeout=20,name='Epson')
 
         # Maps from db to 0-10 volume scale
         self.sources = {
@@ -435,16 +438,26 @@ if __name__ == u'__main__':
     start = time.time()
     print ('Querying Epson')
     res = epsSC.query()
+    db = {}
+    for item in res:
+        db[item] = res[item]
     print(json.dumps(res, indent=4))
 
     print ('Querying AVM20')
     avmSC.query()
-
-    db = {}
+    while True:
+        try:
+            res = q_avmSC.get_nowait()
+            q_avmSC.task_done()
+        except queue.Empty:
+            break 
+        for item in res:
+            db[item] = res[item]
+    time.sleep(2)
 
     while True:
-        inp = input('variable:value (exit to end; query:variable to get status) ')
-        qv = inp.split[':']
+        val = input('variable:value (exit to end; query:variable to get status)\n:')
+        qv = val.split(':')
         if qv[0].lower() == 'exit':
             break
         elif qv[0].lower() == 'query':
@@ -463,14 +476,22 @@ if __name__ == u'__main__':
                 db[item] = res[item]
         else:
             if len(qv) != 2:
-                print ('Command must be in the form of variable:value')
+                if qv[0] != '':
+                    print ('Command must be in the form of variable:value')
             res = {}
+
+            try:
+                if qv[1].lower() in ['true','false']:
+                    qv[1] = True if qv[1].lower() == 'true' else False
+            except:
+                pass
             if qv[0] in avm_attributes:
                 avmSC.iot_to_serial(qv[0], qv[1])
             elif qv[0] in eps_attributes:
                 res = epsSC.iot_to_serial(qv[0], qv[1])
             else:
-                print ('{0} is not a valid attribute'.format(qv[0]))
+                if qv[0] != '':
+                    print ('{0} is not a valid attribute'.format(qv[0]))
             for item in res:
                 db[item] = res[item]
             while True:
@@ -479,12 +500,13 @@ if __name__ == u'__main__':
                     q_avmSC.task_done()
                     for item in res:
                         db[item] = res[item]
-                except Queue.Empty:
+                except queue.Empty:
                     break
         print ('Current values are...\n')
         print (json.dumps(db,indent=4))
 
-    avmSC.close()
+    exitapp[0]=True
+    time.sleep(.5)
     epsSC.close()
 
 '''
