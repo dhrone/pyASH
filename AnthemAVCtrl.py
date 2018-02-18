@@ -69,8 +69,9 @@ class serial_controller(object):
 
         while not exitapp[0]:
             instr = self.get_input()
-            res = self.serial_to_iot(instr)
-            self.q_sc.put(res)
+            if instr:
+                res = self.serial_to_iot(instr)
+                self.q_sc.put(res)
 
         print('serial controller thread exiting...')
 
@@ -177,18 +178,21 @@ class serial_controller(object):
         for item in self.serial_to_iot_db:
 #            (regex_match, regex_cmd, translate_function) = self.serial_to_iot_db[item]
             rule = self.serial_to_iot_db[item]
+            print ('Item [{0}] type [{1}] rule [{2}]'.format(item, str(type(item)), str(rule)))
             regex_match = rule[0]
             if type(regex_match) == str:
                 regex_match = regex_match.encode()
+            print ('regex_match [{0}] data [{1}]'.format(regex_match, data_from_serial))
             m = re.match(regex_match, data_from_serial)
             if m:
                 if type(item) == tuple:
+                    print ('Tuple is [{0}]'.format(item))
                     if len(m.groups()) != len(item):
                         logging.warn('Mismatch between variables and group.  Variables are [{0}] and groups are [{1}]'.format(item, m.groups()))
                         break
                     for i in range(len(item)):
                         translate_function = rule[i+1]
-                        results[v[i]] = translate_function(m.groups()[i])
+                        results[item[i]] = translate_function(m.groups()[i])
                 else:
                     if len(m.groups()) != 1:
                         logging.warn('Mismatch between variables and group.  Variables are [{0}] and groups are [{1}]'.format(item, m.groups()))
@@ -248,7 +252,7 @@ class AVM20_serial_controller(serial_controller):
             'asource': ['P1S([0-9])', self.source_to_iot],
             'apower': ['P1P([0-1])', self.int_to_bool],
             'mute': ['P1M([0-1])', self.int_to_bool],
-            ('asource', 'volume', 'mute'): [b'P1(S[0-9])(V[+-][0-9]{2}[\\.][0-9])(M[0-1])(D[0-9])(E[0-9])', self.source_to_iot, self.volume_to_iot, self.int_to_bool ]
+            ('asource', 'volume', 'mute'): [b'P1(S[0-9])(V[+-][0-9]{2}[\\.][0-9])(M[0-1])D[0-9]E[0-9]', self.source_to_iot, self.volume_to_iot, self.int_to_bool ]
         } # Format { iotvariable: [regex_match, regex_cmd, s2i_func]}
 
         self.iot_to_serial_db = {
@@ -263,7 +267,7 @@ class AVM20_serial_controller(serial_controller):
             'asource': 'P1S?\n',
             'apower': 'P1P?\n',
             'mute': 'P1M?\n',
-            'system', 'P1?\n'
+            'system': 'P1?\n'
         }
 
         self.listen()
