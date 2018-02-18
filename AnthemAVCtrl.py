@@ -69,7 +69,7 @@ class serial_controller(object):
         while not exitapp[0]:
             instr = self.get_input()
             res = self.serial_to_iot(instr)
-            q_sc.put([item, res])
+            self.q_sc.put(res)
 
         self.close()
 
@@ -85,7 +85,7 @@ class serial_controller(object):
         buffer = b''
         if type(delimiter) == str:
             delimiter = delimiter.encode()
-            last_activity = time.time()
+        last_activity = time.time()
         while True:
             c = self.ser.read()
             if c:
@@ -115,6 +115,7 @@ class serial_controller(object):
         if type(value) == str:
             value = value.encode()
         self.ser.write(value)
+        print ('Sending [{0}]'.format(value))
         if ack:
             if ack == str:
                 ack = ack.encode()
@@ -123,8 +124,12 @@ class serial_controller(object):
             while True:
                 c = self.ser.read()
                 buffer += c
-                if (buffer == ack) or (time.time() - last_activity > timeout):
+                if buffer.find(ack)>=0:
+                    return buffer[:buffer.find(ack)]
+                elif time.time() - last_activity > timeout:
                     return buffer
+        else:
+            return b''
 
     def query(self, value=''):
         # This method queries the serial device to get its status
@@ -138,9 +143,8 @@ class serial_controller(object):
             qval = self.device_queries[value]
             if type(qval) == str:
                 qval = qval.encode()
-            self.send_serial(qval, self.cmdack, self.cmdtimeout)
+            instr = self.send_serial(qval, self.cmdack, self.cmdtimeout).strip()
             if not self.listenerstarted:
-                instr = self.get_input()
                 res = self.serial_to_iot(instr)
                 return { value: res }
             else:
@@ -152,9 +156,8 @@ class serial_controller(object):
                 qval = self.device_queries[item]
                 if type(qval) == str:
                     qval = qval.encode()
-                self.send_serial(qval, self.cmdack, self.cmdtimeout)
+                instr = self.send_serial(qval, self.cmdack, self.cmdtimeout).strip()
                 if not self.listenerstarted:
-                    instr = self.get_input()
                     res = self.serial_to_iot(instr)
                     results[item] = res
             return results
@@ -165,17 +168,24 @@ class serial_controller(object):
     def serial_to_iot(self, data_from_serial):
 
         if len(data_from_serial) > 0:
-            print ('From serial, received ['+data_from_serial+']')
+            print ('From serial, received [{0}]'.format(data_from_serial.decode()))
 
+        results = { }
         for item in self.serial_to_iot_db:
             (regex_match, regex_cmd, translate_function) = self.serial_to_iot_db[item]
+            if type(regex_match) == str:
+                regex_match = regex_match.encode()
+            if type(regex_cmd) == str:
+                regex_cmd = regex_cmd.encode()
             m = re.match(regex_match, data_from_serial)
             if m:
-                return translate_function(re.split(regex_cmd, data_from_serial)[1])  # Split command from variable and return translated variable
+                results[item] = translate_function(re.split(regex_cmd, data_from_serial)[1])  # Split command from variable and return translated variable
+                break
+        return results
 
     def int_to_bool(self, value):
         try:
-            res = bool(value)
+            res = bool(int(value))
         except:
             logging.warn('{0} type cannot be converted to a boolean value'.format(str(type(value))))
             res = False
@@ -218,22 +228,22 @@ class AVM20_serial_controller(serial_controller):
         }
         self.serial_to_iot_db = {
             'volume': ['P1VM[+-][0-9]{1,2}([\\.][0-9]{1,2})?', 'P1VM', self.volume_to_iot ],
-            'source': ['P1S[0-9]','P1S', self.source_to_iot],
-            'power': ['P1P[0-1]','P1P', self.int_to_bool],
+            'asource': ['P1S[0-9]','P1S', self.source_to_iot],
+            'apower': ['P1P[0-1]','P1P', self.int_to_bool],
             'mute': ['P1M[0-1]','P1M', self.int_to_bool]
         } # Format { iotvariable: [regex_match, regex_cmd, s2i_func]}
 
         self.iot_to_serial_db = {
             'volume': ['P1VM{0}\n', self.iot_to_volume],
-            'source': ['P1S{0}\n', self.iot_to_source],
-            'power': ['P1P{0}\n', self.bool_to_int],
+            'asource': ['P1S{0}\n', self.iot_to_source],
+            'apower': ['P1P{0}\n', self.bool_to_int],
             'mute': ['P1M{0}\n', self.bool_to_int]
         } # Format { iotvariable: [serialcommand, i2s_func] }
 
         self.device_queries = {
             'volume': 'P1VM?\n',
-            'source': 'P1S?\n',
-            'power': 'P1P?\n',
+            'asource': 'P1S?\n',
+            'apower': 'P1P?\n',
             'mute': 'P1M?\n'
         }
 
@@ -246,7 +256,7 @@ class AVM20_serial_controller(serial_controller):
             logging.warn('{0} is not a valid type for a preamp volume'.format(str(type(value))))
             rawvol = float(-50.0)
         for i in range(len(self.volarray)):
-            if value <= self.volarray[i]:
+            if rawvol <= self.volarray[i]:
                 return i
         else:
             # volume greater than max array value
@@ -296,18 +306,18 @@ class EPSON1080UB_serial_controller(serial_controller):
         }
 
         self.serial_to_iot_db = {
-            'source': ['P1S[0-9]','P1S', self.source_to_iot],
-            'power': ['P1P[0-1]','P1P', self.int_to_bool]
+            'esource': ['SOURCE=[a-zA-Z0-9]{2}','SOURCE=', self.source_to_iot],
+            'epower': ['PWR=[0-9]{2}','PWR=', self.int_to_bool]
         } # Format { iotvariable: [regex_match, regex_cmd, s2i_func]}
 
         self.iot_to_serial_db = {
-            'source': ['SOURCE {0}\r', self.iot_to_source],
-            'power': ['PWR {0}\r', self.bool_to_onoff],
+            'esource': ['SOURCE {0}\r', self.iot_to_source],
+            'epower': ['PWR {0}\r', self.bool_to_onoff],
         } # Format { iotvariable: [serialcommand, i2s_func] }
 
         self.device_queries = {
-            'source': 'SOURCE?\r',
-            'power': 'PWR?\r'
+            'esource': 'SOURCE?\r',
+            'epower': 'PWR?\r'
         }
 
     def source_to_iot(self, value):
@@ -419,14 +429,71 @@ if __name__ == u'__main__':
 
     duration = 60
 
+    avm_attributes = ['apower', 'asource', 'volume', 'mute' ]
+    eps_attributes = ['epower', 'esource']
+
     start = time.time()
+    print ('Querying Epson')
+    res = epsSC.query()
+    print(json.dumps(res, indent=4))
+
+    print ('Querying AVM20')
+    avmSC.query()
+
+    db = {}
+
+    while True:
+        inp = input('variable:value (exit to end; query:variable to get status) ')
+        qv = inp.split[':']
+        if qv[0].lower() == 'exit':
+            break
+        elif qv[0].lower() == 'query':
+            res = {}
+            if len(qv) == 1:
+                avmSC.query()
+                res = epsSC.query()
+            else:
+                if qv[1] in avm_attributes:
+                    avmSC.query(qv[1])
+                elif qv[1] in eps_attributes:
+                    res = epsSC.query(qv[1])
+                else:
+                    print('{0} is not a valid attribute'.format(qv[1]))
+            for item in res:
+                db[item] = res[item]
+        else:
+            if len(qv) != 2:
+                print ('Command must be in the form of variable:value')
+            res = {}
+            if qv[0] in avm_attributes:
+                avmSC.iot_to_serial(qv[0], qv[1])
+            elif qv[0] in eps_attributes:
+                res = epsSC.iot_to_serial(qv[0], qv[1])
+            else:
+                print ('{0} is not a valid attribute'.format(qv[0]))
+            for item in res:
+                db[item] = res[item]
+            while True:
+                try:
+                    res = q_avmSC.get_nowait()
+                    q_avmSC.task_done()
+                    for item in res:
+                        db[item] = res[item]
+                except Queue.Empty:
+                    break
+        print ('Current values are...\n')
+        print (json.dumps(db,indent=4))
+
+    avmSC.close()
+    epsSC.close()
+
+'''
     while start+60 > time.time():
-        eps_res = epsSC.query()
         avm_res = q_avmSC.get()
         q_avmSC.task_done()
-        print (json.dumps(eps_res,indent=4))
-        print (json.dumps(avm_res, indent=4))
-
+        if avm_res:
+            print (json.dumps(avm_res, indent=4))
+'''
 
 
 '''
