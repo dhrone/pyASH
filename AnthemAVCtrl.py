@@ -175,14 +175,28 @@ class serial_controller(object):
 
         results = { }
         for item in self.serial_to_iot_db:
-            (regex_match, regex_cmd, translate_function) = self.serial_to_iot_db[item]
+#            (regex_match, regex_cmd, translate_function) = self.serial_to_iot_db[item]
+            rule = self.serial_to_iot_db[item]
+            regex_match = rule[0]
             if type(regex_match) == str:
                 regex_match = regex_match.encode()
-            if type(regex_cmd) == str:
-                regex_cmd = regex_cmd.encode()
             m = re.match(regex_match, data_from_serial)
             if m:
-                results[item] = translate_function(re.split(regex_cmd, data_from_serial)[1])  # Split command from variable and return translated variable
+                if type(item) == tuple:
+                    if len(m.groups()) != len(item):
+                        logging.warn('Mismatch between variables and group.  Variables are [{0}] and groups are [{1}]'.format(item, m.groups()))
+                        break
+                    for i in range(len(item)):
+                        translate_function = rule[i+1]
+                        results[v[i]] = translate_function(m.groups()[i])
+                else:
+                    if len(m.groups()) != 1:
+                        logging.warn('Mismatch between variables and group.  Variables are [{0}] and groups are [{1}]'.format(item, m.groups()))
+                        break
+                    translate_function = rule[1]
+                    results[item] = translate_function(m.groups()[0])
+
+#                results[item] = translate_function(re.split(regex_cmd, data_from_serial)[1])  # Split command from variable and return translated variable
                 break
         return results
 
@@ -230,10 +244,11 @@ class AVM20_serial_controller(serial_controller):
             '9':'AUX'
         }
         self.serial_to_iot_db = {
-            'volume': ['P1VM[+-][0-9]{1,2}([\\.][0-9]{1,2})?', 'P1VM', self.volume_to_iot ],
-            'asource': ['P1S[0-9]','P1S', self.source_to_iot],
-            'apower': ['P1P[0-1]','P1P', self.int_to_bool],
-            'mute': ['P1M[0-1]','P1M', self.int_to_bool]
+            'volume': [b'P1VM([+-][0-9]{1,2}(?:[\\.][0-9]{1,2})?)', self.volume_to_iot ],
+            'asource': ['P1S([0-9])', self.source_to_iot],
+            'apower': ['P1P([0-1])', self.int_to_bool],
+            'mute': ['P1M([0-1])', self.int_to_bool],
+            ('asource', 'volume', 'mute'): [b'P1(S[0-9])(V[+-][0-9]{2}[\\.][0-9])(M[0-1])(D[0-9])(E[0-9])', self.source_to_iot, self.volume_to_iot, self.int_to_bool ]
         } # Format { iotvariable: [regex_match, regex_cmd, s2i_func]}
 
         self.iot_to_serial_db = {
@@ -247,7 +262,8 @@ class AVM20_serial_controller(serial_controller):
             'volume': 'P1VM?\n',
             'asource': 'P1S?\n',
             'apower': 'P1P?\n',
-            'mute': 'P1M?\n'
+            'mute': 'P1M?\n',
+            'system', 'P1?\n'
         }
 
         self.listen()
@@ -309,8 +325,8 @@ class EPSON1080UB_serial_controller(serial_controller):
         }
 
         self.serial_to_iot_db = {
-            'esource': ['SOURCE=[a-zA-Z0-9]{2}','SOURCE=', self.source_to_iot],
-            'epower': ['PWR=[0-9]{2}','PWR=', self.int_to_bool]
+            'esource': ['SOURCE=([a-zA-Z0-9]{2})', self.source_to_iot],
+            'epower': ['PWR=([0-9]{2})', self.int_to_bool]
         } # Format { iotvariable: [regex_match, regex_cmd, s2i_func]}
 
         self.iot_to_serial_db = {
@@ -450,7 +466,7 @@ if __name__ == u'__main__':
             res = q_avmSC.get_nowait()
             q_avmSC.task_done()
         except queue.Empty:
-            break 
+            break
         for item in res:
             db[item] = res[item]
     time.sleep(2)
