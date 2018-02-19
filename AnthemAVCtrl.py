@@ -33,6 +33,7 @@ class serial_controller(object):
         self.q_sc = q_sc
         self.listenerstarted = False
         self.ser = None
+        self.readlock = threading.Lock()
 
         self.logger = logging.getLogger(__name__)
         self.logger.setLevel(logging.INFO)
@@ -88,14 +89,18 @@ class serial_controller(object):
         if type(delimiter) == str:
             delimiter = delimiter.encode()
         last_activity = time.time()
+
+        self.readlock.acquire()
         while True:
             c = self.ser.read()
             if c:
                 last_activity = time.time()
             if c == delimiter:
+                self.readlock.release()
                 return buffer
             buffer += c
             if time.time() - last_activity > timeout:
+                self.readlock.release()
                 return buffer
 
     def iot_to_serial(self, attribute, value):
@@ -118,18 +123,21 @@ class serial_controller(object):
         if type(value) == str:
             value = value.encode()
         self.ser.write(value)
-        self.logger.info ('Sending [{0}]'.format(value))
+        self.logger.info ('From {0}, Sending  [{1}]'.format(self.name,value))
         if ack:
             if ack == str:
                 ack = ack.encode()
             last_activity = time.time()
             buffer = b''
+            self.readlock.acquire()
             while True:
                 c = self.ser.read()
                 buffer += c
                 if buffer.find(ack)>=0:
+                    self.readlock.release()
                     return buffer[:buffer.find(ack)]
                 elif time.time() - last_activity > timeout:
+                    self.readlock.release()
                     return buffer
         else:
             return b''
