@@ -97,7 +97,7 @@ class serial_controller(object):
     def iot_to_serial(self, attribute, value):
         # Ignore bad commands
 
-        print ('Received IOT update ['+str(attribute)+'] value ['+str(value)+']')
+        logging.info ('Received IOT update ['+str(attribute)+'] value ['+str(value)+']')
 
         if attribute not in self.iot_to_serial_db:
 #            logging.debug(u'{0} is not a valid IOT attribute for this device'.format(attribute))
@@ -114,7 +114,7 @@ class serial_controller(object):
         if type(value) == str:
             value = value.encode()
         self.ser.write(value)
-        print ('Sending [{0}]'.format(value))
+        logging.info ('Sending [{0}]'.format(value))
         if ack:
             if ack == str:
                 ack = ack.encode()
@@ -167,7 +167,7 @@ class serial_controller(object):
     def serial_to_iot(self, data_from_serial):
 
         if len(data_from_serial) > 0:
-            print ('From {0}, received [{1}]'.format(self.name, data_from_serial.decode()))
+            logging.info('From {0}, received [{1}]'.format(self.name, data_from_serial.decode()))
 
         results = { }
         for item in self.serial_to_iot_db:
@@ -365,7 +365,7 @@ def customShadowCallback_Delta(payload, responseStatus, token):
 
     update_needed = False
     for item in payloadDict['state']:
-        print ('Delta Message: processing item [{0}][{1}]'.format(item, payloadDict['state'][item]))
+        logging.info('Delta Message: processing item [{0}][{1}]'.format(item, payloadDict['state'][item]))
         try:
             if item in receiverdata:
                 if receiverdata[item] != payloadDict['state'][item]:
@@ -390,23 +390,23 @@ def customShadowCallback_Update(payload, responseStatus, token):
     # payload is a JSON string ready to be parsed using json.loads(...)
     # in both Py2.x and Py3.x
     if responseStatus == "timeout":
-        print("Update request " + token + " timed out!")
+        logging.warn("Update request " + token + " timed out!")
     if responseStatus == "accepted":
         payloadDict = json.loads(payload)
 #        print("Update request with token: " + token + " accepted!")
 #        print("update: " + str(payloadDict["state"]["desired"]))
-        print ('IOT device update with...')
-        print (payloadDict)
+        logging.info ('IOT device update with...')
+        logging.info (json.dumps(payloadDict, indent=4))
     if responseStatus == "rejected":
-        print("Update request " + token + " rejected!")
+        logging.warn("Update request " + token + " rejected!")
 
 def customShadowCallback_Delete(payload, responseStatus, token):
     if responseStatus == "timeout":
-        print("Delete request " + token + " time out!")
+        logging.warn("Delete request " + token + " time out!")
     if responseStatus == "accepted":
-        print("Delete request with token: " + token + " accepted!")
+        logging.info("Delete request with token: " + token + " accepted!")
     if responseStatus == "rejected":
-        print("Delete request " + token + " rejected!")
+        logging.warn("Delete request " + token + " rejected!")
 
 receiverdata = {
     'apower':False,
@@ -518,6 +518,8 @@ if __name__ == u'__main__':
 
             # If there are changes, update the AWS shadow
             if len(receiverdata_update) > 0:
+                for item in receiverdata_update:
+                    print ('Updating shadow [{0}][{1}]'.format(item, receiverdata_update[item]))
                 payload_dict = {'state':{'desired':{}}}
                 payload_dict['state']['desired'] = receiverdata_update
                 JSONPayload = json.dumps(payload_dict)
