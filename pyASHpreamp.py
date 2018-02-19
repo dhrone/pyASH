@@ -33,6 +33,7 @@ def lambda_handler(request, context):
     ci.register_callback(SpeakerHandler, 'Alexa.Speaker')
     ci.register_callback(PowerHandler, 'Alexa.PowerController')
     ci.register_callback(InputHandler, 'Alexa.InputController')
+    ci.register_callback(SceneHandler, 'Alexa.SceneController')
 
     try:
         d = pyASH.Directive(request)
@@ -46,6 +47,9 @@ def lambda_handler(request, context):
         logger.warn(errmsg)
         return pyASH.ErrorResponse('Alexa', 'INVALID_DIRECTIVE', errmsg).get_json()
 
+    logger.info('Received directive')
+    logger.info(json.dumps(request,indent=4))
+
     response = ci.process_directive(request).get_json()
     try:
         validate_message(request, response)
@@ -55,6 +59,9 @@ def lambda_handler(request, context):
     except  jsonschema.exceptions.SchemaError:
         logger.warn('lambda_handler: schema failed validation')
         raise
+
+    logger.info('Produced response')
+    logger.info(json.dumps(response,indent=4))
 
     return response
 
@@ -147,6 +154,11 @@ def DiscoverHandler(directive):
     cps.append( pyASH.Capability('Alexa.PowerController', pyASH.Properties_supported('powerState', False, True), '3') )
     cps.append( pyASH.Capability('Alexa.InputController', pyASH.Properties_supported('input', False, True), '3') )
     ep = pyASH.Endpoint("avmctrl_den", "Anthem", "Family Room Preamp", "AVM20 Preamp by Anthem", ["OTHER"], capabilities = cps)
+    endpoints.add(ep)
+    
+    cps = []
+    cps.append( pyASH.Capability('Alexa.SceneController', supportsDeactivation=True, proactivelyReported=False, version='3'))
+    ep = pyASH.Endpoint("avmctrl_den:watch", "Anthem", "Watch TV in Family Room", "A TV Scene connected by Anthem", ["ACTIVITY_TRIGGER"], capabilities=cps)
     endpoints.add(ep)
 
     return pyASH.Response(directive, endpoints)
@@ -252,6 +264,47 @@ def SpeakerHandler(directive):
 
     # Send report state back to Alexa
     return pyASH.Response(directive, properties)
+
+def SceneHandler(directive):
+    d = pyASH.Directive(directive)
+
+    endpointId = d.endpointId.split(':')[0]
+    sceneId = d.endpointId.split(':')[1]
+
+    # Get state of endpoint
+    jsonState = IOT_get_state(endpointId, 'us-west-2')
+    reported = jsonState['state']['reported']
+    desired_state = { }
+
+    powerState = reported['apower']
+    projectorState = reported['epower']
+
+    if d.name == "Activate":
+        desired_state['apower'] = True
+        desired_state['epower'] = True
+        desired_state['asource'] = 'SAT'
+        desired_state['esource'] = 'HDMI1'
+        desired_state['mute'] = False
+    elif d.name == 'Deactivate':
+        desired_state['apower'] = True
+        desired_state['asource'] = 'CD'
+        desired_state['epower'] = False
+    else:
+        errmsg = 'Received invalid directive for PowerController.  Value was '+d.name
+        logger.warn(errmsg)
+        return pyASH.ErrorResponse('Alexa', 'INVALID_DIRECTIVE', errmsg, correlationToken=d.correlationToken)
+
+
+    # Issue command to preamp
+    IOT_update_desired_state(desired_state, endpointId, 'us-west-2')
+    time.sleep(.25) # Wait a short time to allow preamp to change and reported state to be updated
+
+    # Get state of endpoint
+    jsonState = IOT_get_state(endpointId, 'us-west-2')
+    reported = jsonState['state']['reported']
+
+    # Send report state back to Alexa
+    return pyASH.Response(directive)
 
 def PowerHandler(directive):
     d = pyASH.Directive(directive)

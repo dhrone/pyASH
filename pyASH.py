@@ -69,7 +69,7 @@ VALID_DIRECTIVES = {
     'Alexa.PlaybackController': ['FastForward', 'Next', 'Pause', 'Play', 'Previous', 'Rewind', 'StartOver', 'Stop' ],
     'Alexa.PowerController': ['TurnOn', 'TurnOff'],
     'Alexa.PowerLevelController': ['SetPowerLevel', 'AdjustPowerLevel'],
-    'Alexa.SceneController': ['Activation', 'Deactivate'],
+    'Alexa.SceneController': ['Activate', 'Deactivate'],
     'Alexa.Speaker': ['SetVolume', 'AdjustVolume', 'SetMute'],
     'Alexa.SpeakerSpeaker': ['AdjustVolume', 'SetMute'],
     'Alexa.TemperatureSensor': [],
@@ -1036,20 +1036,20 @@ class ControllerInterface():
             raise TypeError('Callback function must be callable')
         if name is None:
             for n in VALID_DIRECTIVES[namespace]:
-                print ('Registering [{0}][{1}]'.format(namespace, n))
+#                print ('Registering [{0}][{1}]'.format(namespace, n))
                 self.callbacks[(namespace, n)]=func
         else:
-            print ('Registering [{0}][{1}]'.format(namespace, name))
+#            print ('Registering [{0}][{1}]'.format(namespace, name))
             self.callbacks[(namespace, name)]=func
 
 
     def process_directive(self, directive):
-		d = Directive(directive)
+        d = Directive(directive)
 
         if d.namespace not in VALID_VARIABLES:
             raise ValueError('{0} is not a valid namespace'.format(d.namespace))
 
-        if d.name not in VALID_DIRECTIVES[self.namespace]:
+        if d.name not in VALID_DIRECTIVES[d.namespace]:
             raise ValueError('{0} is not a valid directive for {1}'.format(d.name, d.namespace))
 
         if (d.namespace,d.name) not in self.callbacks:
@@ -1285,7 +1285,7 @@ class Properties_supported(ResponseAttribute):
             self.json['supported'].append(prop)
 
 class Capability(ResponseAttribute):
-    def __init__(self, interface, properties_supported='', version='1', supportedOperations=[], cameraStreamConfigurations=[], proactivelyReported='', supportsDeactivation=''):
+    def __init__(self, interface, properties_supported='', version='3', supportedOperations=[], cameraStreamConfigurations=[], proactivelyReported='', supportsDeactivation=''):
         super(Capability, self).__init__()
 
         if interface not in VALID_INTERFACES:
@@ -1405,7 +1405,7 @@ class Response(ResponseAttribute):
 
         elif d.namespace == 'Alexa' and d.name == 'ReportState':
             if not isinstance(response, Properties):
-                raise TypeError('ReportState responses requires an a Properties object.  Received a '+str(type(response)))
+                raise TypeError('ReportState responses requires a Properties object.  Received a '+str(type(response)))
             header = Header('Alexa', 'StateReport', payloadVersion=d.payloadVersion, correlationToken=d.correlationToken)
             self.json = {
                 'context': {
@@ -1423,6 +1423,32 @@ class Response(ResponseAttribute):
                 self.json['event']['endpoint']['scope'] = d.scope.value
             if d.cookie:
                 self.json['event']['endpoint']['cookie'] = d.cookie
+
+        # Respond to SceneController.  Need to determine whether affected devices need to be in context
+        elif d.namespace == 'Alexa.SceneController':
+            if d.name == 'Activate':
+                action = 'ActivationStarted'
+            else:
+                action = 'DeactivationStarted'
+            header = Header(d.namespace, action, payloadVersion = d.payloadVersion, correlationToken = d.correlationToken )
+            try:
+                tok = d.token
+            except:
+                tok = None
+            endpoint = Endpoint(d.endpointId, token=tok)
+            self.json = {
+                'context': {},
+                'event': {
+                    'header': header.get_json(),
+                    'endpoint': endpoint.get_json(),
+                    'payload': {
+                        'cause': {
+                            'type': 'VOICE_INTERACTION'
+                        },
+                        'timestamp': get_utc_timestamp()
+                    }
+                }
+            }
 
         # Standard Response.  List of namespaces handled in VALID_SIMPLEINTERFACES
         elif d.namespace in VALID_SIMPLEINTERFACES:
