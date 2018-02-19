@@ -11,53 +11,62 @@ import copy
 from datetime import datetime
 import re
 import queue
+from abc import ABC
 
 exitapp = [ False ]
 
-class serial_controller(object):
-    # Communicates with receiver over serial interface
-    # Updates receiver state variables when command received through input queue
 
-    def __init__(self, port, baud, q_sc=None, cmdack = b'', cmdtimeout = 20, name = 'serial'):
-        self.serial_t = threading.Thread(target=self.run)
-        self.serial_t.daemon = True
+class device_controller(ABC):
+    # Abstract class to interface a device to an IOT registry
+    #   Updates state variables when value received from device
+    #   Sends command to device based upon a change in state variables
 
-        self.serial_to_iot_db = { } # Format { iotvariable: [regex_match, regex_cmd, s2i_func]}
-        self.iot_to_serial_db = { } # Format { iotvariable: [serialcommand, i2s_func] }
+    def __init__(self, q_sc=None, cmdack = b'', cmdtimeout = 20, name = 'device'):
+        self.device_t = threading.Thread(target=self.run)
+        self.device_t.daemon = True
+
+        self.device_to_iot_db = { } # Format { iotvariable: [regex_match, regex_cmd, s2i_func]}
+        self.iot_to_device_db = { } # Format { iotvariable: [command, i2s_func] }
         self.device_queries = { } # Format { iotvariable: querystring }
-        self.port = port
         self.name = name
-        self.baud = baud
         self.cmdack = cmdack
         self.cmdtimeout = cmdtimeout
         self.q_sc = q_sc
         self.listenerstarted = False
-        self.ser = None
         self.readlock = threading.Lock()
 
-        self.logger = logging.getLogger(__name__)
+        self.logger = logging.getLogger(self.name)
         self.logger.setLevel(logging.INFO)
 
+
+    @abstractmethod
+    def open(self):
+        pass
+
+    @abstractmethod
+    def close(self):
+        pass
+
+    @abstractmethod
+    def get(self, delimiter=b'\n', timeout=0):
+        pass
+
+    @abstractmethod
+    def send(self, value, ack=b'', timeout=20):
+        pass
 
     def listen(self):
         if not self.q_sc:
             self.logger.critical('Cannot use listen without providing a queue')
             raise RuntimeError('Cannot use listen without providing a queue')
         if type(self.q_sc) != queue.Queue:
-            errmsg = 'Cannot use listen without a valie queue.  Type provided was {0}'.format(str(type(self.q_sc)))
+            errmsg = 'Cannot use listen without a valid queue.  Type provided was {0}'.format(str(type(self.q_sc)))
             self.logger.critical(errmsg)
             raise RuntimeError(errmsg)
 
         self.listenerstarted = True
         self.open()
-        self.serial_t.start()
-
-    def open(self):
-        if not self.ser:
-            self.ser = serial.Serial(self.port, self.baud, timeout=0.25)
-
-    def close(self):
-        self.ser.close()
+        self.device_t.start()
 
     def run(self):
         if not self.listenerstarted:
@@ -67,96 +76,30 @@ class serial_controller(object):
         self.logger.debug(u'{0} threaded monitor starting'.format(self.port))
 
         while not exitapp[0]:
-            instr = self.get_input()
+            instr = self.get()
             if instr:
-                res = self.serial_to_iot(instr)
+                res = self.device_to_iot(instr)
                 self.q_sc.put(res)
 
-        print('serial controller thread exiting...')
+        print('{0} controller thread exiting...'.format(self.name))
 
         self.close()
 
-    def get_input(self, delimiter=b'\n', timeout=0):
-        # Should return a single key value from the input
-
-        self.open()
-
-        if not timeout:
-            if self.cmdtimeout:
-                timeout = self.cmdtimeout
-
-        buffer = b''
-        if type(delimiter) == str:
-            delimiter = delimiter.encode()
-        last_activity = time.time()
-
-        self.readlock.acquire()
-        while True:
-            c = self.ser.read()
-            if c:
-                last_activity = time.time()
-            if c == delimiter:
-                self.readlock.release()
-                return buffer
-            buffer += c
-            if time.time() - last_activity > timeout:
-                self.readlock.release()
-                return buffer
-
-    def iot_to_serial(self, attribute, value):
-        # Ignore bad commands
-
-        self.logger.info ('Received IOT update ['+str(attribute)+'] value ['+str(value)+']')
-
-        if attribute not in self.iot_to_serial_db:
-#            logging.debug(u'{0} is not a valid IOT attribute for this device'.format(attribute))
-            # Ignore a bad value to make updating multiple serial controllers easier
-            return None
-
-        (serialcommand, i2s_func) = self.iot_to_serial_db[attribute]
-        buffer = serialcommand.format(i2s_func(value))
-        self.send_serial(buffer.encode(), self.cmdack, self.cmdtimeout)
-
-    def send_serial(self, value, ack=b'', timeout=20):
-        self.open()
-
-        if type(value) == str:
-            value = value.encode()
-        self.ser.write(value)
-        self.logger.info ('From {0}, Sending  [{1}]'.format(self.name,value))
-        if ack:
-            if ack == str:
-                ack = ack.encode()
-            last_activity = time.time()
-            buffer = b''
-            self.readlock.acquire()
-            while True:
-                c = self.ser.read()
-                buffer += c
-                if buffer.find(ack)>=0:
-                    self.readlock.release()
-                    return buffer[:buffer.find(ack)]
-                elif time.time() - last_activity > timeout:
-                    self.readlock.release()
-                    return buffer
-        else:
-            return b''
-
     def query(self, value=''):
-        # This method queries the serial device to get its status
+        # This method queries the device to get its status
         # If an IOT variable is specified, it's value will be specifically queried
         # Otherwise all possible IOT variables for this device will be queried
-        # Special Note: If this serial controller is listening (e.g. multithreaded),
-        #               no response will be returned.  This is because the response
+        # Special Note: If this controller is listening (e.g. multithreaded), no
+        #               response will be returned.  This is because the response
         #               will be handled in the controllers run method
 
         if value in self.device_queries:
             qval = self.device_queries[value]
             if type(qval) == str:
                 qval = qval.encode()
-            instr = self.send_serial(qval, self.cmdack, self.cmdtimeout).strip()
+            instr = self.send(qval, self.cmdack, self.cmdtimeout).strip()
             if not self.listenerstarted:
-                res = self.serial_to_iot(instr)
+                res = self.device_to_iot(instr)
                 return res
             else:
                 return { }
@@ -167,28 +110,38 @@ class serial_controller(object):
                 qval = self.device_queries[item]
                 if type(qval) == str:
                     qval = qval.encode()
-                instr = self.send_serial(qval, self.cmdack, self.cmdtimeout).strip()
+                instr = self.send(qval, self.cmdack, self.cmdtimeout).strip()
                 if not self.listenerstarted:
-                    res = self.serial_to_iot(instr)
+                    res = self.device_to_iot(instr)
                     results = {**results, **res}
             return results
         else:
             self.logger.warn('{0} is not a valid query attribute for this device'.format(value))
 
+    def iot_to_device(self, attribute, value):
+        self.logger.info ('Received IOT update ['+str(attribute)+'] value ['+str(value)+']')
 
-    def serial_to_iot(self, data_from_serial):
+        if attribute not in self.iot_to_device_db:
+#            logging.debug(u'{0} is not a valid IOT attribute for this device'.format(attribute))
+            # Ignore a bad value to make updating multiple controllers easier
+            return None
 
-        if len(data_from_serial) > 0:
-            self.logger.info('From {0}, received [{1}]'.format(self.name, data_from_serial.decode()))
+        (command, i2s_func) = self.iot_to_device_db[attribute]
+        buffer = command.format(i2s_func(value))
+        self.send(buffer.encode(), self.cmdack, self.cmdtimeout)
+
+    def device_to_iot(self, data_from_device):
+
+        if len(data_from_device) > 0:
+            self.logger.info('From {0}, received [{1}]'.format(self.name, data_from_device.decode()))
 
         results = { }
-        for item in self.serial_to_iot_db:
-#            (regex_match, regex_cmd, translate_function) = self.serial_to_iot_db[item]
-            rule = self.serial_to_iot_db[item]
+        for item in self.device_to_iot_db:
+            rule = self.device_to_iot_db[item]
             regex_match = rule[0]
             if type(regex_match) == str:
                 regex_match = regex_match.encode()
-            m = re.match(regex_match, data_from_serial)
+            m = re.match(regex_match, data_from_device)
             if m:
                 if type(item) == tuple:
                     if len(m.groups()) != len(item):
@@ -203,8 +156,6 @@ class serial_controller(object):
                         break
                     translate_function = rule[1]
                     results[item] = translate_function(m.groups()[0])
-
-#                results[item] = translate_function(re.split(regex_cmd, data_from_serial)[1])  # Split command from variable and return translated variable
                 break
         return results
 
@@ -232,6 +183,78 @@ class serial_controller(object):
             res = 'OFF'
         return res
 
+
+class serial_controller(device_controller):
+    # Communicates with receiver over serial interface
+    # Updates receiver state variables when command received through input queue
+
+    def __init__(self, port, baud, q_sc=None, cmdack = b'', cmdtimeout = 20, name = 'serial'):
+        super(serial_controller, self).__init__(q_sc, cmdack, cmdtimeout, name)
+        self.port = port
+        self.name = name
+        self.baud = baud
+        self.ser = None
+
+    def open(self):
+        if not self.ser:
+            self.ser = serial.Serial(self.port, self.baud, timeout=0.25)
+
+    def close(self):
+        self.ser.close()
+
+    def get(self, delimiter=b'\n', timeout=0):
+        # Should return a single key value from the input
+
+        self.open()
+
+        if not timeout:
+            if self.cmdtimeout:
+                timeout = self.cmdtimeout
+
+        buffer = b''
+        if type(delimiter) == str:
+            delimiter = delimiter.encode()
+        last_activity = time.time()
+
+        self.readlock.acquire()
+        while True:
+            c = self.ser.read()
+            if c:
+                last_activity = time.time()
+            if c == delimiter:
+                self.readlock.release()
+                return buffer
+            buffer += c
+            if time.time() - last_activity > timeout:
+                self.readlock.release()
+                return buffer
+
+    def send(self, value, ack=b'', timeout=20):
+        self.open()
+
+        if type(value) == str:
+            value = value.encode()
+        self.ser.write(value)
+        self.logger.info ('From {0}, Sending  [{1}]'.format(self.name,value))
+        if ack:
+            if ack == str:
+                ack = ack.encode()
+            last_activity = time.time()
+            buffer = b''
+            self.readlock.acquire()
+            while True:
+                c = self.ser.read()
+                buffer += c
+                if buffer.find(ack)>=0:
+                    self.readlock.release()
+                    return buffer[:buffer.find(ack)]
+                elif time.time() - last_activity > timeout:
+                    self.readlock.release()
+                    return buffer
+        else:
+            return b''
+
+
 class AVM20_serial_controller(serial_controller):
 
     def __init__(self, port, baud, q_sc):
@@ -251,7 +274,7 @@ class AVM20_serial_controller(serial_controller):
             '8':'VCR',
             '9':'AUX'
         }
-        self.serial_to_iot_db = {
+        self.device_to_iot_db = {
             'volume': [b'^P1VM([+-][0-9]{1,2}(?:[\\.][0-9]{1,2})?)$', self.volume_to_iot ],
             'asource': ['^P1S([0-9])$', self.source_to_iot],
             'apower': ['^P1P([0-1])$', self.int_to_bool],
@@ -259,18 +282,15 @@ class AVM20_serial_controller(serial_controller):
             ('asource', 'volume', 'mute'): [b'^P1S([0-9])V([+-][0-9]{2}[\\.][0-9])M([0-1])D[0-9]E[0-9]$', self.source_to_iot, self.volume_to_iot, self.int_to_bool ]
         } # Format { iotvariable: [regex_match, regex_cmd, s2i_func]}
 
-        self.iot_to_serial_db = {
+        self.iot_to_device_db = {
             'volume': ['P1VM{0}\n', self.iot_to_volume],
             'asource': ['P1S{0}\n', self.iot_to_source],
             'apower': ['P1P{0}\n', self.bool_to_int],
             'mute': ['P1M{0}\n', self.bool_to_int]
-        } # Format { iotvariable: [serialcommand, i2s_func] }
+        } # Format { iotvariable: [command, i2s_func] }
 
         self.device_queries = {
-            'volume': 'P1VM?\n',
-            'asource': 'P1S?\n',
             'apower': 'P1P?\n',
-            'mute': 'P1M?\n',
             'system': 'P1?\n'
         }
 
@@ -322,7 +342,7 @@ class EPSON1080UB_serial_controller(serial_controller):
     # The Epson works purely on challenge response.  No need for multi-threading
 
     def __init__(self, port, baud):
-        super(EPSON1080UB_serial_controller, self).__init__(port, baud, q_sc=None, cmdack=b':', cmdtimeout=20,name='Epson')
+        super(EPSON1080UB_serial_controller, self).__init__(port, baud, q_sc=None, cmdack=b':', cmdtimeout=20,name='Epson1080UB')
 
         # Maps from db to 0-10 volume scale
         self.sources = {
@@ -332,15 +352,15 @@ class EPSON1080UB_serial_controller(serial_controller):
             '42':'S-VIDEO'
         }
 
-        self.serial_to_iot_db = {
+        self.device_to_iot_db = {
             'esource': ['^SOURCE=([a-zA-Z0-9]{2})$', self.source_to_iot],
             'epower': ['^PWR=([0-9]{2})$', self.int_to_bool]
         } # Format { iotvariable: [regex_match, regex_cmd, s2i_func]}
 
-        self.iot_to_serial_db = {
+        self.iot_to_device_db = {
             'esource': ['SOURCE {0}\r', self.iot_to_source],
             'epower': ['PWR {0}\r', self.bool_to_onoff],
-        } # Format { iotvariable: [serialcommand, i2s_func] }
+        } # Format { iotvariable: [devicecommand, i2s_func] }
 
         self.device_queries = {
             'esource': 'SOURCE?\r',
@@ -369,7 +389,7 @@ class EPSON1080UB_serial_controller(serial_controller):
 def customShadowCallback_Delta(payload, responseStatus, token):
     payloadDict = json.loads(payload)
 
-    # Get global reference to receiver serial controller, state data and ShadowHandler
+    # Get global reference to receiver device controllers, state data and ShadowHandler
     global avmSC
     global epsSC
     global receiverdata
@@ -383,14 +403,14 @@ def customShadowCallback_Delta(payload, responseStatus, token):
             if item in receiverdata:
                 if receiverdata[item] != payloadDict['state'][item]:
                     # Need to update receiver
-                    avmSC.iot_to_serial(item, payloadDict['state'][item])
-                    epsSC.iot_to_serial(item, payloadDict['state'][item])
+                    avmSC.iot_to_device(item, payloadDict['state'][item])
+                    epsSC.iot_to_device(item, payloadDict['state'][item])
 #                    rc.sendupdate(item,payloadDict['state'][item])
                     receiverdata_shadow[item] = receiverdata[item]
                     update_needed = True
             else:
-                avmSC.iot_to_serial(item, payloadDict['state'][item])
-                epsSC.iot_to_serial(item, payloadDict['state'][item])
+                avmSC.iot_to_device(item, payloadDict['state'][item])
+                epsSC.iot_to_device(item, payloadDict['state'][item])
 #                rc.sendupdate(item,payloadDict['state'][item])
                 receiverdata[item] = payloadDict['state'][item]
                 receiverdata_shadow[item] = receiverdata[item]
@@ -541,8 +561,8 @@ if __name__ == u'__main__':
 
             # Make sure that preamp defaults to on and source:CD to enable echo to speak
             if receiverdata['apower']==False:
-                avmSC.iot_to_serial('apower',True)
-                avmSC.iot_to_serial('asource', 'CD')
+                avmSC.iot_to_device('apower',True)
+                avmSC.iot_to_device('asource', 'CD')
 #                rc.ser.write('P1P1;P1S0\n')
 #                receiverdata['mute']=False
                 time.sleep(0.1)

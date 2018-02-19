@@ -153,12 +153,12 @@ def DiscoverHandler(directive):
     cps.append( pyASH.Capability('Alexa.Speaker', pyASH.Properties_supported('muted', False, True), '3') )
     cps.append( pyASH.Capability('Alexa.PowerController', pyASH.Properties_supported('powerState', False, True), '3') )
     cps.append( pyASH.Capability('Alexa.InputController', pyASH.Properties_supported('input', False, True), '3') )
-    ep = pyASH.Endpoint("avmctrl_den", "Anthem", "Family Room Preamp", "AVM20 Preamp by Anthem", ["OTHER"], capabilities = cps)
+    ep = pyASH.Endpoint("avmctrl_den", "pyASH", "Sound", "Sound by pyASH", ["OTHER"], capabilities = cps)
     endpoints.add(ep)
-    
+
     cps = []
     cps.append( pyASH.Capability('Alexa.SceneController', supportsDeactivation=True, proactivelyReported=False, version='3'))
-    ep = pyASH.Endpoint("avmctrl_den:watch", "Anthem", "Watch TV in Family Room", "A TV Scene connected by Anthem", ["ACTIVITY_TRIGGER"], capabilities=cps)
+    ep = pyASH.Endpoint("avmctrl_den:watch", "pyASH", "TV", "TV Scene connected by pyASH", ["ACTIVITY_TRIGGER"], capabilities=cps)
     endpoints.add(ep)
 
     return pyASH.Response(directive, endpoints)
@@ -375,14 +375,7 @@ def InputHandler(directive):
 
     desired_state = { }
     if reported_input != requested_input:
-
-        # If the input is TV, turn on the projector.  Otherwise turn it off.
-        if requested_input == 'TV':
-            desired_state['asource'] = 'SAT'
-            desired_state['epower'] = True
-        else:
-            desired_state['asource'] = requested_input
-            desired_state['epower'] = False
+        desired_state['asource'] = requested_input
 
         # Issue command to preamp
         IOT_update_desired_state(desired_state, d.endpointId, 'us-west-2')
