@@ -34,13 +34,17 @@ class serial_controller(object):
         self.listenerstarted = False
         self.ser = None
 
+        self.logger = logging.getLogger(__name__)
+        self.logger.setLevel(logging.INFO)
+
+
     def listen(self):
         if not self.q_sc:
-            logging.critical('Cannot use listen without providing a queue')
+            self.logger.critical('Cannot use listen without providing a queue')
             raise RuntimeError('Cannot use listen without providing a queue')
         if type(self.q_sc) != queue.Queue:
             errmsg = 'Cannot use listen without a valie queue.  Type provided was {0}'.format(str(type(self.q_sc)))
-            logging.critical(errmsg)
+            self.logger.critical(errmsg)
             raise RuntimeError(errmsg)
 
         self.listenerstarted = True
@@ -56,10 +60,10 @@ class serial_controller(object):
 
     def run(self):
         if not self.listenerstarted:
-            logging.warn('Run can only be started by the listen method.  It is intended to be used only within a separate thread')
+            self.logger.warn('Run can only be started by the listen method.  It is intended to be used only within a separate thread')
             return
 
-        logging.debug(u'{0} threaded monitor starting'.format(self.port))
+        self.logger.debug(u'{0} threaded monitor starting'.format(self.port))
 
         while not exitapp[0]:
             instr = self.get_input()
@@ -97,7 +101,7 @@ class serial_controller(object):
     def iot_to_serial(self, attribute, value):
         # Ignore bad commands
 
-        logging.info ('Received IOT update ['+str(attribute)+'] value ['+str(value)+']')
+        self.logger.info ('Received IOT update ['+str(attribute)+'] value ['+str(value)+']')
 
         if attribute not in self.iot_to_serial_db:
 #            logging.debug(u'{0} is not a valid IOT attribute for this device'.format(attribute))
@@ -114,7 +118,7 @@ class serial_controller(object):
         if type(value) == str:
             value = value.encode()
         self.ser.write(value)
-        logging.info ('Sending [{0}]'.format(value))
+        self.logger.info ('Sending [{0}]'.format(value))
         if ack:
             if ack == str:
                 ack = ack.encode()
@@ -161,13 +165,13 @@ class serial_controller(object):
                     results = {**results, **res}
             return results
         else:
-            logging.warn('{0} is not a valid query attribute for this device'.format(value))
+            self.logger.warn('{0} is not a valid query attribute for this device'.format(value))
 
 
     def serial_to_iot(self, data_from_serial):
 
         if len(data_from_serial) > 0:
-            logging.info('From {0}, received [{1}]'.format(self.name, data_from_serial.decode()))
+            self.logger.info('From {0}, received [{1}]'.format(self.name, data_from_serial.decode()))
 
         results = { }
         for item in self.serial_to_iot_db:
@@ -180,14 +184,14 @@ class serial_controller(object):
             if m:
                 if type(item) == tuple:
                     if len(m.groups()) != len(item):
-                        logging.warn('Mismatch between variables and group.  Variables are [{0}] and groups are [{1}]'.format(item, m.groups()))
+                        self.logger.warn('Mismatch between variables and group.  Variables are [{0}] and groups are [{1}]'.format(item, m.groups()))
                         break
                     for i in range(len(item)):
                         translate_function = rule[i+1]
                         results[item[i]] = translate_function(m.groups()[i])
                 else:
                     if len(m.groups()) != 1:
-                        logging.warn('Mismatch between variables and group.  Variables are [{0}] and groups are [{1}]'.format(item, m.groups()))
+                        self.logger.warn('Mismatch between variables and group.  Variables are [{0}] and groups are [{1}]'.format(item, m.groups()))
                         break
                     translate_function = rule[1]
                     results[item] = translate_function(m.groups()[0])
@@ -200,7 +204,7 @@ class serial_controller(object):
         try:
             res = bool(int(value))
         except:
-            logging.warn('{0} type cannot be converted to a boolean value'.format(str(type(value))))
+            self.logger.warn('{0} type cannot be converted to a boolean value'.format(str(type(value))))
             res = False
         return res
 
@@ -208,7 +212,7 @@ class serial_controller(object):
         try:
             res = int(value)
         except:
-            logging.warn('{0} type cannot be converted to an integer value'.format(str(type(value))))
+            self.logger.warn('{0} type cannot be converted to an integer value'.format(str(type(value))))
             res = False
         return res
 
@@ -216,7 +220,7 @@ class serial_controller(object):
         try:
             res = 'ON' if int(value) > 0 else 'OFF'
         except:
-            logging.warn('{0} type cannot be converted to an integer value'.format(str(type(value))))
+            self.logger.warn('{0} type cannot be converted to an integer value'.format(str(type(value))))
             res = 'OFF'
         return res
 
@@ -268,7 +272,7 @@ class AVM20_serial_controller(serial_controller):
         try:
             rawvol = float(value)
         except:
-            logging.warn('{0} is not a valid type for a preamp volume'.format(str(type(value))))
+            self.logger.warn('{0} is not a valid type for a preamp volume'.format(str(type(value))))
             rawvol = float(-50.0)
         for i in range(len(self.volarray)):
             if rawvol <= self.volarray[i]:
@@ -281,10 +285,10 @@ class AVM20_serial_controller(serial_controller):
         try:
             value = int(value)
         except:
-            logging.warn('IOT volume must be numeric.  Recieved type {0}'.format(str(type(value))))
+            self.logger.warn('IOT volume must be numeric.  Recieved type {0}'.format(str(type(value))))
             value = 0
         if value < 0 or value > 10:
-            logging.warn('IOT volume must be between 0 and 10.  Received {0}'.format(value))
+            self.logger.warn('IOT volume must be between 0 and 10.  Received {0}'.format(value))
         return self.volarray[value]
 
     def source_to_iot(self, value):
@@ -293,7 +297,7 @@ class AVM20_serial_controller(serial_controller):
         try:
             source = self.sources[value]
         except:
-            logging.warn('{0} is not a valid source value'.format(value))
+            self.logger.warn('{0} is not a valid source value'.format(value))
             source = 'Unknown'
         return source
 
@@ -302,7 +306,7 @@ class AVM20_serial_controller(serial_controller):
             if self.sources[k] == value:
                 return k
         else:
-            logging.warn('{0} is not a valid IOT source'.format(value))
+            self.logger.warn('{0} is not a valid IOT source'.format(value))
             return '0'
 
 class EPSON1080UB_serial_controller(serial_controller):
@@ -341,7 +345,7 @@ class EPSON1080UB_serial_controller(serial_controller):
         try:
             source = self.sources[value]
         except:
-            logging.warn('{0} is not a valid source value'.format(value))
+            self.logger.warn('{0} is not a valid source value'.format(value))
             source = 'Unknown'
         return source
 
@@ -350,7 +354,7 @@ class EPSON1080UB_serial_controller(serial_controller):
             if self.sources[k] == value:
                 return k
         else:
-            logging.warn('{0} is not a valid IOT source'.format(value))
+            self.logger.warn('{0} is not a valid IOT source'.format(value))
             return '00'
 
 # Custom Shadow callback
@@ -362,10 +366,11 @@ def customShadowCallback_Delta(payload, responseStatus, token):
     global epsSC
     global receiverdata
     global receiverdata_shadow
+    global logger
 
     update_needed = False
     for item in payloadDict['state']:
-        logging.info('Delta Message: processing item [{0}][{1}]'.format(item, payloadDict['state'][item]))
+        logger.info('Delta Message: processing item [{0}][{1}]'.format(item, payloadDict['state'][item]))
         try:
             if item in receiverdata:
                 if receiverdata[item] != payloadDict['state'][item]:
@@ -384,7 +389,7 @@ def customShadowCallback_Delta(payload, responseStatus, token):
                 update_needed = True
 
         except KeyError:
-            logging.debug(u'Received unexpected attribute in delta message.  Item was '+item)
+            logger.debug(u'Received unexpected attribute in delta message.  Item was '+item)
 
 def customShadowCallback_Update(payload, responseStatus, token):
     # payload is a JSON string ready to be parsed using json.loads(...)
@@ -418,8 +423,6 @@ receiverdata = {
 }
 
 if __name__ == u'__main__':
-
-
 
     # Read in command-line parameters
     parser = argparse.ArgumentParser()
