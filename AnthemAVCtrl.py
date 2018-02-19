@@ -365,7 +365,7 @@ def customShadowCallback_Delta(payload, responseStatus, token):
 
     update_needed = False
     for item in payloadDict['state']:
-        print ('Delta Message: processing item [{0}] [{1}]'.format(item, payloadDict['state'][item]))
+        print ('Delta Message: processing item [{0}][{1}]'.format(item, payloadDict['state'][item]))
         try:
             if item in receiverdata:
                 if receiverdata[item] != payloadDict['state'][item]:
@@ -393,11 +393,10 @@ def customShadowCallback_Update(payload, responseStatus, token):
         print("Update request " + token + " timed out!")
     if responseStatus == "accepted":
         payloadDict = json.loads(payload)
-        print("~~~~~~~~~~~~~~UPDATE~~~~~~~~~~~~~~~")
 #        print("Update request with token: " + token + " accepted!")
 #        print("update: " + str(payloadDict["state"]["desired"]))
+        print ('IOT device update with...')
         print (payloadDict)
-        print("~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~\n\n")
     if responseStatus == "rejected":
         print("Update request " + token + " rejected!")
 
@@ -405,9 +404,7 @@ def customShadowCallback_Delete(payload, responseStatus, token):
     if responseStatus == "timeout":
         print("Delete request " + token + " time out!")
     if responseStatus == "accepted":
-        print("~~~~~~~~~~~~~~~~~~~~~~~")
         print("Delete request with token: " + token + " accepted!")
-        print("~~~~~~~~~~~~~~~~~~~~~~~\n\n")
     if responseStatus == "rejected":
         print("Delete request " + token + " rejected!")
 
@@ -448,7 +445,7 @@ if __name__ == u'__main__':
 
     # Configure logging
     logger = logging.getLogger("AWSIoTPythonSDK.core")
-    logger.setLevel(logging.INFO)
+    logger.setLevel(logging.WARNING)
     streamHandler = logging.StreamHandler()
     formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
     streamHandler.setFormatter(formatter)
@@ -485,6 +482,7 @@ if __name__ == u'__main__':
     receiverdata_shadow = copy.deepcopy(receiverdata)
 
     firstpass = True
+    epson_update_timer = 0
     try:
         while True:
             time.sleep(.5)
@@ -499,6 +497,14 @@ if __name__ == u'__main__':
                 except:
                     break
 
+
+            # Poll Epson status every 5 seconds
+            if time.time() > epson_update_timer:
+                res = epsSC.query()
+                for item in res:
+                    receiverdata[item] = res[item]
+                epson_update_timer = time.time() + 5
+
             if not firstpass:
                 # Check to see if anything has changed
                 receiverdata_update = { }
@@ -508,10 +514,6 @@ if __name__ == u'__main__':
                         receiverdata_shadow[item] = receiverdata[item]
             else:
                 firstpass = False
-                # Get Epson status
-                res = epsSC.query()
-                for item in res:
-                    receiverdata[item] = res[item]
                 receiverdata_update = copy.deepcopy(receiverdata)
 
             # If there are changes, update the AWS shadow
