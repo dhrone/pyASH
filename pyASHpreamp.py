@@ -166,12 +166,11 @@ def ReportStateHandler(directive):
     p = pyASH.SpeakerMuteProperty(reported['mute'], ts, 0)
     properties.add(p)
 
-    p = pyASH.PowerStateProperty(reported['power'],ts,0)
+    p = pyASH.PowerStateProperty(reported['apower'],ts,0)
     properties.add(p)
 
-    p = pyASH.InputProperty(reported['source'],ts,0)
+    p = pyASH.InputProperty(reported['asource'],ts,0)
     properties.add(p)
-
     return pyASH.Response(directive, properties)
 
 def SpeakerHandler(directive):
@@ -261,7 +260,7 @@ def PowerHandler(directive):
     jsonState = IOT_get_state(d.endpointId, 'us-west-2')
     reported = jsonState['state']['reported']
 
-    powerState = reported['power']
+    powerState = reported['apower']
 
 
     if d.name == "TurnOn":
@@ -276,7 +275,7 @@ def PowerHandler(directive):
 
     desired_state = { }
     if powerState != requestedPowerState:
-        desired_state['power'] = requestedPowerState
+        desired_state['apower'] = requestedPowerState
 
         # Issue command to preamp
         IOT_update_desired_state(desired_state, d.endpointId, 'us-west-2')
@@ -288,7 +287,7 @@ def PowerHandler(directive):
 
     ts = pyASH.get_utc_timestamp()
     properties = pyASH.Properties()
-    p = pyASH.PowerStateProperty(reported['power'],ts,0)
+    p = pyASH.PowerStateProperty(reported['apower'],ts,0)
     properties.add(p)
 
     # Send report state back to Alexa
@@ -301,7 +300,7 @@ def InputHandler(directive):
     jsonState = IOT_get_state(d.endpointId, 'us-west-2')
     reported = jsonState['state']['reported']
 
-    reported_input = reported['source']
+    reported_input = reported['asource']
 
 
     if d.name == "SelectInput":
@@ -323,7 +322,14 @@ def InputHandler(directive):
 
     desired_state = { }
     if reported_input != requested_input:
-        desired_state['source'] = requested_input
+
+        # If the input is TV, turn on the projector.  Otherwise turn it off.
+        if requested_input == 'TV':
+            desired_state['asource'] = 'SAT'
+            desired_state['epower'] = True
+        else:
+            desired_state['asource'] = requested_input
+            desired_state['epower'] = False
 
         # Issue command to preamp
         IOT_update_desired_state(desired_state, d.endpointId, 'us-west-2')
@@ -335,7 +341,7 @@ def InputHandler(directive):
 
     ts = pyASH.get_utc_timestamp()
     properties = pyASH.Properties()
-    p = pyASH.InputProperty(reported['source'],ts,0)
+    p = pyASH.InputProperty(reported['asource'],ts,0)
     properties.add(p)
 
     # Send report state back to Alexa

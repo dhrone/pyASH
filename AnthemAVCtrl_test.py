@@ -14,6 +14,12 @@ import queue
 
 exitapp = [ False ]
 
+
+# P1VM+12.34 'P1VM[+-]?[0-9]{1,2}([\\.][0-9]{1,2})?'
+
+# iotk, iotv, device_cmd, translate_function
+# 'power', True, 'P1P', vars(__builtins__)['int']
+
 class serial_controller(object):
     # Communicates with receiver over serial interface
     # Updates receiver state variables when command received through input queue
@@ -100,8 +106,7 @@ class serial_controller(object):
         print ('Received IOT update ['+str(attribute)+'] value ['+str(value)+']')
 
         if attribute not in self.iot_to_serial_db:
-#            logging.debug(u'{0} is not a valid IOT attribute for this device'.format(attribute))
-            # Ignore a bad value to make updating multiple serial controllers easier
+            logging.debug(u'{0} is not a valid IOT attribute for this device'.format(attribute))
             return None
 
         (serialcommand, i2s_func) = self.iot_to_serial_db[attribute]
@@ -355,42 +360,57 @@ class EPSON1080UB_serial_controller(serial_controller):
 
 # Custom Shadow callback
 def customShadowCallback_Delta(payload, responseStatus, token):
+    # payload is a JSON string ready to be parsed using json.loads(...)
+    # in both Py2.x and Py3.x
+#    print(responseStatus)
     payloadDict = json.loads(payload)
 
     # Get global reference to receiver serial controller, state data and ShadowHandler
-    global avmSC
-    global epsSC
+    global rc
     global receiverdata
     global receiverdata_shadow
+    global deviceShadowHandler
+
+    print("++++++++DELTA++++++++++")
+#    print("property: " + str(payloadDict["state"]["property"]))
+#    print("version: " + str(payloadDict["version"])
+    print (payloadDict)
+    print("+++++++++++++++++++++++\n\n")
 
     update_needed = False
     for item in payloadDict['state']:
-        print ('Delta Message: processing item [{0}] [{1}]'.format(item, payloadDict['state'][item]))
+        print ('customShadowCallback_Delta: processing item ' + str(item))
+        if item not in rc.allowedcommands:
+            # Ignore attributes that are not valid valid commands
+            logging.debug(u'customShadowCallback_Delta: invalid command received in payload.  Value was '+str(item))
+            continue
         try:
             if item in receiverdata:
                 if receiverdata[item] != payloadDict['state'][item]:
                     # Need to update receiver
-                    avmSC.iot_to_serial(item, payloadDict['state'][item])
-                    epsSC.iot_to_serial(item, payloadDict['state'][item])
-#                    rc.sendupdate(item,payloadDict['state'][item])
+                    rc.sendupdate(item,payloadDict['state'][item])
                     receiverdata_shadow[item] = receiverdata[item]
                     update_needed = True
             else:
-                avmSC.iot_to_serial(item, payloadDict['state'][item])
-                epsSC.iot_to_serial(item, payloadDict['state'][item])
-#                rc.sendupdate(item,payloadDict['state'][item])
+                rc.sendupdate(item,payloadDict['state'][item])
                 receiverdata[item] = payloadDict['state'][item]
                 receiverdata_shadow[item] = receiverdata[item]
                 update_needed = True
 
         except KeyError:
-            logging.debug(u'Received unexpected attribute in delta message.  Item was '+item)
+            logging.debug(u'customShadowCallback_Delta: item missing from receiverdata.  Item was '+item)
+
+#    payload_dict = {'state':{'reported':{}}}
+#    payload_dict['state']['reported'] = receiverdata
+#    JSONPayload = json.dumps(payload_dict)
+#    deviceShadowHandler.shadowUpdate(JSONPayload, customShadowCallback_Update, 5)
+
 
 def customShadowCallback_Update(payload, responseStatus, token):
     # payload is a JSON string ready to be parsed using json.loads(...)
     # in both Py2.x and Py3.x
     if responseStatus == "timeout":
-        print("Update request " + token + " timed out!")
+        print("Update request " + token + " time out!")
     if responseStatus == "accepted":
         payloadDict = json.loads(payload)
         print("~~~~~~~~~~~~~~UPDATE~~~~~~~~~~~~~~~")
@@ -412,24 +432,127 @@ def customShadowCallback_Delete(payload, responseStatus, token):
         print("Delete request " + token + " rejected!")
 
 receiverdata = {
-    'apower':False,
-    'epower':False,
+    'power':False,
     'volume':0,
     'mute':False,
-    'asource':'Unknown',
-    'esource':'Unknown'
+    'source':'Unknown'
 }
+
+
 
 if __name__ == u'__main__':
 
 
+    q_avmSC = queue.Queue()
+    avmSC = AVM20_serial_controller('/dev/ttyUSB0',9600, q_avmSC)
+    epsSC = EPSON1080UB_serial_controller('/dev/ttyUSB1', 9600)
 
+    duration = 60
+
+    avm_attributes = ['apower', 'asource', 'volume', 'mute' ]
+    eps_attributes = ['epower', 'esource']
+
+    start = time.time()
+    print ('Querying Epson')
+    res = epsSC.query()
+    db = {}
+    for item in res:
+        db[item] = res[item]
+
+    print ('Querying AVM20')
+    avmSC.query()
+    while True:
+        try:
+            res = q_avmSC.get_nowait()
+            q_avmSC.task_done()
+        except queue.Empty:
+            break
+        for item in res:
+            db[item] = res[item]
+
+    while True:
+        time.sleep(.5)
+        # Process AVM items
+        while True:
+            try:
+                res = q_avmSC.get_nowait()
+                q_avmSC.task_done()
+                for item in res:
+                    db[item] = res[item]
+            except queue.Empty:
+                break
+        val = input('variable:value (exit to end; query:variable to get status)\n:')
+        if not val:
+            print ('Current values are...')
+            print (json.dumps(db,indent=4))
+            continue
+        qv = val.split(':')
+        if not qv[0]:
+            continue
+        if qv[0].lower() == 'exit' or qv[0].lower() == 'q':
+            break
+        elif qv[0].lower() == 'query':
+            res = {}
+            if len(qv) == 1:
+                avmSC.query()
+                res = epsSC.query()
+            else:
+                if qv[1] in avm_attributes:
+                    avmSC.query(qv[1])
+                elif qv[1] in eps_attributes:
+                    res = epsSC.query(qv[1])
+                else:
+                    print('{0} is not a valid attribute'.format(qv[1]))
+            for item in res:
+                db[item] = res[item]
+        else:
+            if len(qv) != 2:
+                print ('Command must be in the form of variable:value')
+                continue
+            res = {}
+
+            try:
+                if qv[0].lower() in ['mute', 'apower', 'epower']:
+                    qv[1] = True if qv[1].lower() == 'true' else False
+                elif qv[0].lower() in ['volume']:
+                    qv[1] = float(qv[1])
+            except:
+                pass
+            if qv[0] in avm_attributes:
+                avmSC.iot_to_serial(qv[0], qv[1])
+            elif qv[0] in eps_attributes:
+                res = epsSC.iot_to_serial(qv[0], qv[1])
+            else:
+                print ('{0} is not a valid attribute'.format(qv[0]))
+
+            # Process Epson items
+            for item in res:
+                db[item] = res[item]
+
+
+
+    exitapp[0]=True
+    time.sleep(.5)
+    epsSC.close()
+
+'''
+    while start+60 > time.time():
+        avm_res = q_avmSC.get()
+        q_avmSC.task_done()
+        if avm_res:
+            print (json.dumps(avm_res, indent=4))
+'''
+
+
+'''
     # Read in command-line parameters
     parser = argparse.ArgumentParser()
     parser.add_argument("-e", "--endpoint", action="store", required=True, dest="host", help="Your AWS IoT custom endpoint")
     parser.add_argument("-r", "--rootCA", action="store", required=True, dest="rootCAPath", help="Root CA file path")
     parser.add_argument("-c", "--cert", action="store", dest="certificatePath", help="Certificate file path")
     parser.add_argument("-k", "--key", action="store", dest="privateKeyPath", help="Private key file path")
+    parser.add_argument("-w", "--websocket", action="store_true", dest="useWebsocket", default=False,
+                        help="Use MQTT over WebSocket")
     parser.add_argument("-n", "--thingName", action="store", dest="thingName", default="Bot", help="Targeted thing name")
     parser.add_argument("-id", "--clientId", action="store", dest="clientId", default="basicShadowUpdater", help="Targeted client id")
 
@@ -438,11 +561,15 @@ if __name__ == u'__main__':
     rootCAPath = args.rootCAPath
     certificatePath = args.certificatePath
     privateKeyPath = args.privateKeyPath
-#    useWebsocket = args.useWebsocket
+    useWebsocket = args.useWebsocket
     thingName = args.thingName
     clientId = args.clientId
 
-    if (not args.certificatePath or not args.privateKeyPath):
+    if args.useWebsocket and args.certificatePath and args.privateKeyPath:
+        parser.error("X.509 cert authentication and WebSocket are mutual exclusive. Please pick one.")
+        exit(2)
+
+    if not args.useWebsocket and (not args.certificatePath or not args.privateKeyPath):
         parser.error("Missing credentials for authentication.")
         exit(2)
 
@@ -456,9 +583,14 @@ if __name__ == u'__main__':
 
     # Init AWSIoTMQTTShadowClient
     myAWSIoTMQTTShadowClient = None
-    myAWSIoTMQTTShadowClient = AWSIoTMQTTShadowClient('pyASHTV')
-    myAWSIoTMQTTShadowClient.configureEndpoint(host, 8883)
-    myAWSIoTMQTTShadowClient.configureCredentials(rootCAPath, privateKeyPath, certificatePath)
+    if useWebsocket:
+        myAWSIoTMQTTShadowClient = AWSIoTMQTTShadowClient(clientId, useWebsocket=True)
+        myAWSIoTMQTTShadowClient.configureEndpoint(host, 443)
+        myAWSIoTMQTTShadowClient.configureCredentials(rootCAPath)
+    else:
+        myAWSIoTMQTTShadowClient = AWSIoTMQTTShadowClient(clientId)
+        myAWSIoTMQTTShadowClient.configureEndpoint(host, 8883)
+        myAWSIoTMQTTShadowClient.configureCredentials(rootCAPath, privateKeyPath, certificatePath)
 
     # AWSIoTMQTTShadowClient configuration
     myAWSIoTMQTTShadowClient.configureAutoReconnectBackoffTime(1, 32, 20)
@@ -477,28 +609,23 @@ if __name__ == u'__main__':
     # Listen on deltas
     deviceShadowHandler.shadowRegisterDeltaCallback(customShadowCallback_Delta)
 
-    q_avmSC = queue.Queue()
-    avmSC = AVM20_serial_controller('/dev/ttyUSB0',9600, q_avmSC)
-    avmSC.query()
-    epsSC = EPSON1080UB_serial_controller('/dev/ttyUSB1', 9600)
-
     receiverdata_shadow = copy.deepcopy(receiverdata)
+
+    rc = receiver_serial_controller('/dev/ttyUSB0',9600,receiverdata)
+    rc.readupdates()
+
+#    rc.start()
+    time.sleep(1)
 
     firstpass = True
     try:
         while True:
-            time.sleep(.5)
+#            for item in receiverdata:
+#                value = receiverdata[item]
+#                print "[{0}] {1}".format(item, value)
+#            print '\n\n'
 
-            # Process queue messages
-            while True:
-                try:
-                    res = q_avmSC.get_nowait()
-                    q_avmSC.task_done()
-                    for item in res:
-                        receiverdata[item] = res[item]
-                except:
-                    break
-
+            rc.readupdates()
             if not firstpass:
                 # Check to see if anything has changed
                 receiverdata_update = { }
@@ -508,10 +635,6 @@ if __name__ == u'__main__':
                         receiverdata_shadow[item] = receiverdata[item]
             else:
                 firstpass = False
-                # Get Epson status
-                res = epsSC.query()
-                for item in res:
-                    receiverdata[item] = res[item]
                 receiverdata_update = copy.deepcopy(receiverdata)
 
             # If there are changes, update the AWS shadow
@@ -525,22 +648,19 @@ if __name__ == u'__main__':
                 deviceShadowHandler.shadowUpdate(JSONPayload, customShadowCallback_Update, 5)
 
             # Make sure that preamp defaults to on and source:CD to enable echo to speak
-            if receiverdata['apower']==False:
-                avmSC.iot_to_serial('apower',True)
-                avmSC.iot_to_serial('asource', 'CD')
-#                rc.ser.write('P1P1;P1S0\n')
-#                receiverdata['mute']=False
+            if receiverdata['power']==False:
+                rc.ser.write('P1P1;P1S0\n')
+                receiverdata['mute']=False
                 time.sleep(0.1)
-                avmSC.query()
-#                rc.ser.write('P1S?;P1VM?\n')
+                rc.ser.write('P1S?;P1VM?\n')
 
     except KeyboardInterrupt:
         pass
 
     finally:
-        print ("Exiting...")
-        if epsSC:
-            epsSC.close()
-        exitapp[0] = True
+        print "Exiting..."
+#        exitapp[0] = True
+
+        #rc.join()
         logging.info('Exiting...')
-        time.sleep(1)
+'''
