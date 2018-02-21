@@ -36,7 +36,7 @@ def lambda_handler(request, context):
     ci.register_callback(SceneHandler, 'Alexa.SceneController')
 
     try:
-        d = pyASH.Directive(request)
+        d = pyASH.Request(request)
     except (ValueError, TypeError) as error:
         # Bad directive received
         logger.error('lambda_handler received a bad directive: ' + str(error))
@@ -68,7 +68,7 @@ def lambda_handler(request, context):
 def AcceptGrantHandler(directive):
     logger.info('Handling AcceptGrant')
 
-    d = pyASH.Directive(directive)
+    d = pyASH.Request(directive)
 
     # Retrieve tokens using Grant code
     lwa_client_id = os.environ['lwa_client_id']
@@ -141,52 +141,48 @@ def AcceptGrantHandler(directive):
     return pyASH.Response(directive)
 
 def DiscoverHandler(directive):
-    header = pyASH.Header('Alexa.Discovery','Discover.Response').get_json()
-    payload = {
-        'endpoints': [ ]
-    }
 
-    endpoints = pyASH.Endpoints()
+    endpoints = []
     # Add appliance-001
     cps = []
-    cps.append( pyASH.Capability('Alexa.Speaker', pyASH.Properties_supported('volume', False, True), '3') )
-    cps.append( pyASH.Capability('Alexa.Speaker', pyASH.Properties_supported('muted', False, True), '3') )
-    cps.append( pyASH.Capability('Alexa.PowerController', pyASH.Properties_supported('powerState', False, True), '3') )
-    cps.append( pyASH.Capability('Alexa.InputController', pyASH.Properties_supported('input', False, True), '3') )
+    cps.append( pyASH.Capability('Alexa.Speaker', 'volume', False, True) )
+    cps.append( pyASH.Capability('Alexa.Speaker', 'muted', False, True) )
+    cps.append( pyASH.Capability('Alexa.PowerController', 'powerState', False, True) )
+    cps.append( pyASH.Capability('Alexa.InputController', 'input', False, True) )
     ep = pyASH.Endpoint("avmctrl_den", "pyASH", "Sound", "Sound by pyASH", ["OTHER"], capabilities = cps)
-    endpoints.add(ep)
+    endpoints.append(ep)
 
     cps = []
-    cps.append( pyASH.Capability('Alexa.SceneController', supportsDeactivation=True, proactivelyReported=False, version='3'))
+    cps.append( pyASH.Capability('Alexa.SceneController', supportsDeactivation=True, proactivelyReported=False) )
     ep = pyASH.Endpoint("avmctrl_den:watch", "pyASH", "TV", "TV Scene connected by pyASH", ["ACTIVITY_TRIGGER"], capabilities=cps)
-    endpoints.add(ep)
+    endpoints.append(ep)
 
     return pyASH.Response(directive, endpoints)
 
 def ReportStateHandler(directive):
-    d = pyASH.Directive(directive)
+    d = pyASH.Request(directive)
     ts = pyASH.get_utc_timestamp()
-    properties = pyASH.Properties()
+    properties = []
 
     # Retrieve state of endpoint from AWS IOT service
     jsonState = IOT_get_state(d.endpointId, 'us-west-2')
     reported = jsonState['state']['reported']
 
     p = pyASH.SpeakerVolumeProperty(reported['volume'],ts,0)
-    properties.add(p)
+    properties.append(p)
 
     p = pyASH.SpeakerMuteProperty(reported['mute'], ts, 0)
-    properties.add(p)
+    properties.append(p)
 
     p = pyASH.PowerStateProperty(reported['apower'],ts,0)
-    properties.add(p)
+    properties.append(p)
 
     p = pyASH.InputProperty(reported['asource'],ts,0)
-    properties.add(p)
+    properties.append(p)
     return pyASH.Response(directive, properties)
 
 def SpeakerHandler(directive):
-    d = pyASH.Directive(directive)
+    d = pyASH.Request(directive)
 
     # Get state of endpoint
     jsonState = IOT_get_state(d.endpointId, 'us-west-2')
@@ -255,18 +251,18 @@ def SpeakerHandler(directive):
     reported = jsonState['state']['reported']
 
     ts = pyASH.get_utc_timestamp()
-    properties = pyASH.Properties()
+    properties = []
     p = pyASH.SpeakerVolumeProperty(reported['volume'],ts,0)
-    properties.add(p)
+    properties.append(p)
 
     p = pyASH.SpeakerMuteProperty(reported['mute'], ts, 0)
-    properties.add(p)
+    properties.append(p)
 
     # Send report state back to Alexa
     return pyASH.Response(directive, properties)
 
 def SceneHandler(directive):
-    d = pyASH.Directive(directive)
+    d = pyASH.Request(directive)
 
     endpointId = d.endpointId.split(':')[0]
     sceneId = d.endpointId.split(':')[1]
@@ -307,7 +303,7 @@ def SceneHandler(directive):
     return pyASH.Response(directive)
 
 def PowerHandler(directive):
-    d = pyASH.Directive(directive)
+    d = pyASH.Request(directive)
 
     # Get state of endpoint
     jsonState = IOT_get_state(d.endpointId, 'us-west-2')
@@ -339,15 +335,15 @@ def PowerHandler(directive):
         reported = jsonState['state']['reported']
 
     ts = pyASH.get_utc_timestamp()
-    properties = pyASH.Properties()
+    properties = []
     p = pyASH.PowerStateProperty(reported['apower'],ts,0)
-    properties.add(p)
+    properties.append(p)
 
     # Send report state back to Alexa
     return pyASH.Response(directive, properties)
 
 def InputHandler(directive):
-    d = pyASH.Directive(directive)
+    d = pyASH.Request(directive)
 
     # Get state of endpoint
     jsonState = IOT_get_state(d.endpointId, 'us-west-2')
@@ -386,9 +382,9 @@ def InputHandler(directive):
         reported = jsonState['state']['reported']
 
     ts = pyASH.get_utc_timestamp()
-    properties = pyASH.Properties()
+    properties = []
     p = pyASH.InputProperty(reported['asource'],ts,0)
-    properties.add(p)
+    properties.append(p)
 
     # Send report state back to Alexa
     return pyASH.Response(directive, properties)

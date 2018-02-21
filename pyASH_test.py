@@ -614,7 +614,7 @@ alexa_testset = [
                 "type": "BearerToken",
                 "token": "access-token-from-skill"
               },
-              "endpointId": "device-001",
+              "endpointId": "appliance-001",
               "cookie": {
 
               }
@@ -622,8 +622,8 @@ alexa_testset = [
             "payload": {
               "channel": {
                   "number": "1234",
-                  "callSign": "KSTATION1",
-                  "affiliateCallSign": "KSTATION2",
+                  "callSign": "callsign1",
+                  "affiliateCallSign": "callsign2",
                   "uri": "someUrl"
               },
               "channelMetadata": {
@@ -679,7 +679,7 @@ alexa_testset = [
                 "type": "BearerToken",
                 "token": "access-token-from-skill"
               },
-              "endpointId": "device-001",
+              "endpointId": "appliance-001",
               "cookie": {
 
               }
@@ -722,7 +722,7 @@ alexa_testset = [
                 "type": "BearerToken",
                 "token": "access-token-from-skill"
               },
-              "endpointId": "device-001",
+              "endpointId": "appliance-001",
               "cookie": {
 
               }
@@ -769,54 +769,6 @@ alexa_testset = [
     {
         'name': 'ReportState test',
         'input': {
-          "directive": {
-            "header": {
-              "messageId": "abc-123-def-456",
-              "correlationToken": "abcdef-123456",
-              "namespace": "Alexa",
-              "name": "ReportState",
-              "payloadVersion": "3"
-            },
-            "endpoint": {
-              "endpointId": "appliance-001",
-              "cookie": {},
-              "scope":{
-                    "type":"BearerToken",
-                    "token":"access-token-from-skill"
-              }
-            },
-            "payload": {
-            }
-          }
-        },
-        'output': {
-            "context": {
-                "properties": [ {
-                    "namespace": "Alexa.ColorTemperatureController",
-                    "name": "colorTemperatureInKelvin",
-                    "value": 7500,
-                    "timeOfSample": "2017-02-03T16:20:50.52Z",
-                    "uncertaintyInMilliseconds": 500
-                } ]
-            },
-            "event": {
-                "header": {
-                    "namespace": "Alexa",
-                    "name": "Response",
-                    "payloadVersion": "3",
-                    "messageId": "5f8a426e-01e4-4cc9-8b79-65f8bd0fd8a4",
-                    "correlationToken": "dFMb0z+PgpgdDmluhJ1LddFvSqZ/jCc8ptlAKulUj90jSqg=="
-                },
-                "endpoint": {
-                    "endpointId": "appliance-001"
-                },
-                "payload": {}
-            }
-        }
-    },
-    {
-        'name': 'ReportState test',
-        'input': {
             "directive": {
                 "header": {
                     "namespace": "Alexa",
@@ -830,7 +782,7 @@ alexa_testset = [
                     "cookie": {},
                     "scope": {
                         "type": "BearerToken",
-                        "token": "access-token-from-skill"
+                        "token": "access-token-from-Amazon"
                     }
                 },
                 "payload": {}
@@ -899,12 +851,6 @@ alexa_testset = [
 ]
 
 def EXAMPLEacceptgranthandler(directive):
-
-    if pyASH.check_dict_keys(directive, ['directive','header','correlationToken']):
-        correlationToken = directive['directive']['header']['correlationToken']
-    else:
-        correlationToken = ''
-
     return pyASH.Response(directive)
 
 
@@ -933,15 +879,15 @@ def EXAMPLEdiscoverhandler(directive):
         'endpoints': [ ]
     }
 
-    endpoints = pyASH.Endpoints()
+    endpoints = []
     # Add appliance-001
     cps = []
-    cps.append( pyASH.Capability('Alexa.ColorTemperatureController', pyASH.Properties_supported('colorTemperatureInKelvin', True, True), '3') )
-    cps.append( pyASH.Capability('Alexa.EndpointHealth', pyASH.Properties_supported('connectivity', True, True), '3') )
-    cps.append( pyASH.Capability('Alexa', version='3') )
-    cps.append( pyASH.Capability('Alexa.ColorController', pyASH.Properties_supported('color', True, True), '3') )
-    cps.append( pyASH.Capability('Alexa.PowerController', pyASH.Properties_supported('powerState', True, True), '3') )
-    cps.append( pyASH.Capability('Alexa.BrightnessController', pyASH.Properties_supported('brightness', True, True), '3') )
+    cps.append( pyASH.Capability('Alexa.ColorTemperatureController', 'colorTemperatureInKelvin', True, True) )
+    cps.append( pyASH.Capability('Alexa.EndpointHealth', 'connectivity', True, True) )
+    cps.append( pyASH.Capability('Alexa') )
+    cps.append( pyASH.Capability('Alexa.ColorController', 'color', True, True) )
+    cps.append( pyASH.Capability('Alexa.PowerController', 'powerState', True, True) )
+    cps.append( pyASH.Capability('Alexa.BrightnessController', 'brightness', True, True) )
     ep = pyASH.Endpoint("appliance-001", "Sample Manufacturer", "Living Room Light", "Smart Light by Sample Manufacturer", ["LIGHT"], \
         cookie = { \
            "extraDetail1":"optionalDetailForSkillAdapterToReferenceThisDevice", \
@@ -949,36 +895,36 @@ def EXAMPLEdiscoverhandler(directive):
            "extraDetail3":"but they should only be used for reference purposes", \
            "extraDetail4":"This is not a suitable place to maintain current device state" \
         }, capabilities = cps)
-    endpoints.add(ep)
+    endpoints.append(ep)
 
     # Add appliance-002
     cps = []
     cps.append( pyASH.Capability('Alexa', version='3') )
-    cps.append( pyASH.Capability('Alexa.ThermostatController', pyASH.Properties_supported(['lowerSetpoint','targetSetpoint', 'upperSetpoint', 'thermostatMode'], True, True), '3') )
-    cps.append( pyASH.Capability('Alexa.TemperatureSensor', pyASH.Properties_supported('temperature', False, True), '3') )
+    cps.append( pyASH.Capability('Alexa.ThermostatController', ['lowerSetpoint','targetSetpoint', 'upperSetpoint', 'thermostatMode'], True, True) )
+    cps.append( pyASH.Capability('Alexa.TemperatureSensor', 'temperature', False, True) )
     ep = pyASH.Endpoint("appliance-002", "Sample Manufacturer", "Hallway Thermostat", "Smart Thermostat by Sample Manufacturer", ["THERMOSTAT"], cookie = {}, capabilities = cps)
-    endpoints.add(ep)
+    endpoints.append(ep)
 
     # Add appliance-003
     cps = []
-    cps.append( pyASH.Capability('Alexa.LockController', pyASH.Properties_supported('lockState', True, True), '3') )
-    cps.append( pyASH.Capability('Alexa.EndpointHealth', pyASH.Properties_supported('connectivity', True, True), '3') )
+    cps.append( pyASH.Capability('Alexa.LockController', 'lockState', True, True) )
+    cps.append( pyASH.Capability('Alexa.EndpointHealth', 'connectivity', True, True) )
     ep = pyASH.Endpoint("appliance-003", "Sample Manufacturer", "Front Door", "Smart Lock by Sample Manufacturer", ["SMARTLOCK"], cookie = {}, capabilities = cps)
-    endpoints.add(ep)
+    endpoints.append(ep)
 
     # Add appliance-004
     cps = []
-    cps.append( pyASH.Capability('Alexa.SceneController', version='3', proactivelyReported=True, supportsDeactivation = False))
+    cps.append( pyASH.Capability('Alexa.SceneController', proactivelyReported=True, supportsDeactivation = False))
     ep = pyASH.Endpoint("appliance-004", "Sample Manufacturer", "Goodnight", "Smart Scene by Sample Manufacturer", ["SCENE_TRIGGER"], cookie = {}, capabilities = cps)
-    endpoints.add(ep)
+    endpoints.append(ep)
 
     # Add appliance-005
     cps = []
     cps.append( pyASH.Capability('Alexa', version='3') )
-    cps.append( pyASH.Capability('Alexa.SceneController', version='3', proactivelyReported=True, supportsDeactivation = True))
-    cps.append( pyASH.Capability('Alexa.EndpointHealth', pyASH.Properties_supported('connectivity', True, True), '3') )
+    cps.append( pyASH.Capability('Alexa.SceneController', proactivelyReported=True, supportsDeactivation = True))
+    cps.append( pyASH.Capability('Alexa.EndpointHealth', 'connectivity', True, True) )
     ep = pyASH.Endpoint("appliance-005", "Sample Manufacturer", "Watch TV", "Smart Activity by Sample Manufacturer", ["ACTIVITY_TRIGGER"], cookie = {}, capabilities = cps)
-    endpoints.add(ep)
+    endpoints.append(ep)
 
     # Add appliance-006
     cps = []
@@ -988,36 +934,36 @@ def EXAMPLEdiscoverhandler(directive):
     csc = pyASH.CameraStreamConfiguration('RTSP', [pyASH.Resolution(1920,1080),pyASH.Resolution(1280,720)], 'NONE', 'H264','AAC')
     cscs.add(csc)
 
-    cps.append( pyASH.Capability('Alexa', version='3') )
-    cps.append( pyASH.Capability('Alexa.CameraStreamController', cameraStreamConfigurations=cscs.value, version='3') )
-    cps.append( pyASH.Capability('Alexa.PowerController', pyASH.Properties_supported('powerState', True, True), '3') )
-    cps.append( pyASH.Capability('Alexa.EndpointHealth', pyASH.Properties_supported('connectivity', True, True), '3') )
+    cps.append( pyASH.Capability('Alexa') )
+    cps.append( pyASH.Capability('Alexa.CameraStreamController', cameraStreamConfigurations=cscs.value) )
+    cps.append( pyASH.Capability('Alexa.PowerController', 'powerState', True, True) )
+    cps.append( pyASH.Capability('Alexa.EndpointHealth', 'connectivity', True, True) )
     ep = pyASH.Endpoint("appliance-006", "Sample Manufacturer", "Back Door Camera", "Smart Camera by Sample Manufacturer", ["CAMERA"], cookie = {}, capabilities = cps)
-    endpoints.add(ep)
+    endpoints.append(ep)
 
     return pyASH.Response(directive, endpoints)
 
 def EXAMPLEreportstatehandler(directive):
-    d = pyASH.Directive(directive)
+    d = pyASH.Request(directive)
     ts = pyASH.get_utc_timestamp()
-    properties = pyASH.Properties()
+    properties = []
 
 
     ephp = pyASH.EndpointHealthProperty('OK', ts, 200)
-    properties.add(ephp)
+    properties.append(ephp)
     tsp = pyASH.ThermostatTargetSetpointProperty(25, 'CELSIUS', ts, 200)
-    properties.add(tsp)
+    properties.append(tsp)
     tmp = pyASH.ThermostatModeProperty('AUTO', '', ts, 200)
-    properties.add(tmp)
+    properties.append(tmp)
     tp = pyASH.TemperatureProperty(20, 'CELSIUS', ts, 200)
-    properties.add(tp)
+    properties.append(tp)
 
 
     return pyASH.Response(directive, properties)
 
 def EXAMPLEgenerichandler(directive):
 
-    d = pyASH.Directive(directive)
+    d = pyASH.Request(directive)
     ts = pyASH.get_utc_timestamp()
     properties = pyASH.Properties()
     if d.namespace == 'Alexa.BrightnessController':
@@ -1106,6 +1052,6 @@ if __name__ == u'__main__':
 #    compare_results(res.get_json(), alexa_testset[i-1]['output'])
     for i in range(len(alexa_testset)):
         print ('\nTest {0} {1}'.format(i,alexa_testset[i]['name']))
-        res = ci.process_directive(alexa_testset[i]['input'])
+        res = ci.process_request(alexa_testset[i]['input'])
 #        print (json.dumps(res.get_json(),indent=4))
         compare_results(res.get_json(), alexa_testset[i]['output'])

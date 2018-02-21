@@ -11,7 +11,8 @@ import copy
 from datetime import datetime
 import re
 import queue
-from abc import ABC
+from abc import ABC, abstractmethod
+import socket
 
 exitapp = [ False ]
 
@@ -64,8 +65,8 @@ class device_controller(ABC):
             self.logger.critical(errmsg)
             raise RuntimeError(errmsg)
 
-        self.listenerstarted = True
         self.open()
+        self.listenerstarted = True
         self.device_t.start()
 
     def run(self):
@@ -254,6 +255,93 @@ class serial_controller(device_controller):
         else:
             return b''
 
+class network_controller(device_controller):
+    # Communicates with receiver over TCP/IP interface
+    # Updates receiver state variables when command received through input queue
+
+    def __init__(self, server, port, q_sc=None, cmdack = b'', cmdtimeout = 20, name = 'network'):
+        super(network_controller, self).__init__(q_sc, cmdack, cmdtimeout, name)
+        self.server = server
+        self.port = port
+        self.name = name
+        self.socket = None
+
+    def open(self):
+        if not self.socket:
+            self.socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+            self.socket.connect(self.server, self.port)
+            self.socket.settimeout(0.5)
+
+    def close(self):
+        # If listenerstarted assumes that port will remain open while listener is running
+        if not self.listenerstarted:
+            self.socket.close()
+            self.socket = None
+
+    def get(self, delimiter=b'\n', timeout=0):
+        # Should return a single key value from the input
+
+        if not self.
+        self.open()
+
+        if not timeout:
+            if self.cmdtimeout:
+                timeout = self.cmdtimeout
+
+        buffer = b''
+        if type(delimiter) == str:
+            delimiter = delimiter.encode()
+        last_activity = time.time()
+
+        self.readlock.acquire()
+        while True:
+            data = b''
+            try:
+                data = self.handle.recv(1024)
+            except socket.timeout:
+                pass
+            buffer += data
+            if data:
+                last_activity = time.time()
+            if data.find(delimiter) >=0:
+                self.readlock.release()
+                break
+            if time.time() - last_activity > timeout:
+                self.readlock.release()
+                break
+        self.close()
+        return buffer
+
+    def send(self, value, ack=b'', timeout=20):
+        self.open()
+
+        if type(value) == str:
+            value = value.encode()
+        self.socket.send(value)
+        self.logger.info ('From {0}, Sending  [{1}]'.format(self.name,value))
+        if ack:
+            if ack == str:
+                ack = ack.encode()
+            last_activity = time.time()
+            buffer = b''
+            self.readlock.acquire()
+            while True:
+                try:
+                    data = self.ser.recv(1024)
+                except socket.timeout:
+                    pass
+                buffer += data
+                if buffer.find(ack)>=0:
+                    self.readlock.release()
+                    self.close()
+                    return buffer[:buffer.find(ack)]
+                elif time.time() - last_activity > timeout:
+                    self.readlock.release()
+                    self.close()
+                    return buffer
+        else:
+            self.close()
+            return b''
 
 class AVM20_serial_controller(serial_controller):
 
@@ -360,6 +448,46 @@ class EPSON1080UB_serial_controller(serial_controller):
         self.iot_to_device_db = {
             'esource': ['SOURCE {0}\r', self.iot_to_source],
             'epower': ['PWR {0}\r', self.bool_to_onoff],
+        } # Format { iotvariable: [devicecommand, i2s_func] }
+
+        self.device_queries = {
+            'esource': 'SOURCE?\r',
+            'epower': 'PWR?\r'
+        }
+
+    def source_to_iot(self, value):
+        if type(value) == bytes:
+            value = value.decode()
+        try:
+            source = self.sources[value]
+        except:
+            self.logger.warn('{0} is not a valid source value'.format(value))
+            source = 'Unknown'
+        return source
+
+    def iot_to_source(self, value):
+        for k in self.sources:
+            if self.sources[k] == value:
+                return k
+        else:
+            self.logger.warn('{0} is not a valid IOT source'.format(value))
+            return '00'
+
+class TIVO_network_controller(network_controller):
+
+    # The Epson works purely on challenge response.  No need for multi-threading
+
+    def __init__(self, server, port, q_sc):
+        super(TIVO_network_controller, self).__init__(port, baud, q_sc=q_sc, cmdtimeout=1,name='TIVO')
+
+        self.device_to_iot_db = {
+            'channel': ['^SOURCE=([a-zA-Z0-9]{2})$', self.source_to_iot],
+            'screen': ['^PWR=([0-9]{2})$', self.int_to_bool]
+        } # Format { iotvariable: [regex_match, regex_cmd, s2i_func]}
+
+        self.iot_to_device_db = {
+            'channel': ['SOURCE {0}\r', self.iot_to_source],
+            'screen': ['PWR {0}\r', self.bool_to_onoff],
         } # Format { iotvariable: [devicecommand, i2s_func] }
 
         self.device_queries = {
