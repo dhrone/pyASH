@@ -88,9 +88,9 @@ class Endpoint(object):
             raise ValueError('{0} is not a valid directive for interface {1}'.format(directive,interface))
         raise ValueError('{0} is not a valid directive'.format(directive))
 
-	@staticmethod
-	def getEndpointId(thingName):
-		return self.__name__ + ':' + thingName
+    @staticmethod
+    def getEndpointId(thingName):
+        return self.__name__ + ':' + thingName
 
     @_classproperty
     def actions(cls):

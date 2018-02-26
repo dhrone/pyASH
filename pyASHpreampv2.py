@@ -19,12 +19,30 @@ import jsonschema
 import pyASH
 from endpoint import Endpoint
 from iot import Iot
+from message import Request
 
 # Setup logger
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
 
-class iotTV(Endpoint):
+class iotTV(Iot):
+    @Iot.transformFromProperty('powerState', 'apower')
+    def fromPowerState(self, value):
+        return value
+
+    @Iot.transformToProperty('powerState', 'apower')
+    def toPowerState(self, value):
+        return value
+
+    @Iot.transformFromProperty('volume')
+    def fromVolume(self, value):
+        return int(value / 10)
+
+    @Iot.transformToProperty('volume')
+    def toVolume(self, value):
+        return value * 10
+
+class dhroneTV(Endpoint):
     class Metadata:
         manufacturerName = 'dhrone'
         description = 'iotTV controller by dhrone'
@@ -57,7 +75,7 @@ class iotTV(Endpoint):
         d = Iot(request.endpointId)
         d['asource'] = request.payload['input']
 
-class iotTVScene(Endpoint):
+class dhroneTVScene(Endpoint):
     class Metadata:
         manufacturerName = 'dhrone'
         description = 'iotTV controller by dhrone'
@@ -222,12 +240,12 @@ dDeactivate = {
     }
 }
 
-rVolumeUp = pyASH.Request(dAdjustVolumeUp)
-rVolumeDown = pyASH.Request(dAdjustVolumeDown)
-rSetVolume = pyASH.Request(dSetVolume)
-rOff = pyASH.Request(dTurnOff)
-rActivate = pyASH.Request(dActivate)
-rDeactivate = pyASH.Request(dDeactivate)
+rVolumeUp = Request(dAdjustVolumeUp)
+rVolumeDown = Request(dAdjustVolumeDown)
+rSetVolume = Request(dSetVolume)
+rOff = Request(dTurnOff)
+rActivate = Request(dActivate)
+rDeactivate = Request(dDeactivate)
 
 #class discover(Discover):
 
