@@ -6,17 +6,8 @@
 import json
 import pyASH
 
-class _classproperty(property):
-    """Utility class for @property fields on the class."""
-    def __init__(self, func):
-        self.func = func
-        self.__doc__ = func.__doc__
-
-    def __get__(self, instance, owner):
-        # This makes docstrings work
-        if owner is Endpoint:
-            return self
-        return self.func(owner)
+from utility import *
+from utility import _classproperty
 
 class Endpoint(object):
     def __init__(self, request=None):
@@ -27,6 +18,11 @@ class Endpoint(object):
             self.request = request
             self.id = request.appliance_id
             self.additional_details = request.appliance_details
+
+    class _Metadata:
+        manufacturerName = 'dhrone'
+        description = 'Generic device by dhrone'
+        displayCategories = 'OTHER'
 
     @classmethod
     def register(cls, *args, **kwargs):
@@ -118,8 +114,3 @@ class Endpoint(object):
                     ret[action] = method
 
         return ret
-
-    class Details:
-        """Inner class in ``Appliance`` subclasses provides default values so that they don't
-        have to be repeated in ``Smarthome.add_appliance``.
-        """

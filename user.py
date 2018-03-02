@@ -9,11 +9,7 @@ import logging
 logger = logging.getLogger(__name__)
 logger.setLevel(LOGLEVEL)
 
-# Custom Exceptions
-class MissingCredential(Exception):
-class FailedAuthorization(Exception):
-class BadRequest(IOError):
-
+from decimal import Decimal
 
 
 class User(object):
@@ -35,7 +31,7 @@ class User(object):
         self._createThingTable()
 
         if not token and not code:
-            errmsg = 'Cannot initialize a client without either an access token or an AccessGrant code'
+            errmsg = 'Cannot initialize a user without either an access token or an AccessGrant code'
             logger.critical(errmsg)
             raise MissingRequiredValue(errmsg)
 
@@ -91,6 +87,7 @@ class User(object):
             response = r.json()
             self.accessToken = response['access_token']
             self.refreshToken = response['refresh_token']
+            self.refreshTokenIssued = time.time()
         except KeyError:
             errmsg = 'Tokens not in response'
             logger.warn(errmsg)
@@ -102,64 +99,42 @@ class User(object):
         except KeyError:
             self.accessDuration = 900 # Set default token duration to 15 minutes
 
-    def _createTokenTable(self):
-        ddb = boto3.resource('dynamodb', self.region)
-        try:
-            tn = self.systemName + '_user_tokens'
-            ddb.create_table(TableName = tn, KeySchema=[{ 'AttributeName':'userId', 'KeyType':'HASH'}],AttributeDefinitions=[{'AttributeName':'userId', 'AttributeType':'S'}],ProvisionedThroughput={'ReadCapacityUnits':5, 'WriteCapacityUnits':5})
-        except ddb.exceptions.ResourceInUseException:
-            # Table already exists
-            pass
-        except:
-            errmsg = 'Needed to create new {0} table but failed'.format(tn)
-            logger.critical(errmsg)
-            raise Exception(errmsg)
-
-    def _createThingTable(self):
-        ddb = boto3.resource('dynamodb', self.region)
-        try:
-            tn = self.systemName + '_user_things'
-            ddb.create_table(TableName = tn, KeySchema=[{ 'AttributeName':'userId', 'KeyType':'HASH'}, {'AttributeName':'thing', 'KeyType':'RANGE'}],AttributeDefinitions=[{'AttributeName':'userId', 'AttributeType':'S'}, { 'AttributeName':'thing', 'AttributeType':'S'}],ProvisionedThroughput={'ReadCapacityUnits':5, 'WriteCapacityUnits':5})
-        except ddb.ResourceInUseException:
-            # Table already exists
-            pass
-        except:
-            errmsg = 'Needed to create new {0} table but failed'.format(tn)
-            logger.critical(errmsg)
-            raise Exception(errmsg)
-
 
     def _persistTokens(self):
-        # Item={ 'userId': { 'S':'ron@ritchey.org' }, 'type': {'L':[{'S':'dhroneTV'}]}, 'thing': { 'S':'avmctrl_den'}}
-
-        tn = 'dhrone_user_tokens'
-        key = {'userId': {'S': self.userId}}
-        ue = 'set accessToken = :at, refreshToken = :rt, accessDuration = :d'
-        eav = { ':at': { 'S':self.accessToken }, ':rt':{ 'S':self.refreshToken}, ':d':{ 'S':str(self.accessDuration)}}
+        tn = self.systemName + '_user_tokens'
+        key = {'userId': self.userId }
+        ue = 'set accessToken = :at, refreshToken = :rt, accessDuration = :d, tokenIssued = :ti'
+        eav = { ':at': self.accessToken, ':rt': self.refreshToken, ':d':str(self.accessDuration), ':ti':Decimal(self.refreshTokenIssued)}
         ddb = boto3.resource('dynamodb', self.region)
+        table = ddb.Table(tn)
         try:
-            ddb.update_item(TableName=tn, Key=key, UpdateExpression=ue, ExpressionAttributeValues=eav, ReturnValues="UPDATE_NEW")
-        except ddb.exceptions.ResourceNotFoundException:
-            # Need to create tables
-            try:
-                ddb.create_table(TableName = tn, KeySchema=[{ 'AttributeName':'userId', 'KeyType':'HASH'}],AttributeDefinitions=[{'AttributeName':'userId', 'AttributeType':'S'}],ProvisionedThroughput={'ReadCapacityUnits':5, 'WriteCapacityUnits':5})
-            except:
-                errmsg = 'Needed to create new {0} table but failed'.format(tn)
-                logger.critical(errmsg)
-                raise Exception(errmsg)
-
-            expires = time.time()+5
-            while True:
+            res = table.update_item(Key=key, UpdateExpression=ue, ExpressionAttributeValues=eav, ReturnValues="UPDATED_NEW")
+        except ClientError as e: # boto3.exceptions.ResourceNotFoundException:
+            if e.__class__.__name__ == 'ResourceNotFoundException':
                 try:
-                    time.sleep(0.25) # Give the new table a chance to update
-                    ddb.update_item(TableName=tn, Key=key, UpdateExpression=ue, ExpressionAttributeValues=eav, ReturnValues="UPDATE_NEW")
-                except ddb.exceptions.ResourceNotFoundException:
-                    if time.time() > expires:
-                        errmsg = 'Successfully created new {0} table but have been unable to store tokens into it'
-                        raise Exception(errmsg)
-
-
-
+                    _createTokenTable()
+                    time.sleep(10)
+                except:
+                    errmsg = 'Needed to create new {0} table but failed'.format(tn)
+                    logger.critical(errmsg)
+                    raise
+                expires = time.time()+20
+                while True:
+                    try:
+                        time.sleep(1) # Give the new table a chance to update
+                        print ('Attempting again with {0} seconds remaining'.format(int(expires-time.time())))
+                        table = ddb.Table(tn)
+                        res = table.update_item(Key=key, UpdateExpression=ue, ExpressionAttributeValues=eav, ReturnValues="UPDATED_NEW")
+                        break
+                    except ClientError as e:
+                        if e.__class__.__name__ == 'ResourceNotFoundException':
+                            if time.time() > expires:
+                                errmsg = 'Successfully created new {0} table but have been unable to store tokens into it'
+                                raise
+                        else:
+                            raise
+            else:
+                raise
 
 
     def _persistEndpoints(self):

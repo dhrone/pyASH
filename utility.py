@@ -6,6 +6,9 @@
 import logging
 import time
 import uuid
+import boto3
+from boto3.dynamodb.conditions import Key, Attr
+from botocore.exceptions import ClientError
 
 LOGLEVEL = logging.WARN
 
@@ -87,6 +90,7 @@ VALID_DIRECTIVES = {
 VALID_INTERFACES =[]
 for item in VALID_PROPERTIES:
     VALID_INTERFACES.append(item)
+del (item)
 
 VALID_COOKINGMODES = [ 'DEFROST', 'OFF', 'PRESET', 'REHEAT', 'TIMECOOK']
 VALID_CONNECTIVITY = ['OK', 'UNREACHABLE']
@@ -117,7 +121,26 @@ VALID_TERMS = [ VALID_COOKINGMODES, VALID_CONNECTIVITY, VALID_ENUMERATEDPOWERLEV
     VALID_PAYLOADVERSIONS
 ]
 
+DEFAULT_REGION = 'us-east-1'
+DEFAULT_SYSTEM_NAME = 'pyASH'
+
 # Utilities
+
+# Custom Exceptions
+class MissingCredential(Exception):
+    pass
+
+class MissingRequiredValue(Exception):
+    pass
+
+class FailedAuthorization(Exception):
+    pass
+
+class BadRequest(IOError):
+    pass
+
+class TokenMissing(Exception):
+    pass
 
 def get_utc_timestamp(seconds=None):
     return time.strftime("%Y-%m-%dT%H:%M:%S.", time.gmtime(seconds)) + str(time.time()).split('.')[1][:2] + 'Z'
@@ -183,6 +206,7 @@ def fix_term(term):
                 return i
     raise ValueError('{0} not a valid term'.format(term))
 
+
 class _classproperty(property):
     """Utility class for @property fields on the class."""
     def __init__(self, func):
@@ -194,3 +218,45 @@ class _classproperty(property):
         if owner is Endpoint:
             return self
         return self.func(owner)
+
+# Oauth2 utilities
+def validateReturnCode(status_code):
+    if status_code == 401:
+        errmsg = 'Permission denied.  Unable to retrieve profile.'
+        logger.warn(errmsg)
+        raise FailedAuthorization(errmsg)
+    elif status_code == 400:
+        errmsg = 'Bad request.  Unable to retrieve profile.'
+        logger.warn(errmsg)
+        raise BadRequest(errmsg)
+    elif status_code != 200:
+        errmsg = 'Unable to retrieve profile.  Error code returned was {0}'.format(r.status_code)
+        logger.warn(errmsg)
+        raise IOError(errmsg)
+    return status_code
+
+
+def get_user_profile(user_token):
+    payload = { 'access_token': user_token }
+    r = requests.get("https://api.amazon.com/user/profile", params=payload)
+
+    if r.status_code != 200:
+        errmsg = 'get_user_id: unable to retrieve profile.  Return code was ' + str(r.status_code)
+        logger.warn(errmsg)
+        r.raise_for_status()
+
+    user_id = ''
+    user_email = ''
+    user_name = ''
+    try:
+        user_id = r.json()['user_id']
+        user_email = r.json()['email']
+        user_name = r.json()['name']
+    except KeyError:
+        if user_id == '':
+            errmsg = 'handle_authorization: requested profile but user_id not received'
+        elif user_name == '' or user_email == '':
+            errmsg = 'handle_authorization: requested profile but user_name or user_email not received'
+        logger.warn(errmsg)
+
+    return { 'user_id': user_id, 'email': user_email, 'name': user_name }

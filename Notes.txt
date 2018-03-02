@@ -1,0 +1,45 @@
+Times when system needs to know about the endpoints
+
+AcceptGrant
+AWS provides AcceptGrant Token which can be exchanged for user tokens and identity info
+Need to persist the refresh token for the user
+
+Discovery
+AWS provides user token
+Need to provide to AWS a list of endpoints which includes...
+	EndpointId
+	friendlyName
+	description
+	manufacturerName
+	displayCategories
+	cookies (if provided)
+	type of device (e.g. dhroneTV) so that the device can inform the capabilities.
+		Capabilities are about the properties not the directives.  Directives are inferred by the properties that are supported.
+		Capabilities also need to include proactivelyReported and retrievable attributes.
+		For Scenes, also supportsDeactivation but not retrievable
+
+Where does the system learn what endpoint's a user has?
+Options:
+	Hard code into program
+	Use a separate registration process (outside pyASH) to record the assignments to a database.  Read database during discovery
+		When a new device gets registered to AWS IOT seems a good time for that database assignment
+
+	Program should use a stub function to call for the list of endpoints that are discovered for a particular user.  Perhaps a decorated function within a subclass of Endpoint.
+	Thinking to use the Endpoint class as the container to hold discovery data.  Would pass an array of Endpoints to support Discovery routine
+
+
+Handling directives for supported interfaces
+	AWS provides endpointID and a user token
+	AWS provides directive for interface (e.g. TurnOn for powerState)
+	pyASH needs to know what device type to use to respond to the request
+
+	How does pyASH decide which device type to use for the response?
+	Options:
+		Use endpointID to look up device details in some repository
+			Could be hard coded or from a db
+		Infer the endpoint type based upon the requested interface/directive
+		Use some encoding in the issued endpointID (e.g. <type>:<id>)
+
+ReportState
+	AWS provides endpointID and user token
+	pyASH needs to look up thing from endpointID/token, determine the things' status and respond back

@@ -21,7 +21,6 @@ logger = logging.getLogger(__name__)
 logger.setLevel(LOGLEVEL)
 
 
-
 # ControllerInterface class -- Function router for implementing an Alexa Smart Home application
 #
 # Two main methods...
