@@ -925,7 +925,7 @@ class Event(ResponseElement):
         super(Event, self).__init__()
 
         h = header.get_json() if isinstance(header, Header) else header
-        e = endpoint.get_json() if isinstance(endpoint, Endpoint) else endpoint
+        e = endpoint.get_json() if isinstance(endpoint, EndpointResponse) else endpoint
         p = payload.get_json() if isinstance(payload, Payload) else payload
 
         self.json = {
@@ -1075,11 +1075,11 @@ class Endpoints():
     def __init__(self, endpoint = None):
         self.value = []
 
-        if isinstance(endpoint, Endpoint):
+        if isinstance(endpoint, EndpointResponse):
             add(endpoint)
 
     def add(self, endpoint):
-        if not isinstance(endpoint, Endpoint):
+        if not isinstance(endpoint, EndpointResponse):
             raise TypeError('Endpoints can only add Endpoint objects.  Received a ' + str(type(endpoint)))
 
         self.value.append(endpoint.get_json())
@@ -1161,9 +1161,9 @@ class Capability(ResponseElement):
             self.json['supportsDeactivation'] = supportsDeactivation
 
 
-class Endpoint(ResponseElement):
+class EndpointResponse(ResponseElement):
     def __init__(self, endpointId, manufacturerName='', friendlyName='', description='', displayCategories=[], cookie='', capabilities=[], token={}):
-        super(Endpoint, self).__init__()
+        super(EndpointResponse, self).__init__()
 
         if token:
             self.json = { 'endpointId': endpointId, 'scope': { 'type':'BearerToken', 'token': token }}
@@ -1270,12 +1270,12 @@ class Response(ResponseElement):
         # Respond to Discovery
         # No default possible
         elif d.namespace == 'Alexa.Discovery' and d.name == 'Discover':
-            if isinstance(response, Endpoint):
+            if isinstance(response, EndpointResponse):
                 response = [ response ]
             if type(response) != list:
                 raise TypeError('Discovery response requires either an endpoint object or an array of endpoint objects')
             for i in range(len(response)):
-                if not isinstance(response[i], Endpoint):
+                if not isinstance(response[i], EndpointResponse):
                     raise TypeError('Endpoint array contains a non-endpoint.  Type was {0}'.format(str(type(response[i]))))
                 response[i] = response[i].get_json()
             header = Header('Alexa.Discovery', 'Discover.Response',payloadVersion=d.payloadVersion)
@@ -1364,7 +1364,7 @@ class Response(ResponseElement):
                 tok = d.token
             except:
                 tok = None
-            endpoint = Endpoint(d.endpointId, token=tok)
+            endpoint = EndpointResponse(d.endpointId, token=tok)
             self.json = {
                 'context': {},
                 'event': {
@@ -1423,7 +1423,7 @@ class ErrorResponse(ResponseElement):
             }
         }
 
-        if isinstance(endpoint, Endpoint):
+        if isinstance(endpoint, EndpointResponse):
             endpoint = endpoint.get_json()
 
         if endpoint:

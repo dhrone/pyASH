@@ -6,7 +6,9 @@
 import logging
 import time
 import uuid
+import os
 import boto3
+from exceptions import *
 from boto3.dynamodb.conditions import Key, Attr
 from botocore.exceptions import ClientError
 
@@ -126,21 +128,7 @@ DEFAULT_SYSTEM_NAME = 'pyASH'
 
 # Utilities
 
-# Custom Exceptions
-class MissingCredential(Exception):
-    pass
 
-class MissingRequiredValue(Exception):
-    pass
-
-class FailedAuthorization(Exception):
-    pass
-
-class BadRequest(IOError):
-    pass
-
-class TokenMissing(Exception):
-    pass
 
 def get_utc_timestamp(seconds=None):
     return time.strftime("%Y-%m-%dT%H:%M:%S.", time.gmtime(seconds)) + str(time.time()).split('.')[1][:2] + 'Z'
@@ -206,19 +194,6 @@ def fix_term(term):
                 return i
     raise ValueError('{0} not a valid term'.format(term))
 
-
-class _classproperty(property):
-    """Utility class for @property fields on the class."""
-    def __init__(self, func):
-        self.func = func
-        self.__doc__ = func.__doc__
-
-    def __get__(self, instance, owner):
-        # This makes docstrings work
-        if owner is Endpoint:
-            return self
-        return self.func(owner)
-
 # Oauth2 utilities
 def validateReturnCode(status_code):
     if status_code == 401:
@@ -235,28 +210,61 @@ def validateReturnCode(status_code):
         raise IOError(errmsg)
     return status_code
 
-
-def get_user_profile(user_token):
-    payload = { 'access_token': user_token }
+def getUserProfile(accessToken):
+    payload = { 'access_token': accessToken }
     r = requests.get("https://api.amazon.com/user/profile", params=payload)
+    validateReturnCode(r.status_code)
+    return r.json()
 
-    if r.status_code != 200:
-        errmsg = 'get_user_id: unable to retrieve profile.  Return code was ' + str(r.status_code)
-        logger.warn(errmsg)
-        r.raise_for_status()
-
-    user_id = ''
-    user_email = ''
-    user_name = ''
+def refreshAccessToken(refreshToken):
     try:
-        user_id = r.json()['user_id']
-        user_email = r.json()['email']
-        user_name = r.json()['name']
+        # Get stored credentials for the LWA service
+        lwa_client_id = os.environ['oauth2_client_id']
+        lwa_client_secret = os.environ['oauth2_client_secret']
     except KeyError:
-        if user_id == '':
-            errmsg = 'handle_authorization: requested profile but user_id not received'
-        elif user_name == '' or user_email == '':
-            errmsg = 'handle_authorization: requested profile but user_name or user_email not received'
-        logger.warn(errmsg)
+        errmsg = 'Missing oauth2 credentials.  Unable to retrieve tokens'
+        logger.critical(errmsg)
+        raise MissingCredential(errmsg)
 
-    return { 'user_id': user_id, 'email': user_email, 'name': user_name }
+    payload = {
+        'grant_type':'refresh_token',
+        'client_id':lwa_client_id,
+        'client_secret':lwa_client_secret,
+    }
+
+    r = requests.post("https://api.amazon.com/auth/o2/token", data=payload)
+    validateReturnCode(r.status_code)
+
+    try:
+        return r.json()
+    except KeyError:
+        errmsg = 'Tokens not in response'
+        logger.warn(errmsg)
+        raise TokenMissing(errmsg)
+
+def getAccessTokenFromCode(code):
+    try:
+        # Get stored credentials for the LWA service
+        lwa_client_id = os.environ['oauth2_client_id']
+        lwa_client_secret = os.environ['oauth2_client_secret']
+    except KeyError:
+        errmsg = 'Missing oauth2 credentials.  Unable to retrieve tokens'
+        logger.critical(errmsg)
+        raise MissingCredential(errmsg)
+
+    payload = {
+        'grant_type':'authorization_code',
+        'code': d.code,
+        'client_id':lwa_client_id,
+        'client_secret':lwa_client_secret,
+    }
+
+    r = requests.post("https://api.amazon.com/auth/o2/token", data=payload)
+    validateReturnCode(r.status_code)
+
+    try:
+        return r.json()
+    except KeyError:
+        errmsg = 'Tokens not in response'
+        logger.warn(errmsg)
+        raise TokenMissing(errmsg)

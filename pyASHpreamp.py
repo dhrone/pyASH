@@ -149,12 +149,12 @@ def DiscoverHandler(directive):
     cps.append( pyASH.Capability('Alexa.Speaker', 'muted', False, True) )
     cps.append( pyASH.Capability('Alexa.PowerController', 'powerState', False, True) )
     cps.append( pyASH.Capability('Alexa.InputController', 'input', False, True) )
-    ep = pyASH.Endpoint("avmctrl_den", "pyASH", "Sound", "Sound by pyASH", ["OTHER"], capabilities = cps)
+    ep = pyASH.EndpointResponse("avmctrl_den", "pyASH", "Sound", "Sound by pyASH", ["OTHER"], capabilities = cps)
     endpoints.append(ep)
 
     cps = []
     cps.append( pyASH.Capability('Alexa.SceneController', supportsDeactivation=True, proactivelyReported=False) )
-    ep = pyASH.Endpoint("avmctrl_den:watch", "pyASH", "TV", "TV Scene connected by pyASH", ["ACTIVITY_TRIGGER"], capabilities=cps)
+    ep = pyASH.EndpointResponse("avmctrl_den:watch", "pyASH", "TV", "TV Scene connected by pyASH", ["ACTIVITY_TRIGGER"], capabilities=cps)
     endpoints.append(ep)
 
     return pyASH.Response(directive, endpoints)

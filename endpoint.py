@@ -7,26 +7,72 @@ import json
 import pyASH
 
 from utility import *
-from utility import _classproperty
+from message import EndpointResponse, Capability
+
+class _classproperty(property):
+    """Utility class for @property fields on the class."""
+    def __init__(self, func):
+        self.func = func
+        self.__doc__ = func.__doc__
+
+    def __get__(self, instance, owner):
+        # This makes docstrings work
+        if owner is Endpoint:
+            return self
+        return self.func(owner)
 
 class Endpoint(object):
-    def __init__(self, request=None):
-        """Appliance gets initialized just before its action methods are called. Put your
-        logic for preparation before handling the request here.
-        """
-        if request is not None:
-            self.request = request
-            self.id = request.appliance_id
-            self.additional_details = request.appliance_details
+    friendlyName = 'pyASH device'
+    manufacturerName = 'pyASH'
+    description = 'Generic device by pyASH'
+    displayCategories = 'OTHER'
+    proactivelyReported = None
+    retrievable = None
+    supportsDeactivation = None
+    cookie = None
 
-    class _Metadata:
-        manufacturerName = 'dhrone'
-        description = 'Generic device by dhrone'
-        displayCategories = 'OTHER'
+    def __init__(self, endpointId=None, friendlyName = None, manufacturerName=None, description = None, displayCategories=None, proactivelyReported=None, retrievable=None, supportsDeactivation=None, cookie=None, json=None):
+
+        if json:
+            self.endpointId = json.get('endpointId') if 'endpointId' in json else None
+            self.friendlyName = json.get('friendlyName') if 'friendlyName' in json else None
+            self.manufacturerName = json.get('manufacturerName') if 'manufacturerName' in json else None
+            self.description = json.get('description') if 'description' in json else None
+            self.displayCategories = json.get('displayCategories') if 'displayCategories' in json else None
+            self.proactivelyReported = json.get('proactivelyReported') if 'proactivelyReported' in json else None
+            self.retrievable = json.get('retrievable') if 'retrievable' in json else None
+            self.supportsDeactivation = json.get('supportsDeactivation') if 'supportsDeactivation' in json else None
+            self.cookie = json.get('cookie') if 'cookie' in json else None
+        else:
+            self.endpointId = endpointId
+            self.friendlyName = friendlyName if friendlyName else Endpoint.friendlyName
+            self.manufacturerName = manufacturerName if manufacturerName else Endpoint.manufacturerName
+            self.description = description if description else Endpoint.description
+            self.displayCategories = displayCategories if displayCategories else Endpoint.displayCategories
+            self.proactivelyReported = proactivelyReported if proactivelyReported else Endpoint.proactivelyReported
+            self.retrievable = retrievable if retrievable else Endpoint.retrievable
+            self.supportsDeactivation = supportsDeactivation if supportsDeactivation else Endpoint.supportsDeactivation
+            self.cookie = cookie if cookie else Endpoint.cookie
+
+    @property
+    def json(self):
+        return {
+            'endpointId': self.endpointId,
+            'className': self.__class__.__name__,
+            'friendlyName': self.friendlyName,
+            'manufacturerName': self.manufacturerName,
+            'description': self.description,
+            'displayCategories': self.displayCategories,
+            'proactivelyReported': self.proactivelyReported,
+            'retrievable': self.retrievable,
+            'supportsDeactivation': self.supportsDeactivation,
+            'cookie': self.cookie
+        }
 
     @classmethod
     def register(cls, *args, **kwargs):
         _interface = kwargs['interface'] if 'interface' in kwargs else ''
+        _properties = kwargs['properties'] if 'properties' in kwargs else '__all__'
         if _interface:
             Endpoint.lookupInterface(_interface)
 
@@ -35,24 +81,50 @@ class Endpoint(object):
             for item in d:
                 directives = getattr(func, '_directives', [])
                 interface = _interface if _interface else Endpoint.lookupInterfaceFromDirective(item)
-                func._directives = directives + [(interface, Endpoint.lookupDirective(item,interface))]
+                func._directives = directives + [(interface, Endpoint.lookupDirective(item,interface), _properties)]
             return func
         def decorateinterface(func):
             directives = getattr(func, '_directives', [])
             interface = _interface if _interface else Endpoint.lookupInterfaceFromDirective(func.__name__)
-            func._directives = directives + [(interface, Endpoint.lookupDirective(func.__name__, interface))]
+            func._directives = directives + [(interface, Endpoint.lookupDirective(func.__name__, interface), _properties)]
             return func
 
         if args:
             if callable(args[0]):
                 directives = getattr(args[0], '_directives', [])
                 interface = _interface if _interface else Endpoint.lookupInterfaceFromDirective(args[0].__name__)
-                args[0]._directives = directives + [(interface, Endpoint.lookupDirective(args[0].__name__,interface))]
+                args[0]._directives = directives + [(interface, Endpoint.lookupDirective(args[0].__name__,interface), _properties)]
                 return args[0]
             else:
                 return decoratelist
         else:
             return decorateinterface
+
+    @property
+    def _getCapabilities(self):
+        ### Need to go through all of the potential capabilities per interface to make sure I am handling all of the special cases
+
+        ip_list = self.properties
+        cps = [Capability('Alexa')] # All endpoints should report this generic capability
+        for interface in ip_list:
+            if len(ip_list[interface]):
+                for property in ip_list[interface]:
+                    # Main use case.  Handles most of the capabilities
+                    cps.append( Capability(interface, property, self.proactivelyReported, self.retrievable) )
+            else:
+                # Handles all of the special cases
+                if interface == 'Alexa.SceneController':
+                    cps.append( Capability(interface, property, proactivelyReported=self.proactivelyReported, supportsDeactivation = self.supportsDeactivation) )
+                elif interface == 'Alexa.CameraStreamController':
+                    pass
+                else:
+                    # Handles all of the normal non-property use-cases
+                    cps.append( Capability(interface, self.proactivelyReported, self.retrievable) )
+        return cps
+
+    def endpointResponse(self):
+        # endpointId, manufacturerName='', friendlyName='', description='', displayCategories=[], cookie='', capabilities=[], token={}
+        return EndpointResponse(self.endpointId, self.manufacturerName, self.friendlyName, self.description, self.displayCategories, self.cookie, self._getCapabilities)
 
     @staticmethod
     def lookupInterface(interface):
@@ -99,6 +171,30 @@ class Endpoint(object):
                 for action in getattr(method, '_directives', []):
                     ret[action] = method
         return ret
+
+    @property
+    def properties(self):
+
+        ret = self.actions
+        idp_list = ret.keys()
+        ret = {}
+        for i in idp_list:
+            if i[2] == '__all__':
+                ret[i[0]] = VALID_PROPERTIES[i[0]]
+            else:
+                if i[0] in ret:
+                    if type(i[2]) is tuple:
+                        for j in i[2]:
+                            if j not in ret[i[0]]:
+                                ret[i[0]].append(j)
+                    else:
+                        if i[2] not in ret[i[0]]:
+                            ret[i[0]].append(i[2])
+                else:
+                    ret[i[0]] = list(i[2]) if type(i[2]) is tuple else [i[2]]
+        return ret
+
+
 
 
     @_classproperty

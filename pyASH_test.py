@@ -888,7 +888,7 @@ def EXAMPLEdiscoverhandler(directive):
     cps.append( pyASH.Capability('Alexa.ColorController', 'color', True, True) )
     cps.append( pyASH.Capability('Alexa.PowerController', 'powerState', True, True) )
     cps.append( pyASH.Capability('Alexa.BrightnessController', 'brightness', True, True) )
-    ep = pyASH.Endpoint("appliance-001", "Sample Manufacturer", "Living Room Light", "Smart Light by Sample Manufacturer", ["LIGHT"], \
+    ep = pyASH.EndpointResponse("appliance-001", "Sample Manufacturer", "Living Room Light", "Smart Light by Sample Manufacturer", ["LIGHT"], \
         cookie = { \
            "extraDetail1":"optionalDetailForSkillAdapterToReferenceThisDevice", \
            "extraDetail2":"There can be multiple entries", \
@@ -902,20 +902,20 @@ def EXAMPLEdiscoverhandler(directive):
     cps.append( pyASH.Capability('Alexa', version='3') )
     cps.append( pyASH.Capability('Alexa.ThermostatController', ['lowerSetpoint','targetSetpoint', 'upperSetpoint', 'thermostatMode'], True, True) )
     cps.append( pyASH.Capability('Alexa.TemperatureSensor', 'temperature', False, True) )
-    ep = pyASH.Endpoint("appliance-002", "Sample Manufacturer", "Hallway Thermostat", "Smart Thermostat by Sample Manufacturer", ["THERMOSTAT"], cookie = {}, capabilities = cps)
+    ep = pyASH.EndpointResponse("appliance-002", "Sample Manufacturer", "Hallway Thermostat", "Smart Thermostat by Sample Manufacturer", ["THERMOSTAT"], cookie = {}, capabilities = cps)
     endpoints.append(ep)
 
     # Add appliance-003
     cps = []
     cps.append( pyASH.Capability('Alexa.LockController', 'lockState', True, True) )
     cps.append( pyASH.Capability('Alexa.EndpointHealth', 'connectivity', True, True) )
-    ep = pyASH.Endpoint("appliance-003", "Sample Manufacturer", "Front Door", "Smart Lock by Sample Manufacturer", ["SMARTLOCK"], cookie = {}, capabilities = cps)
+    ep = pyASH.EndpointResponse("appliance-003", "Sample Manufacturer", "Front Door", "Smart Lock by Sample Manufacturer", ["SMARTLOCK"], cookie = {}, capabilities = cps)
     endpoints.append(ep)
 
     # Add appliance-004
     cps = []
     cps.append( pyASH.Capability('Alexa.SceneController', proactivelyReported=True, supportsDeactivation = False))
-    ep = pyASH.Endpoint("appliance-004", "Sample Manufacturer", "Goodnight", "Smart Scene by Sample Manufacturer", ["SCENE_TRIGGER"], cookie = {}, capabilities = cps)
+    ep = pyASH.EndpointResponse("appliance-004", "Sample Manufacturer", "Goodnight", "Smart Scene by Sample Manufacturer", ["SCENE_TRIGGER"], cookie = {}, capabilities = cps)
     endpoints.append(ep)
 
     # Add appliance-005
@@ -923,7 +923,7 @@ def EXAMPLEdiscoverhandler(directive):
     cps.append( pyASH.Capability('Alexa', version='3') )
     cps.append( pyASH.Capability('Alexa.SceneController', proactivelyReported=True, supportsDeactivation = True))
     cps.append( pyASH.Capability('Alexa.EndpointHealth', 'connectivity', True, True) )
-    ep = pyASH.Endpoint("appliance-005", "Sample Manufacturer", "Watch TV", "Smart Activity by Sample Manufacturer", ["ACTIVITY_TRIGGER"], cookie = {}, capabilities = cps)
+    ep = pyASH.EndpointResponse("appliance-005", "Sample Manufacturer", "Watch TV", "Smart Activity by Sample Manufacturer", ["ACTIVITY_TRIGGER"], cookie = {}, capabilities = cps)
     endpoints.append(ep)
 
     # Add appliance-006
@@ -938,7 +938,7 @@ def EXAMPLEdiscoverhandler(directive):
     cps.append( pyASH.Capability('Alexa.CameraStreamController', cameraStreamConfigurations=cscs.value) )
     cps.append( pyASH.Capability('Alexa.PowerController', 'powerState', True, True) )
     cps.append( pyASH.Capability('Alexa.EndpointHealth', 'connectivity', True, True) )
-    ep = pyASH.Endpoint("appliance-006", "Sample Manufacturer", "Back Door Camera", "Smart Camera by Sample Manufacturer", ["CAMERA"], cookie = {}, capabilities = cps)
+    ep = pyASH.EndpointResponse("appliance-006", "Sample Manufacturer", "Back Door Camera", "Smart Camera by Sample Manufacturer", ["CAMERA"], cookie = {}, capabilities = cps)
     endpoints.append(ep)
 
     return pyASH.Response(directive, endpoints)

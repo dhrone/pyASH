@@ -1,4 +1,3 @@
-from abc import ABC
 from utility import *
 
 # Setup logger
@@ -6,7 +5,7 @@ import logging
 logger = logging.getLogger(__name__)
 logger.setLevel(LOGLEVEL)
 
-class Persist(ABC):
+class Persist(object):
     def __init__(self, primaryKey, primaryKeyName, tableName = 'Persist', secondaryKey=None, secondaryKeyName=None, systemName=DEFAULT_SYSTEM_NAME, region=DEFAULT_REGION, dataAgeMax=5):
         self.primaryKey = primaryKey
         self.primaryKeyName = primaryKeyName
@@ -109,10 +108,20 @@ class Persist(ABC):
 
 class Things(Persist):
     def __init__(self, userId='', systemName=DEFAULT_SYSTEM_NAME, region=DEFAULT_REGION):
-        super(Things, self).__init__(userId, 'userId', 'Things')
+        super(Things, self).__init__(userId, 'uuid', 'Things')
         self.userId = userId
 
 class Tokens(Persist):
     def __init__(self, userId='', systemName=DEFAULT_SYSTEM_NAME, region=DEFAULT_REGION):
         super(Tokens, self).__init__(userId, 'userId', 'Tokens')
+        self.userId = userId
+
+class UUIDemail(Persist):
+    def __init__(self, userId='', systemName=DEFAULT_SYSTEM_NAME, region=DEFAULT_REGION):
+        super(Tokens, self).__init__(userId, 'email', 'UUIDlookupEmail')
+        self.userId = userId
+
+class UUIDuserid(Persist):
+    def __init__(self, userId='', systemName=DEFAULT_SYSTEM_NAME, region=DEFAULT_REGION):
+        super(Tokens, self).__init__(userId, 'userId', 'UUIDlookupUserId')
         self.userId = userId

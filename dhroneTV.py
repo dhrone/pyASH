@@ -49,10 +49,9 @@ class iotTV(Iot):
         return value * 10
 
 class dhroneTV(Endpoint):
-    class Metadata:
-        manufacturerName = 'dhrone'
-        description = 'iotTV controller by dhrone'
-        displayCategories = 'OTHER'
+    manufacturerName = 'dhrone'
+    description = 'iotTV controller by dhrone'
+    displayCategories = 'OTHER'
 
     @Endpoint.register(['TurnOn'])
     def TurnOn(self, request):
@@ -71,10 +70,9 @@ class dhroneTV(Endpoint):
         else:
             d['volume'] = request.payload['volume']
 
-    @Endpoint.register
-    def SetMute(self, request):
-        d = iotTV(request.endpointId)
-        d['muted'] = request.payload['mute']
+#    def SetMute(self, request):
+#        d = iotTV(request.endpointId)
+#        d['muted'] = request.payload['mute']
 
     @Endpoint.register
     def SelectInput(self, request):
@@ -82,10 +80,9 @@ class dhroneTV(Endpoint):
         d['asource'] = request.payload['input']
 
 class dhroneTVScene(Endpoint):
-    class Metadata:
-        manufacturerName = 'dhrone'
-        description = 'iotTV controller by dhrone'
-        displayCategories = 'SCENE_TRIGGER'
+    manufacturerName = 'dhrone'
+    description = 'iotTV controller by dhrone'
+    displayCategories = 'SCENE_TRIGGER'
 
     @Endpoint.register
     def Activate(self, request):
@@ -101,19 +98,13 @@ class dhroneTVScene(Endpoint):
         ds = { 'epower': False, 'input': 'CD' }
         d.batchSet(ds)
 
+
+#user = StaticUser(dhroneTV('avmctrl_den'), dhroneTVScene('avmctrl_den:scene1'))
+#user = DbUser(dhroneTV, dhroneTVScene)
+#ash = pyASH(user, dhroneTV, dhroneTVScene)
+#lambda_handler = ash.lambda_handler
+
 if __name__ == u'__main__':
-	to = Tokens()
-	th = Things()
-	to.createTable()
-	th.createTable()
-	print ('Creating Tables.  This can take up to 60 seconds')
-	starttime = time.time()
-	while True:
-		if to.ready():
-			break
-		print ('{0} seconds elapsed'.format(int(time.time() - starttime)))
-	while True:
-		if th.ready():
-			break
-		print ('{0} seconds elapsed'.format(int(time.time() - starttime)))
-	print ('Finished')
+from user import DbUser
+
+DbUser.createTables()
