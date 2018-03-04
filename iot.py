@@ -39,7 +39,7 @@ class Iot(object):
         # Send desired changes to shadow
         bdata = json.dumps(item).encode('utf-8')
         response = self.client.update_thing_shadow(thingName=self.endpointId, payload = bdata)
-        currentTime = time.time()
+        currentTime = int(time.time())
         for item in newState:
             self.reportedStateTimeStamp[item] = {'timestamp': currentTime}
 

@@ -1274,9 +1274,9 @@ class defaultResponse(ResponseElement):
         if iot:
             iotTime = iot.timeStamps
             volume=iot['volume']
-            tsV = iotTime.get('volume', tsV)
+            tsV = get_utc_timestamp(iotTime.get('volume', tsV))
             muted = iot['muted']
-            tsM = iotTime.get('muted',tsM)
+            tsM = get_utc_timestamp(iotTime.get('muted',tsM))
 
         properties = [ SpeakerVolumeProperty(volume,tsV,0), SpeakerMuteProperty(muted, tsM, 0) ]
         return Response(request, properties)
@@ -1287,11 +1287,11 @@ class defaultResponse(ResponseElement):
         properties = []
         if cls:
             var = request.payload[varname]
-            ts = get_utc_timestamp()
+            ts = int(get_utc_timestamp())
             if iot:
                 iotTime = iot.timeStamps
                 var=iot[varname]
-                ts = iotTime.get(varname, ts)
+                ts = get_utc_timestamp(iotTime.get(varname, ts))
                 properties = [ cls(var,ts,0) ]
         return Response(request, properties)
 

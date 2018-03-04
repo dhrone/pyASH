@@ -23,7 +23,6 @@ logger.setLevel(LOGLEVEL)
 
 class User(ABC):
 
-
     def __init__(self, iotcls = None):
         self.iotcls = iotcls
         self.endpoints = {}
@@ -51,6 +50,26 @@ class User(ABC):
         self.accessTokenExpires = response['expires_in']
         self._getUserProfile(self.accessToken)
         return response
+
+    def handleDirective(self, request):
+        # Find appropriate handler for message by looking up endpointId
+        try:
+            endpoint = self.endpoints[request.endpointId]
+        except KeyError:
+            raise EndpointNotFoundException('{0} not found'.format(request.endpointId))
+
+        method = endpoint.getHandler(request)
+        if not method:
+            raise NoMethodToHandleDirectiveException('No method to handle {0}:{1}'.format(request.namespace,request.directive))
+
+        # bind the method to it's class
+        method = method.__get__(endpoint, endpoint.__class__)
+
+        iot = self.iotcls(request.endpointId) if self.iotcls else None
+        response = method(request, iot)
+        if response:
+            return response
+        return defaultResponse(request,iot)
 
     def addEndpoint(self, endpoint):
         self.endpointClasses[endpoint.__class__.__name__] = endpoint.__class__
@@ -106,26 +125,6 @@ class DbUser(User):
         for e in self.endpoints.values():
             epResponses.append(e.endpointResponse())
         return Response(request, epResponses)
-
-    def handleDirective(self, request):
-        # Find appropriate handler for message by looking up endpointId
-        try:
-            endpoint = self.endpoints[request.endpointId]
-        except KeyError:
-            raise EndpointNotFoundException('{0} not found'.format(request.endpointId))
-
-        method = endpoint.getHandler(request)
-        if not method:
-            raise NoMethodToHandleDirectiveException('No method to handle {0}:{1}'.format(request.namespace,request.directive))
-
-        # bind the method to it's class
-        method = method.__get__(endpoint, endpoint.__class__)
-
-        iot = self.iotcls(request.endpointId) if self.iotcls else None
-        response = method(request, iot)
-        if response:
-            return response
-        return defaultResponse(request,iot)
 
     def getUser(self, token=None, userId=None, userEmail=None):
         self.userId = userId
@@ -196,8 +195,6 @@ class DbUser(User):
             dbUUIDemail['uuid'] = uuid
         print ('creating user {0} with uuid {1}'.format(email, uuid))
         self.getUser(userEmail=email)
-
-
 
     def commit(self):
         self._persistEndpoints()
