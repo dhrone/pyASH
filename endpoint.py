@@ -4,10 +4,15 @@
 #
 
 import json
-import pyASH
 
+# pyASH imports
 from utility import *
 from message import EndpointResponse, Capability
+
+# Setup logger
+import logging
+logger = logging.getLogger(__name__)
+logger.setLevel(LOGLEVEL)
 
 class _classproperty(property):
     """Utility class for @property fields on the class."""
@@ -30,8 +35,9 @@ class Endpoint(object):
     retrievable = None
     supportsDeactivation = None
     cookie = None
+    endpointIdPattern = None
 
-    def __init__(self, endpointId=None, friendlyName = None, manufacturerName=None, description = None, displayCategories=None, proactivelyReported=None, retrievable=None, supportsDeactivation=None, cookie=None, json=None):
+    def __init__(self, endpointId=None, friendlyName = None, description = None, manufacturerName=None, displayCategories=None, proactivelyReported=None, retrievable=None, supportsDeactivation=None, cookie=None, json=None):
 
         if json:
             self.endpointId = json.get('endpointId') if 'endpointId' in json else None
@@ -104,7 +110,7 @@ class Endpoint(object):
     def _getCapabilities(self):
         ### Need to go through all of the potential capabilities per interface to make sure I am handling all of the special cases
 
-        ip_list = self.properties
+        ip_list = self._properties
         cps = [Capability('Alexa')] # All endpoints should report this generic capability
         for interface in ip_list:
             if len(ip_list[interface]):
@@ -114,7 +120,7 @@ class Endpoint(object):
             else:
                 # Handles all of the special cases
                 if interface == 'Alexa.SceneController':
-                    cps.append( Capability(interface, property, proactivelyReported=self.proactivelyReported, supportsDeactivation = self.supportsDeactivation) )
+                    cps.append( Capability(interface, proactivelyReported=self.proactivelyReported, supportsDeactivation = self.supportsDeactivation) )
                 elif interface == 'Alexa.CameraStreamController':
                     pass
                 else:
@@ -128,15 +134,15 @@ class Endpoint(object):
 
     @staticmethod
     def lookupInterface(interface):
-        for item in pyASH.VALID_DIRECTIVES:
+        for item in VALID_DIRECTIVES:
             if interface == item:
                 return interface
         raise ValueError('{0} is not a valid interface'.format(interface))
 
     @staticmethod
     def lookupInterfaceFromDirective(directive):
-        for interface in pyASH.VALID_DIRECTIVES:
-            for item in pyASH.VALID_DIRECTIVES[interface]:
+        for interface in VALID_DIRECTIVES:
+            for item in VALID_DIRECTIVES[interface]:
                 if directive == item:
                     return interface
         raise ValueError('{0} is not a valid directive'.format(directive))
@@ -144,12 +150,12 @@ class Endpoint(object):
     @staticmethod
     def lookupDirective(directive, interface=''):
         if interface:
-            for item in pyASH.VALID_DIRECTIVES[interface]:
+            for item in VALID_DIRECTIVES[interface]:
                 if directive == item:
                     return directive
         else:
-            for interface in pyASH.VALID_DIRECTIVES:
-                for item in pyASH.VALID_DIRECTIVES[interface]:
+            for interface in VALID_DIRECTIVES:
+                for item in VALID_DIRECTIVES[interface]:
                     if directive == item:
                         return interface
         if interface:
@@ -173,7 +179,7 @@ class Endpoint(object):
         return ret
 
     @property
-    def properties(self):
+    def _properties(self):
 
         ret = self.actions
         idp_list = ret.keys()
@@ -194,8 +200,11 @@ class Endpoint(object):
                     ret[i[0]] = list(i[2]) if type(i[2]) is tuple else [i[2]]
         return ret
 
-
-
+    def getHandler(self, request):
+        ret = self.actions
+        for i in ret:
+            if i[0] == request.namespace and i[1] == request.directive:
+                return ret[i]
 
     @_classproperty
     def request_handlers(cls):

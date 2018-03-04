@@ -7,15 +7,23 @@ import logging
 import time
 import uuid
 import os
+import requests
 import boto3
-from exceptions import *
 from boto3.dynamodb.conditions import Key, Attr
 from botocore.exceptions import ClientError
 
+# Set up logging
 LOGLEVEL = logging.WARN
 
 logger = logging.getLogger(__name__)
 logger.setLevel(LOGLEVEL)
+
+# pyASH imports
+from exceptions import *
+
+DEFAULT_REGION = 'us-east-1'
+DEFAULT_IOTREGION = 'us-west-2'
+DEFAULT_SYSTEM_NAME = 'pyASH'
 
 VALID_PROPERTIES = {
     'Alexa': [],
@@ -123,8 +131,7 @@ VALID_TERMS = [ VALID_COOKINGMODES, VALID_CONNECTIVITY, VALID_ENUMERATEDPOWERLEV
     VALID_PAYLOADVERSIONS
 ]
 
-DEFAULT_REGION = 'us-east-1'
-DEFAULT_SYSTEM_NAME = 'pyASH'
+
 
 # Utilities
 
@@ -199,11 +206,11 @@ def validateReturnCode(status_code):
     if status_code == 401:
         errmsg = 'Permission denied.  Unable to retrieve profile.'
         logger.warn(errmsg)
-        raise FailedAuthorization(errmsg)
+        raise FailedAuthorizationException(errmsg)
     elif status_code == 400:
         errmsg = 'Bad request.  Unable to retrieve profile.'
         logger.warn(errmsg)
-        raise BadRequest(errmsg)
+        raise BadRequestException(errmsg)
     elif status_code != 200:
         errmsg = 'Unable to retrieve profile.  Error code returned was {0}'.format(r.status_code)
         logger.warn(errmsg)
@@ -224,7 +231,7 @@ def refreshAccessToken(refreshToken):
     except KeyError:
         errmsg = 'Missing oauth2 credentials.  Unable to retrieve tokens'
         logger.critical(errmsg)
-        raise MissingCredential(errmsg)
+        raise MissingCredentialException(errmsg)
 
     payload = {
         'grant_type':'refresh_token',
@@ -240,7 +247,7 @@ def refreshAccessToken(refreshToken):
     except KeyError:
         errmsg = 'Tokens not in response'
         logger.warn(errmsg)
-        raise TokenMissing(errmsg)
+        raise TokenMissingException(errmsg)
 
 def getAccessTokenFromCode(code):
     try:
@@ -250,7 +257,7 @@ def getAccessTokenFromCode(code):
     except KeyError:
         errmsg = 'Missing oauth2 credentials.  Unable to retrieve tokens'
         logger.critical(errmsg)
-        raise MissingCredential(errmsg)
+        raise MissingCredentialException(errmsg)
 
     payload = {
         'grant_type':'authorization_code',
@@ -267,4 +274,4 @@ def getAccessTokenFromCode(code):
     except KeyError:
         errmsg = 'Tokens not in response'
         logger.warn(errmsg)
-        raise TokenMissing(errmsg)
+        raise TokenMissingException(errmsg)

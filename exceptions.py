@@ -4,17 +4,26 @@
 #
 
 # Custom Exceptions
-class MissingCredential(Exception):
+class MissingCredentialException(Exception):
     pass
 
-class MissingRequiredValue(Exception):
+class MissingRequiredValueException(Exception):
     pass
 
-class FailedAuthorization(Exception):
+class FailedAuthorizationException(Exception):
     pass
 
-class BadRequest(IOError):
+class BadRequestException(IOError):
     pass
 
-class TokenMissing(Exception):
+class TokenMissingException(Exception):
     pass
+
+class UserNotFoundException(Exception):
+	pass
+
+class EndpointNotFoundException(Exception):
+	pass
+
+class NoMethodToHandleDirectiveException(Exception):
+	pass

@@ -1,26 +1,47 @@
-import json
-import boto3
+# -*- coding: utf-8 -*-
 
+# Copyright 2018 dhrone. All Rights Reserved.
+#
+
+import json
+import time
+import boto3
+from botocore.exceptions import ClientError
+
+# pyASH imports
 from utility import *
 
+# Setup logger
+import logging
+logger = logging.getLogger(__name__)
+logger.setLevel(LOGLEVEL)
+
 class Iot(object):
-    def __init__(self, endpointId, region='us-west-2'):
+    uncertainty = { }
+
+    def __init__(self, endpointId, region=DEFAULT_IOTREGION):
         self.endpointId = endpointId
         self.region = region
         self.client = boto3.client('iot-data', region_name=region)
         self.setTransforms()
         self.reportedState = {}
+        self.reportedStateTimeStamp = {}
+
         self._get()
 
     def _get(self):
         thingData = json.loads(self.client.get_thing_shadow(thingName=self.endpointId)['payload'].read().decode('utf-8'))
         self.reportedState = thingData['state']['reported']
+        self.reportedStateTimeStamp = thingData['metadata']['reported']
 
     def _put(self, newState):
         item = {'state': {'desired': newState}}
         # Send desired changes to shadow
         bdata = json.dumps(item).encode('utf-8')
         response = self.client.update_thing_shadow(thingName=self.endpointId, payload = bdata)
+        currentTime = time.time()
+        for item in newState:
+            self.reportedStateTimeStamp[item] = {'timestamp': currentTime}
 
     def __getitem__(self, property):
         (method, variable) = self._getMethodVariable(property, 'to')
@@ -50,17 +71,29 @@ class Iot(object):
             method = self.doNothing
         return (method, property)
 
+    @property
+    def timeStamps(self):
+        ret = {}
+        for variable in self.reportedState:
+            try:
+                (method, property) = self._getMethodProperty(variable, 'to')
+                ret[property] = self.reportedStateTimeStamp[variable]['timestamp']
+            except ValueError:
+                # If a variable can not be translated from device to property then skip it
+                pass
+        return ret
+
     def batchSet(self, propdict):
         vars = {}
         for property in propdict:
-            (method, variable) = _getMethodVariable(property, 'to')
+            (method, variable) = self._getMethodVariable(property, 'to')
             vars[variable] = method(self, propdict[property])
         self._put(vars)
 
     def batchGet(self):
         ret = {}
         for variable in self.reportedState:
-            (method, property) = _getMethodProperty(variable, 'to')
+            (method, property) = self._getMethodProperty(variable, 'to')
             ret[property] = method(self, self.reportedState[variable])
         return ret
 

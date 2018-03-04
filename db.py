@@ -1,3 +1,10 @@
+# -*- coding: utf-8 -*-
+
+# Copyright 2018 dhrone. All Rights Reserved.
+#
+from botocore.exceptions import ClientError
+
+# pyASH imports
 from utility import *
 
 # Setup logger
@@ -62,7 +69,7 @@ class Persist(object):
     def __getitem__(self, property):
         if time.time() > self.dataAge+self.dataAgeMax:
             self._get()
-        return self.item[property]
+        return self.item.get(property)
 
     def __setitem__(self, property, value):
         self.item[property] = value
@@ -107,21 +114,17 @@ class Persist(object):
         return False
 
 class Things(Persist):
-    def __init__(self, userId='', systemName=DEFAULT_SYSTEM_NAME, region=DEFAULT_REGION):
-        super(Things, self).__init__(userId, 'uuid', 'Things')
-        self.userId = userId
+    def __init__(self, uuid='', systemName=DEFAULT_SYSTEM_NAME, region=DEFAULT_REGION):
+        super(Things, self).__init__(uuid, 'uuid', 'Things')
 
 class Tokens(Persist):
     def __init__(self, userId='', systemName=DEFAULT_SYSTEM_NAME, region=DEFAULT_REGION):
         super(Tokens, self).__init__(userId, 'userId', 'Tokens')
-        self.userId = userId
 
 class UUIDemail(Persist):
-    def __init__(self, userId='', systemName=DEFAULT_SYSTEM_NAME, region=DEFAULT_REGION):
-        super(Tokens, self).__init__(userId, 'email', 'UUIDlookupEmail')
-        self.userId = userId
+    def __init__(self, email='', systemName=DEFAULT_SYSTEM_NAME, region=DEFAULT_REGION):
+        super(UUIDemail, self).__init__(email, 'email', 'UUIDlookupEmail')
 
 class UUIDuserid(Persist):
     def __init__(self, userId='', systemName=DEFAULT_SYSTEM_NAME, region=DEFAULT_REGION):
-        super(Tokens, self).__init__(userId, 'userId', 'UUIDlookupUserId')
-        self.userId = userId
+        super(UUIDuserid, self).__init__(userId, 'userId', 'UUIDlookupUserId')

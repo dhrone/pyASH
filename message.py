@@ -7,6 +7,7 @@ import json
 from datetime import datetime
 from datetime import timedelta
 
+# pyASH imports
 from utility import *
 
 # Setup logger
@@ -14,14 +15,13 @@ import logging
 logger = logging.getLogger(__name__)
 logger.setLevel(LOGLEVEL)
 
-
 # Standard Response.  List of namespaces handled in VALID_SIMPLEINTERFACES
 VALID_SIMPLEINTERFACES = ['Alexa.BrightnessController', 'Alexa.ChannelController',\
-    'Alexa.Cooking', 'Alexa.InputController', 'Alexa.LockController', \
-    'Alexa.PercentageController', 'Alexa.PlaybackController', 'Alexa.PowerController', \
-    'Alexa.PowerLevelController', 'Alexa.Speaker', 'Alexa.StepSpeaker', 'Alexa.TemperatureSensor',\
-    'Alexa.ThermostatController', 'Alexa.TimeHoldController']
-
+    'Alexa.ColorTemperatureController','Alexa.Cooking', 'Alexa.InputController', \
+    'Alexa.LockController', 'Alexa.PercentageController', 'Alexa.PlaybackController', \
+    'Alexa.PowerController', 'Alexa.PowerLevelController', 'Alexa.Speaker',\
+    'Alexa.StepSpeaker', 'Alexa.TemperatureSensor', 'Alexa.ThermostatController',\
+    'Alexa.TimeHoldController']
 
 # PropertyElement classes -- These classes help properly format property values
 # They are largely used in the Property classes but also the Request class
@@ -897,6 +897,25 @@ class ThermostatModeProperty(Property):
         pe = ThermostatMode(value, customName)
         super(ThermostatModeProperty, self).__init__('Alexa.ThermostatController', pe, timeOfSample, uncertaintyInMilliseconds)
 
+PROPERTYMAP_SIMPLE = {
+    'Alexa.BrightnessController': ('brightness', BrightnessProperty),
+    'Alexa.ColorTemperatureController': ('colorTemperatureInKelvin', ColorTemperatureInKelvinProperty),
+    'Alexa.InputController': ('input', InputProperty),
+    'Alexa.LockController': ('lockState', LockProperty),
+    'Alexa.PercentageController': ('percentage', PercentageProperty),
+    'Alexa.PowerController': ('powerState', PowerStateProperty),
+    'Alexa.PowerLevelController': ('powerLevel', PowerLevelProperty),
+    'Alexa.PlaybackController': ('', None),
+    'Alexa.StepSpeaker': ('', None)
+}
+#PROPERTYMAP_SIMPLE['Alexa.BrightnessController'] = ('brightness', BrightnessProperty)
+#PROPERTYMAP_SIMPLE['Alexa.ColorTemperatureController'] = ('colorTemperatureInKelvin', ColorTemperatureInKelvinProperty)
+#PROPERTYMAP_SIMPLE['Alexa.InputController'] = ('input', InputProperty)
+#PROPERTYMAP_SIMPLE['Alexa.LockController'] = ('lockState', LockProperty)
+#PROPERTYMAP_SIMPLE['Alexa.PercentageController'] = ('percentage', PercentageProperty)
+#PROPERTYMAP_SIMPLE['Alexa.PowerController'] = ('powerState', PowerStateProperty)
+#PROPERTYMAP_SIMPLE['Alexa.PowerLevelController'] = ('powerLevel', PowerLevelProperty)
+
 # ResponseElement classes -- used to propertly format the elements of a response message
 class ResponseElement(object):
     def __init__(self):
@@ -1084,22 +1103,6 @@ class Endpoints():
 
         self.value.append(endpoint.get_json())
 
-class Properties():
-    def __init__(self, property = None):
-        self.value = []
-
-        if isinstance(property, Property):
-            add(property)
-
-    def add(self, property):
-        if not isinstance(property, Property):
-            raise TypeError('Properties can only add Property objects.  Received a ' + str(type(property)))
-
-        self.value.append(property.get_json())
-
-
-#class Properties(ResponseElement):
-#    def __init__(self, proactivelyReported=False, retrievable=False):
 class Properties_supported(ResponseElement):
     def __init__(self, values, proactivelyReported='', retrievable=''):
         super(Properties_supported, self).__init__()
@@ -1188,6 +1191,7 @@ class EndpointResponse(ResponseElement):
 
 class Request():
     def __init__(self, request):
+
         if type(request) != dict:
             raise TypeError('Expected a dict.  Received a {0}'.format(str(type(request))))
 
@@ -1256,11 +1260,56 @@ class Request():
             if 'thermostatMode' in request['directive']['payload']:
                 self.thermostatMode = ThermostatMode(json=request['directive']['payload']['thermostatMode'])
 
+class defaultResponse(ResponseElement):
+    def __init__(self, request, iot=None):
+        super(defaultResponse, self).__init__()
+
+        self.json = self.composeResponse(request,iot).json
+
+    @staticmethod
+    def responseSpeaker(request, iot):
+        volume = request.payload.get('volume',0)
+        muted = request.payload.get('muted',False)
+        tsV = tsM = get_utc_timestamp()
+        if iot:
+            iotTime = iot.timeStamps
+            volume=iot['volume']
+            tsV = iotTime.get('volume', tsV)
+            muted = iot['muted']
+            tsM = iotTime.get('muted',tsM)
+
+        properties = [ SpeakerVolumeProperty(volume,tsV,0), SpeakerMuteProperty(muted, tsM, 0) ]
+        return Response(request, properties)
+
+    @staticmethod
+    def responseXController(request, iot):
+        (varname, cls) = PROPERTYMAP_SIMPLE[request.interface]
+        properties = []
+        if cls:
+            var = request.payload[varname]
+            ts = get_utc_timestamp()
+            if iot:
+                iotTime = iot.timeStamps
+                var=iot[varname]
+                ts = iotTime.get(varname, ts)
+                properties = [ cls(var,ts,0) ]
+        return Response(request, properties)
+
+    @staticmethod
+    def composeResponse(request,iot=None):
+        if request.namespace in PROPERTYMAP_SIMPLE:
+            return self.responseXController(request,iot)
+
+        return {
+            'Alexa.Speaker': defaultResponse.responseSpeaker
+        }.get(request.namespace)(request,iot)
+
+
 class Response(ResponseElement):
     def __init__(self, request, response=None):
         super(Response, self).__init__()
 
-        d = Request(request)
+        d = request if isinstance(request, Request) else Request(request)
 
         # Respond to AcceptGrant
         if d.namespace == 'Alexa.Authorization' and d.name == 'AcceptGrant':
@@ -1379,13 +1428,20 @@ class Response(ResponseElement):
                 }
             }
 
-        elif d.namespace in pyASH.VALID_SIMPLEINTERFACES:
-            if not isinstance(response, Properties):
-                raise TypeError('Simple responses requires an a Properties object.  Received a '+str(type(response)))
+        elif d.namespace in VALID_SIMPLEINTERFACES:
+            if isinstance(response, Property) or not response:
+                response = [ response ]
+            if type(response) != list:
+                raise TypeError('{0} response requires either a Property object or an array of Property objects'.format(request.interface))
+            for i in range(len(response)):
+                if not isinstance(response[i], Property):
+                    raise TypeError('Property array contains a non-property.  Type was {0}'.format(str(type(response[i]))))
+                response[i] = response[i].get_json()
+
             header = Header('Alexa', 'Response', payloadVersion=d.payloadVersion, correlationToken=d.correlationToken)
             self.json = {
                 'context': {
-                    'properties': response.value,
+                    'properties': response,
                 },
                 'event': {
                     'header': header.get_json(),
@@ -1408,7 +1464,7 @@ class ErrorResponse(ResponseElement):
         super(ErrorResponse, self).__init__()
 
         self.type = type
-        if self.type not in pyASH.VALID_ERROR_TYPES:
+        if self.type not in VALID_ERROR_TYPES:
             raise TypeError('{0} is not a valid error value'.format(self.type))
 
         header = Header(namespace, 'ErrorResponse', correlationToken = correlationToken).get_json()

@@ -1,33 +1,32 @@
- -*- coding: utf-8 -*-
+# -*- coding: utf-8 -*-
 
 # Copyright 2018 by dhrone. All Rights Reserved.
 #
-from abc import ABC
+from abc import ABC, abstractmethod
 import json
 import boto3
 from botocore.vendored import requests
+from decimal import Decimal
+
+# pyASH imports
+from exceptions import *
+from db import Tokens,Things, Persist, UUIDemail, UUIDuserid
+from message import Capability, Request, Response, defaultResponse
+from endpoint import Endpoint
 
 from utility import *
-from exceptions import *
-from db import Tokens,Things, Persist
-from message import Capability, Request, Response
 
 # Setup logger
 import logging
 logger = logging.getLogger(__name__)
 logger.setLevel(LOGLEVEL)
 
-from decimal import Decimal
-
-
 class User(ABC):
 
-    def __init__(self, endpoints=[]):
-        self.endpoints = endpoints
 
-    @abstractmethod
-    def _getEndpoints(token):
-        pass
+    def __init__(self, iotcls = None):
+        self.iotcls = iotcls
+        self.endpoints = {}
 
     @abstractmethod
     def handleAcceptGrant(self, request):
@@ -42,6 +41,7 @@ class User(ABC):
         self.userID = response['user_id']
         self.userName = response['name']
         self.userEmail = response['email']
+        return response
 
     def _getAccessTokensFromCode(self, code):
         response = getAccessTokenFromCode(code)
@@ -50,77 +50,157 @@ class User(ABC):
         self.accessTokenTimestamp = time.time()
         self.accessTokenExpires = response['expires_in']
         self._getUserProfile(self.accessToken)
+        return response
 
+    def addEndpoint(self, endpoint):
+        self.endpointClasses[endpoint.__class__.__name__] = endpoint.__class__
+        self.endpoints[endpoint.endpointID] = endpoint
 
 class StaticUser(User):
-    def __init__(self, endpoints=[]):
+    def __init__(self, endpoints=[], iotcls=None):
+        super(StaticUser, self).__init__(iotcls)
+
         if type(endpoints) != list:
             if isinstance(endpoints, Endpoint):
                 endpoints = [ endpoints ]
             else:
                 raise TypeError('Must provide a list of endpoints')
-        self.endpoints = endpoints
-
-    def _getEndpoints(self, token):
-        return self.endpoints
+        for item in endpoints:
+            self.addEndpoint(item)
 
     def handleDiscovery(self, request):
-        r = Request(request)
-        endpoints = self._getEndpoints(r.token)
-
         epResponses = []
-        for e in endpoints:
+        for e in self.endpoints.values():
             epResponses.append(e.endpointResponse())
-
-        return Response(directive, epResponses)
+        return Response(request, epResponses)
 
     def handleAcceptGrant(self, request):
-        r = Request(request)
-        response = self._getAccessTokenFromCode(r.code)
-        profile = self._getUserProfile(response['access_token'])
-        print "User {0}'s refreshToken is {1}".format(profile['name'], response['refresh_token'])
+        response = self._getAccessTokenFromCode(request.code)
+        profile = self._getUserProfile(self.accessToken)
+        print ("User {0}'s refreshToken is {1}".format(self.userName, self.refreshToken))
 
 class DbUser(User):
-    def __init__(self, endpoints=[], region='us-east-1', systemName = 'pyASH'):
+    def __init__(self, endpointClasses=[], iotcls=None, region='us-east-1', systemName = 'pyASH'):
+        super(DbUser, self).__init__(iotcls)
+
+        self.endpointClasses = {}
         self.region = region
         self.systemName = systemName
-        self.endpointClasses = {}
-        self.endpoints = []
+        self.uuid = None
 
-        if type(endpoints) is not list:
-            endpoints = [ endpoints ]
-
-        for item in endpoints:
+        for item in endpointClasses:
             if isinstance(item, Endpoint):
                 self.endpointClasses[item.__class__.__name__] = item.__class__
             else:
                 self.endpointClasses[item.__name__]=item
 
-    def getUser(self, token=None, userId=None):
-        self.userId = None
+    def handleAcceptGrant(self, request):
+        response = self._getAccessTokenFromCode(request.code)
+
+    def handleDiscovery(self, request):
+        self.getUserProfileFromToken(request.token)
+        self.getUser(self.userId)
+        self._retrieveEndpoints()
+
+        epResponses = []
+        for e in self.endpoints.values():
+            epResponses.append(e.endpointResponse())
+        return Response(request, epResponses)
+
+    def handleDirective(self, request):
+        # Find appropriate handler for message by looking up endpointId
+        try:
+            endpoint = self.endpoints[request.endpointId]
+        except KeyError:
+            raise EndpointNotFoundException('{0} not found'.format(request.endpointId))
+
+        method = endpoint.getHandler(request)
+        if not method:
+            raise NoMethodToHandleDirectiveException('No method to handle {0}:{1}'.format(request.namespace,request.directive))
+
+        # bind the method to it's class
+        method = method.__get__(endpoint, endpoint.__class__)
+
+        iot = self.iotcls(request.endpointId) if self.iotcls else None
+        response = method(request, iot)
+        if response:
+            return response
+        return defaultResponse(request,iot)
+
+    def getUser(self, token=None, userId=None, userEmail=None):
+        self.userId = userId
         self.userName = None
-        self.userEmail = None
+        self.userEmail = userEmail
         self.refreshToken = None
         self.accessToken = token
         self.accessTokenTimestamp = 0
         self.accessTokenExpires = 0
-        self.accessGrantCode = code
+        self.accessGrantCode = None
         self.refreshToken = None
         self.ddb = None
 
-        if not token and not userId:
-            errmsg = 'Cannot initialize a user without an access token or a userId'
+        if not token and not userId and not userEmail:
+            errmsg = 'Cannot initialize a user without an access token, an email address or a userId'
             logger.critical(errmsg)
-            raise MissingRequiredValue(errmsg)
+            raise MissingRequiredValueException(errmsg)
 
         if token:
             self._getUserProfileFromToken()
+        elif userId:
+            self._getUserProfileFromDb()
         else:
-            self._retrieveTokens()
+            self._getUserUUID()
 
-    def addEndpoint(self, endpoint):
-        self.endpointClasses[endpoint.__class__.__name__] = endpoint.__class__
-        self.endpoints.append(endpoint)
+        self._retrieveEndpoints()
+
+    def _getUserUUID(self):
+        res = None
+        if self.userId:
+            dbUUIDuserid = UUIDuserid(self.userId)
+            res = dbUUIDuserid['uuid']
+        if self.userEmail and not res:
+            dbUUIDemail = UUIDemail(self.userEmail)
+            res = dbUUIDemail['uuid']
+        if res:
+            self.uuid = res
+            return self.uuid
+        raise UserNotFoundException
+
+    def _getUserProfileFromToken(self):
+        response = getUserProfile(self.accessToken)
+        self.userID = response['userId']
+        self.userName = response['name']
+        self.userEmail = response['email']
+        self._getUserUUID()
+
+    def _getUserProfileFromDb(self):
+        dbTokens = Tokens(self.userId)
+
+        self.refreshToken = dbTokens['refreshToken']
+        self.userName = dbTokens['userName']
+        self.userEmail = dbTokens['userEmail']
+        if dbTokens['accessTokenTimestamp'] + dbTokens['accessTokenExpires'] < time.time():
+            # Need to refresh access token
+            self._refreshAccessToken()
+        else:
+            self.accessToken = dbTokens['accessToken']
+            self.accessTokenTimestamp = dbTokens['accessTokenTimestamp']
+            self.accessTokenExpires = dbTokens['accessTokenExpires']
+        self._getUserUUID()
+
+    def createUser(self, email):
+        dbUUIDemail = UUIDemail(email)
+        uuid = dbUUIDemail['uuid']
+        if not uuid:
+            uuid = get_uuid()
+            dbUUIDemail['uuid'] = uuid
+        print ('creating user {0} with uuid {1}'.format(email, uuid))
+        self.getUser(userEmail=email)
+
+
+
+    def commit(self):
+        self._persistEndpoints()
 
     @staticmethod
     def createTables():
@@ -142,16 +222,12 @@ class DbUser(User):
     			print ('{0} seconds elapsed'.format(int(time.time() - starttime)))
     	print ('Finished')
 
-
-    def commit(self):
-        self._persistEndpoints()
-
     def _getTokens(self, type):
         if type == 'CODE':
             response = getAccessTokenFromCode(self.accessGrantCode)
         else:
             if not self.refreshToken:
-                self._retrieveTokens()
+                self._getUserProfileFromDb()
             response = refreshAccessToken(self.refreshToken)
         self.accessToken = response['access_token']
         self.refreshToken = response['refresh_token']
@@ -165,12 +241,6 @@ class DbUser(User):
     def _refreshAccessToken(self):
         self._getTokens('REFRESH')
 
-    def _getUserProfileFromToken(self):
-        response = getUserProfile(self.accessToken)
-        self.userID = response['userId']
-        self.userName = response['name']
-        self.userEmail = response['email']
-
     def _persistTokens(self):
         dbTokens = Tokens(self.userId)
         dbTokens['values'] = {
@@ -182,32 +252,18 @@ class DbUser(User):
             'userEmail': self.userEmail
         }
 
-    def _retrieveTokens(self):
-        dbTokens = Tokens(self.userId)
-
-        self.refreshToken = dbTokens['refreshToken']
-        self.userName = dbTokens['userName']
-        self.userEmail = dbTokens['userEmail']
-        if dbTokens['accessTokenTimestamp'] + dbTokens['accessTokenExpires'] < time.time():
-            # Need to refresh access token
-            self._refreshAccessToken()
-        else:
-            self.accessToken = dbTokens['accessToken']
-            self.accessTokenTimestamp = dbTokens['accessTokenTimestamp']
-            self.accessTokenExpires = dbTokens['accessTokenExpires']
-
     def _persistEndpoints(self):
-        if self.userId and self.endpoints:
-            dbThings = Things(self.userId)
+        if self.uuid and self.endpoints:
+            dbThings = Things(self.uuid)
             json_list = []
-            for item in self.endpoints:
+            for item in self.endpoints.values():
                 json_list.append(item.json)
             dbThings['endpoints'] = json_list
 
     def _retrieveEndpoints(self):
-        self.endpoints = []
-        dbThings = Things(self.userId)
+        self.endpoints = {}
+        dbThings = Things(self.uuid)
         json_list = dbThings['endpoints']
         for item in json_list:
             cls = self.endpointClasses[item['className']]
-            self.endpoints.append(cls(json=item))
+            self.endpoints[item['endpointId']] = cls(json=item)
