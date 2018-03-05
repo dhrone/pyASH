@@ -4,6 +4,7 @@
 #
 from abc import ABC, abstractmethod
 import json
+import re
 import boto3
 from botocore.vendored import requests
 from decimal import Decimal
@@ -52,12 +53,15 @@ class User(ABC):
         return response
 
     def handleDirective(self, request):
-        # Find appropriate handler for message by looking up endpointId
+        # Decode endpointId
+        (className, endpointId) = request.endpointId.split('|')
         try:
-            endpoint = self.endpoints[request.endpointId]
+            endpoint = self.endpoints[]
         except KeyError:
             raise EndpointNotFoundException('{0} not found'.format(request.endpointId))
 
+        # Create instance of class to handle request
+        endpoint = self.endpointClasses[className](endpointId)
         method = endpoint.getHandler(request)
         if not method:
             raise NoMethodToHandleDirectiveException('No method to handle {0}:{1}'.format(request.namespace,request.directive))
@@ -88,6 +92,8 @@ class StaticUser(User):
             self.addEndpoint(item)
 
     def handleDiscovery(self, request):
+        # Need to determine the encoding of the endpointId
+
         epResponses = []
         for e in self.endpoints.values():
             epResponses.append(e.endpointResponse())

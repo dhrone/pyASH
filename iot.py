@@ -29,6 +29,10 @@ class Iot(object):
 
         self._get()
 
+    @staticmethod
+    def _getThing(endpointId):
+        return endpointId
+
     def _get(self):
         thingData = json.loads(self.client.get_thing_shadow(thingName=self.endpointId)['payload'].read().decode('utf-8'))
         self.reportedState = thingData['state']['reported']

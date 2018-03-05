@@ -130,7 +130,7 @@ class Endpoint(object):
 
     def endpointResponse(self):
         # endpointId, manufacturerName='', friendlyName='', description='', displayCategories=[], cookie='', capabilities=[], token={}
-        return EndpointResponse(self.endpointId, self.manufacturerName, self.friendlyName, self.description, self.displayCategories, self.cookie, self._getCapabilities)
+        return EndpointResponse(self.endpointId, self.manufacturerName, self.friendlyName, self.description, self.displayCategories, self.cookie, self._getCapabilities, self.__class__.__name__)
 
     @staticmethod
     def lookupInterface(interface):
