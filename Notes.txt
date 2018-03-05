@@ -77,3 +77,12 @@ user.getUser(userEmail='ron@ritchey.org')
 response = user.handleDirective(reqUp)
 import json
 print (json.dumps(response.json,indent=4))
+
+class C(object):
+   class iotTV(Iot):
+     def __init__(self):
+       super(C.iotTV, self).__init__('avmctrl_den')
+       print ('Loading iotTV')
+   def __init__(self):
+     x = self.iotTV()
+     print ('Yeah')
