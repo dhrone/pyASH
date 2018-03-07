@@ -55,21 +55,24 @@ class dhroneTV(Endpoint):
     description = 'iotTV controller by dhrone'
     displayCategories = 'OTHER'
 
+    class Iot(iotTV):
+        pass
+
     @Endpoint.register(['TurnOn'])
-    def TurnOn(self, request, iot):
-        iot['powerState'] = True
+    def TurnOn(self, request):
+        self.iot['powerState'] = True
 
     @Endpoint.register
-    def TurnOff(self, request, iot):
-        iot['powerState'] = False
+    def TurnOff(self, request):
+        self.iot['powerState'] = False
 
     @Endpoint.register(['AdjustVolume','SetVolume'], properties='volume')
-    def Volume(self, request, iot):
+    def Volume(self, request):
         if request.directive == 'AdjustVolume':
-            v = iot['volume'] + request.payload['volume']
-            iot['volume'] = 0 if v < 0 else 100 if v > 100 else v
+            v = self.iot['volume'] + request.payload['volume']
+            self.iot['volume'] = 0 if v < 0 else 100 if v > 100 else v
         else:
-            iot['volume'] = request.payload['volume']
+            self.iot['volume'] = request.payload['volume']
 
 #    @Endpoint.register
 #    def SetMute(self, request, iot):
@@ -77,26 +80,29 @@ class dhroneTV(Endpoint):
 
     @Endpoint.register
     def SelectInput(self, request, iot):
-        iot['asource'] = request.payload['input']
+        self.iot['asource'] = request.payload['input']
 
 class dhroneTVScene(Endpoint):
     manufacturerName = 'dhrone'
     description = 'iotTV controller by dhrone'
     displayCategories = 'SCENE_TRIGGER'
-    endpointIdPattern = '^[^:]+'
+
+    class Iot(iotTV):
+        @staticmethod
+        def _getThingName(endpointId):
+            return endpointId.split(':')[0]
 
     @Endpoint.register
-    def Activate(self, request, iot):
+    def Activate(self, request):
         (endpointId, sceneId) = request.endpointId.split(':')
         ds = { 'epower':True, 'esource': 'HDMI1', 'input': 'SAT', 'powerState':True }
-        iot.batchSet(ds)
+        self.iot.batchSet(ds)
 
     @Endpoint.register
-    def Deactivate(self, request, iot):
+    def Deactivate(self, request):
         (endpointId, sceneId) = request.endpointId.split(':')
         ds = { 'epower': False, 'input': 'CD' }
-        iot.batchSet(ds)
-
+        self.iot.batchSet(ds)
 
 #user = StaticUser(dhroneTV('avmctrl_den'), dhroneTVScene('avmctrl_den:scene1'))
 #user = DbUser(endpointClasses=[dhroneTV, dhroneTVScene])

@@ -24,9 +24,14 @@ logger.setLevel(LOGLEVEL)
 
 class User(ABC):
 
-    def __init__(self, iotcls = None):
-        self.iotcls = iotcls
+    def __init__(self, endpointClasses = []):
         self.endpoints = {}
+        self.endpointClasses = {}
+        for item in endpointClasses:
+            if isinstance(item, Endpoint):
+                self.endpointClasses[item.__class__.__name__] = item.__class__
+            else:
+                self.endpointClasses[item.__name__]=item
 
     @abstractmethod
     def handleAcceptGrant(self, request):
@@ -34,6 +39,9 @@ class User(ABC):
 
     @abstractmethod
     def handleDiscovery(self, request):
+        pass
+
+    def handleReportState(seld, request):
         pass
 
     def _getUserProfile(self, token):
@@ -53,15 +61,21 @@ class User(ABC):
         return response
 
     def handleDirective(self, request):
+
         # Decode endpointId
         (className, endpointId) = request.endpointId.split('|')
         try:
-            endpoint = self.endpoints[]
+            endpoint = self.endpoints[endpointId]
         except KeyError:
-            raise EndpointNotFoundException('{0} not found'.format(request.endpointId))
+            # Ok, endpoint wasn't found.  Let's see if we can find the class name
+            class = self.endpointClasses.get(className)
+            if not class:
+                raise EndpointNotFoundException('{0} not found'.format(request.endpointId))
 
-        # Create instance of class to handle request
-        endpoint = self.endpointClasses[className](endpointId)
+        # If no endpoint found but we have the class, create an instance to handle request
+        if not endpoint:
+            endpoint = self.endpointClasses[className](endpointId)
+
         method = endpoint.getHandler(request)
         if not method:
             raise NoMethodToHandleDirectiveException('No method to handle {0}:{1}'.format(request.namespace,request.directive))
@@ -69,19 +83,51 @@ class User(ABC):
         # bind the method to it's class
         method = method.__get__(endpoint, endpoint.__class__)
 
-        iot = self.iotcls(request.endpointId) if self.iotcls else None
-        response = method(request, iot)
+        response = method(request)
         if response:
             return response
-        return defaultResponse(request,iot)
+        return defaultResponse(request,endpoint.iot)
+
+    def lambda_handler(self, request, context=None):
+        def doNothing(request):
+
+        return {
+            'Alexa' : self.handleReportState,
+            'Alexa.Authorization' : self.handleAcceptGrant,
+            'Alexa.Discovery' : self.handleDiscovery,
+            'Alexa.BrightnessController' : self.handleDirective,
+            'Alexa.Calendar' :
+            'Alexa.CameraStreamController' :
+            'Alexa.ChannelController' :
+            'Alexa.ColorController' :
+            'Alexa.ColorTemperatureController' : self.handleDirective,
+            'Alexa.Cooking' :
+            'Alexa.Cooking.TimeController' :
+            'Alexa.Cooking.PresetController' :
+            'Alexa.EndpointHealth' :
+            'Alexa.InputController' : self.handleDirective,
+            'Alexa.LockController' : self.handleDirective,
+            'Alexa.MeetingClientController' :
+            'Alexa.PercentageController' : self.handleDirective,
+            'Alexa.PlaybackController' : self.handleDirective,
+            'Alexa.PowerController' : self.handleDirective,
+            'Alexa.PowerLevelController' : self.handleDirective,
+            'Alexa.SceneController' : self.handleDirective,
+            'Alexa.Speaker' : self.handleDirective,
+            'Alexa.StepSpeaker' : self.handleDirective,
+            'Alexa.TemperatureSensor' : self.handleDirective,
+            'Alexa.ThermostatController' :
+            'Alexa.TimeHoldController' :
+        }.get(request.namespace)(request)
+
 
     def addEndpoint(self, endpoint):
         self.endpointClasses[endpoint.__class__.__name__] = endpoint.__class__
         self.endpoints[endpoint.endpointID] = endpoint
 
 class StaticUser(User):
-    def __init__(self, endpoints=[], iotcls=None):
-        super(StaticUser, self).__init__(iotcls)
+    def __init__(self, endpoints=[], endpointClasses=[]):
+        super(StaticUser, self).__init__(endpointClasses)
 
         if type(endpoints) != list:
             if isinstance(endpoints, Endpoint):
@@ -105,19 +151,12 @@ class StaticUser(User):
         print ("User {0}'s refreshToken is {1}".format(self.userName, self.refreshToken))
 
 class DbUser(User):
-    def __init__(self, endpointClasses=[], iotcls=None, region='us-east-1', systemName = 'pyASH'):
-        super(DbUser, self).__init__(iotcls)
+    def __init__(self, endpointClasses=[], region='us-east-1', systemName = 'pyASH'):
+        super(DbUser, self).__init__(endpointClasses)
 
-        self.endpointClasses = {}
         self.region = region
         self.systemName = systemName
         self.uuid = None
-
-        for item in endpointClasses:
-            if isinstance(item, Endpoint):
-                self.endpointClasses[item.__class__.__name__] = item.__class__
-            else:
-                self.endpointClasses[item.__name__]=item
 
     def handleAcceptGrant(self, request):
         response = self._getAccessTokenFromCode(request.code)

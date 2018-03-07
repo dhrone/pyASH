@@ -6,8 +6,9 @@
 import json
 
 # pyASH imports
-from utility import *
+from iot import Iot
 from message import EndpointResponse, Capability
+from utility import *
 
 # Setup logger
 import logging
@@ -59,6 +60,10 @@ class Endpoint(object):
             self.retrievable = retrievable if retrievable else Endpoint.retrievable
             self.supportsDeactivation = supportsDeactivation if supportsDeactivation else Endpoint.supportsDeactivation
             self.cookie = cookie if cookie else Endpoint.cookie
+
+        # Find and instantiate an Iot object if possible
+        self.iotClass = self._findIot()
+        self.iot = self.iotClass(self.endpointId) if self.iotClass and self.endpointId else None
 
     @property
     def json(self):
@@ -205,6 +210,16 @@ class Endpoint(object):
         for i in ret:
             if i[0] == request.namespace and i[1] == request.directive:
                 return ret[i]
+
+    # See if an Iot class was included and return it if yes
+    def _findIot(self):
+        for item in dir(self):
+            try:
+                if issubclass(getattr(self, item), Iot):
+                    return getattr(self, item)
+            except:
+                pass
+        return Null
 
     @_classproperty
     def request_handlers(cls):

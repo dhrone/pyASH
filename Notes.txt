@@ -7,42 +7,42 @@ Need to persist the refresh token for the user
 Discovery
 AWS provides user token
 Need to provide to AWS a list of endpoints which includes...
-	EndpointId
-	friendlyName
-	description
-	manufacturerName
-	displayCategories
-	cookies (if provided)
-	type of device (e.g. dhroneTV) so that the device can inform the capabilities.
-		Capabilities are about the properties not the directives.  Directives are inferred by the properties that are supported.
-		Capabilities also need to include proactivelyReported and retrievable attributes.
-		For Scenes, also supportsDeactivation but not retrievable
+  EndpointId
+  friendlyName
+  description
+  manufacturerName
+  displayCategories
+  cookies (if provided)
+  type of device (e.g. dhroneTV) so that the device can inform the capabilities.
+    Capabilities are about the properties not the directives.  Directives are inferred by the properties that are supported.
+    Capabilities also need to include proactivelyReported and retrievable attributes.
+    For Scenes, also supportsDeactivation but not retrievable
 
 Where does the system learn what endpoint's a user has?
 Options:
-	Hard code into program
-	Use a separate registration process (outside pyASH) to record the assignments to a database.  Read database during discovery
-		When a new device gets registered to AWS IOT seems a good time for that database assignment
+  Hard code into program
+  Use a separate registration process (outside pyASH) to record the assignments to a database.  Read database during discovery
+    When a new device gets registered to AWS IOT seems a good time for that database assignment
 
-	Program should use a stub function to call for the list of endpoints that are discovered for a particular user.  Perhaps a decorated function within a subclass of Endpoint.
-	Thinking to use the Endpoint class as the container to hold discovery data.  Would pass an array of Endpoints to support Discovery routine
+  Program should use a stub function to call for the list of endpoints that are discovered for a particular user.  Perhaps a decorated function within a subclass of Endpoint.
+  Thinking to use the Endpoint class as the container to hold discovery data.  Would pass an array of Endpoints to support Discovery routine
 
 
 Handling directives for supported interfaces
-	AWS provides endpointID and a user token
-	AWS provides directive for interface (e.g. TurnOn for powerState)
-	pyASH needs to know what device type to use to respond to the request
+  AWS provides endpointID and a user token
+  AWS provides directive for interface (e.g. TurnOn for powerState)
+  pyASH needs to know what device type to use to respond to the request
 
-	How does pyASH decide which device type to use for the response?
-	Options:
-		Use endpointID to look up device details in some repository
-			Could be hard coded or from a db
-		Infer the endpoint type based upon the requested interface/directive
-		Use some encoding in the issued endpointID (e.g. <type>:<id>)
+  How does pyASH decide which device type to use for the response?
+  Options:
+    Use endpointID to look up device details in some repository
+      Could be hard coded or from a db
+    Infer the endpoint type based upon the requested interface/directive
+    Use some encoding in the issued endpointID (e.g. <type>:<id>)
 
 ReportState
-	AWS provides endpointID and user token
-	pyASH needs to look up thing from endpointID/token, determine the things' status and respond back
+  AWS provides endpointID and user token
+  pyASH needs to look up thing from endpointID/token, determine the things' status and respond back
 
 
 Database Structure
@@ -64,25 +64,3 @@ UserId (pk)
 uuid
 
 ### NEED to BIND UUIDs
-
-dAdjustVolumeDown = { "directive": { "header": { "namespace": "Alexa.Speaker", "name": "AdjustVolume", "messageId": "5f8a426e-01e4-4cc9-8b79-65f8bd0fd8a4", "correlationToken": "dFMb0z+PgpgdDmluhJ1LddFvSqZ/jCc8ptlAKulUj90jSqg==", "payloadVersion": "3"},"endpoint": { "scope": { "type": "BearerToken", "token": "access-token-from-skill" }, "endpointId": "avmctrl_den", "cookie": { } }, "payload": { "volume": -10 } } }
-dAdjustVolumeUp = { "directive": { "header": { "namespace": "Alexa.Speaker", "name": "AdjustVolume", "messageId": "5f8a426e-01e4-4cc9-8b79-65f8bd0fd8a4", "correlationToken": "dFMb0z+PgpgdDmluhJ1LddFvSqZ/jCc8ptlAKulUj90jSqg==", "payloadVersion": "3"},"endpoint": { "scope": { "type": "BearerToken", "token": "access-token-from-skill" }, "endpointId": "avmctrl_den", "cookie": { } }, "payload": { "volume": 10 } } }
-from dhroneTV import dhroneTV, dhroneTVScene, iotTV
-from user import DbUser
-user = DbUser(endpointClasses=[dhroneTV, dhroneTVScene], iotcls=iotTV)
-from message import Request
-reqDown = Request(dAdjustVolumeDown)
-reqUp   = Request(dAdjustVolumeUp)
-user.getUser(userEmail='ron@ritchey.org')
-response = user.handleDirective(reqUp)
-import json
-print (json.dumps(response.json,indent=4))
-
-class C(object):
-   class iotTV(Iot):
-     def __init__(self):
-       super(C.iotTV, self).__init__('avmctrl_den')
-       print ('Loading iotTV')
-   def __init__(self):
-     x = self.iotTV()
-     print ('Yeah')

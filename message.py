@@ -1301,7 +1301,6 @@ class defaultResponse(ResponseElement):
     def composeResponse(request,iot=None):
         if request.namespace in PROPERTYMAP_SIMPLE:
             return self.responseXController(request,iot)
-
         return {
             'Alexa.Speaker': defaultResponse.responseSpeaker
         }.get(request.namespace)(request,iot)

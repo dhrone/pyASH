@@ -30,7 +30,7 @@ class Iot(object):
         self._get()
 
     @staticmethod
-    def _getThing(endpointId):
+    def _getThingName(endpointId):
         return endpointId
 
     def _get(self):
@@ -97,7 +97,10 @@ class Iot(object):
     def batchGet(self):
         ret = {}
         for variable in self.reportedState:
-            (method, property) = self._getMethodProperty(variable, 'to')
+            try:
+                (method, property) = self._getMethodProperty(variable, 'to')
+            except ValueError:
+                continue
             ret[property] = method(self, self.reportedState[variable])
         return ret
 
