@@ -106,7 +106,7 @@ VALID_COOKINGMODES = [ 'DEFROST', 'OFF', 'PRESET', 'REHEAT', 'TIMECOOK']
 VALID_CONNECTIVITY = ['OK', 'UNREACHABLE']
 VALID_ENUMERATEDPOWERLEVELS = ['LOW','MED_LOW', 'MEDIUM', 'MED_HIGH', 'HIGH']
 VALID_FOODCOUNTSIZES = ['EXTRA_EXTRA_LARGE', 'JUMBO', 'EXTRA_LARGE', 'LARGE', 'MEDIUM', 'SMALL', 'EXTRA_SMALL', 'SIZE_A', 'SIZE_B']
-VALID_FOODQUANTITYTYPES=['WEIGHT', 'FOODCOUNT', 'VOLUME']
+VALID_FOODQUANTITYTYPES=['Weight', 'FoodCount', 'Volume']
 VALID_VOLUMEUNITS = ['LITER', 'MILLILITER', 'TEASPOON', 'UK_GALLON', 'US_FLUID_GALLON', 'US_FLUID_OUNCE', 'US_DRY_GALLON', 'US_DRY_OUNCE' ]
 VALID_WEIGHTUNITS = ['GRAM', 'KILOGRAM', 'OUNCE', 'POUND']
 VALID_FOODCATEGORIES = ['BEEF', 'BEVERAGE', 'CHICKEN', 'FISH', 'MEAT', 'PASTA', 'PIZZA', 'POPCORN', 'PORK', 'POTATO', 'SHRIMP', 'SOUP', 'TURKEY', 'WATER', 'UNKNOWN']
@@ -216,6 +216,12 @@ def validateReturnCode(status_code):
         logger.warn(errmsg)
         raise IOError(errmsg)
     return status_code
+
+def validateValue(value, validList, errmsg=None):
+    if value.upper() in map(str.upper, validList):
+        return list(filter(lambda x: x.upper() == value.upper(), validList))[0]
+    errmsg = errmsg if type(errmsg) == str else '{0} is not a valid value'
+    raise ValueError(errmsg.format(value))
 
 def getUserProfile(accessToken):
     payload = { 'access_token': accessToken }

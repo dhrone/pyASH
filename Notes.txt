@@ -64,3 +64,17 @@ UserId (pk)
 uuid
 
 ### NEED to BIND UUIDs
+
+
+Cooking interface discovery contains a pretty normal properties response but also requires a configuration section which has different attributes based upon the interface.
+Cooking
+  supportedCookingModes
+Cooking.TimeController
+  enumeratedPowerLevels
+	integralPowerLevels
+	supportedCookingModes
+	supportsRemoteStart
+Cooking.PresetController
+  presetCatalogId (comes from material submitted through off-line process with AWS)
+	supportedCookingModes
+	supportsRemoteStart

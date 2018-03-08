@@ -19,13 +19,15 @@ logger.setLevel(LOGLEVEL)
 class Iot(object):
     uncertainty = { }
 
-    def __init__(self, endpointId, region=DEFAULT_IOTREGION):
+    def __init__(self, endpointId, region=DEFAULT_IOTREGION, consideredStaleAfter=2):
         self.endpointId = endpointId
         self.region = region
         self.client = boto3.client('iot-data', region_name=region)
         self.setTransforms()
         self.reportedState = {}
         self.reportedStateTimeStamp = {}
+        self.lastGet = 0
+        self.consideredStaleAfter = consideredStaleAfter
 
         self._get()
 
@@ -37,6 +39,7 @@ class Iot(object):
         thingData = json.loads(self.client.get_thing_shadow(thingName=self.endpointId)['payload'].read().decode('utf-8'))
         self.reportedState = thingData['state']['reported']
         self.reportedStateTimeStamp = thingData['metadata']['reported']
+        self.lastGet = time.time()
 
     def _put(self, newState):
         item = {'state': {'desired': newState}}
@@ -47,7 +50,12 @@ class Iot(object):
         for item in newState:
             self.reportedStateTimeStamp[item] = {'timestamp': currentTime}
 
+    def _stale(self):
+        return True if self.lastGet + self.consideredStaleAfter < time.time() else False
+
     def __getitem__(self, property):
+        if self._stale():
+            self._get()
         (method, variable) = self._getMethodVariable(property, 'to')
         return method(self, self.reportedState[variable])
 
@@ -95,6 +103,8 @@ class Iot(object):
         self._put(vars)
 
     def batchGet(self):
+        if self._stale():
+            self._get()
         ret = {}
         for variable in self.reportedState:
             try:
