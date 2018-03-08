@@ -1,4 +1,6 @@
+from iot import Iot
 from utility import get_utc_timestamp
+
 
 class Interface(object):
     interface = None
@@ -11,7 +13,7 @@ class Interface(object):
 
         if iot and isinstance(iot, Iot) and self.properties:
             timeStamps = iot.timeStamps
-            for item in self.properties:
+            for item in self.properties.properties:
                 self[item] = (iot[item], timeStamps[item], self.uncertaintyInMilliseconds)
 
     @property
@@ -21,12 +23,12 @@ class Interface(object):
     @property
     def jsonDiscover(self):
         if self.properties:
-            return { 'type':'AlexaInterface', 'interface':self.interface, 'version': self.version, 'properties': self.properties.discover() }
+            return { 'type':'AlexaInterface', 'interface':self.interface, 'version': self.version, 'properties': self.properties.jsonDiscover }
         return { 'type':'AlexaInterface', 'interface':self.interface, 'version': self.version  }
 
     @property
     def jsonResponse(self):
-        return self.properties.jsonResponse(self.interface)
+        return self.properties.jsonResponse
 
     def __getitem__(self, property):
         return self.properties.properties[property].value
@@ -35,8 +37,9 @@ class Interface(object):
         self.properties[property] = value
 
     class Properties(object):
-        def __init__(self, properties, proactivelyReported, retrievable):
+        def __init__(self, interface, properties, proactivelyReported, retrievable):
             properties = properties if type(properties) == list else [ properties ]
+            self.interface = interface
             self.properties = {}
             self.proactivelyReported = proactivelyReported
             self.retrievable = retrievable
@@ -64,10 +67,10 @@ class Interface(object):
             return { 'supported': proplist, 'proactivelyReported':self.proactivelyReported, 'retrievable': self.retrievable }
 
         @property
-        def jsonResponse(self, interface, timeOfSample=get_utc_timestamp(), uncertaintyInMilliseconds=0):
+        def jsonResponse(self):
             proplist = []
             for item, p in self.properties.items():
-                proplist.append({'namespace': interface, 'name':item, 'value': p.value, 'timeOfSample': p.timeOfSample, 'uncertaintyInMilliseconds': p.uncertaintyInMilliseconds})
+                proplist.append({'namespace': self.interface, 'name':item, 'value': p.value, 'timeOfSample': p.timeOfSample, 'uncertaintyInMilliseconds': p.uncertaintyInMilliseconds})
             return proplist
 
     class Property(object):
@@ -93,7 +96,7 @@ class BrightnessController(Interface):
         self.interface = 'Alexa.BrightnessController'
         self.version = '3'
         self.properties = \
-            Interface.Properties([ Interface.Property('brightness')], \
+            Interface.Properties(self.interface, [ Interface.Property('brightness')], \
                 proactivelyReported=proactivelyReported, retrievable=retrievable)
         super(BrightnessController, self).__init__(iot, uncertaintyInMilliseconds)
 
@@ -121,6 +124,7 @@ class CameraStreamController(Interface):
             ret.append(item.json)
         return ret
 
+    #  Need to figure out how to get the selected cameraStream into this class!!
     @property
     def jsonResponse(self, cameraStreams):
         ret = []
@@ -133,7 +137,7 @@ class InputController(Interface):
         self.interface = 'Alexa.InputController'
         self.version = '3'
         self.properties = \
-            Interface.Properties([ Interface.Property('input')], \
+            Interface.Properties(self.interface, [ Interface.Property('input')], \
                 proactivelyReported=proactivelyReported, retrievable=retrievable)
         super(InputController, self).__init__(iot, uncertaintyInMilliseconds)
 
@@ -143,6 +147,6 @@ class Speaker(Interface):
         self.interface = 'Alexa.InputController'
         self.version = '3'
         self.properties = \
-            Interface.Properties([ Interface.Property('volume'), Interface.Property('muted') ], \
+            Interface.Properties(self.interface, [ Interface.Property('volume'), Interface.Property('muted') ], \
                 proactivelyReported=proactivelyReported, retrievable=retrievable)
         super(Speaker, self).__init__(iot, uncertaintyInMilliseconds)
