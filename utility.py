@@ -201,6 +201,7 @@ def fix_term(term):
                 return i
     raise ValueError('{0} not a valid term'.format(term))
 
+
 # Oauth2 utilities
 def validateReturnCode(status_code):
     if status_code == 401:

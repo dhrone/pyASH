@@ -21,3 +21,9 @@ class C(object):
      print ('Yeah')
 
 method_list = [func for func in dir(dhroneTV) if isinstance(getattr(dhroneTV, func),Iot)]
+
+
+from concept import *
+from dhroneTV import iotTV
+iot = iotTV('avmctrl_den')
+pc = PowerController(iot)

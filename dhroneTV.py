@@ -20,11 +20,11 @@ class iotTV(Iot):
 
     @Iot.transformFromProperty('powerState', 'apower')
     def fromPowerState(self, value):
-        return value
+        return { 'ON': True, 'OFF': False }.get(value, value)
 
     @Iot.transformToProperty('powerState', 'apower')
     def toPowerState(self, value):
-        return value
+        return { True: 'ON', False: 'OFF'}.get(value, value) 
 
     @Iot.transformFromProperty('input', 'asource')
     def fromInput(self, value):

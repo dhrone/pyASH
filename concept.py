@@ -11,11 +11,6 @@ class Interface(object):
         self.uncertaintyInMilliseconds = uncertaintyInMilliseconds
         self.iot = iot
 
-        if iot and isinstance(iot, Iot) and self.properties:
-            timeStamps = iot.timeStamps
-            for item in self.properties.properties:
-                self[item] = (iot[item], timeStamps[item], self.uncertaintyInMilliseconds)
-
     @property
     def capability(self):
         return self.jsonDiscover()
@@ -31,9 +26,16 @@ class Interface(object):
         return self.properties.jsonResponse
 
     def __getitem__(self, property):
-        return self.properties.properties[property].value
+        if self.iot:
+            timeStamps = self.iot.timeStamps
+            for item in self.properties.properties:
+                self.properties._set( item, (self.iot[item], timeStamps[item], self.uncertaintyInMilliseconds) )
+        return self.properties[property]
 
     def __setitem__(self, property, value):
+        if self.iot:
+            if self.iot[property] != self.properties[property]:
+                self.iot[property] = self.properties[property]
         self.properties[property] = value
 
     class Properties(object):
@@ -50,6 +52,9 @@ class Interface(object):
             return self.properties[property].value
 
         def __setitem__(self, property, value):
+            self._set(property, value)
+
+        def _set(self, property, value):
             if type(value) is tuple:
                 (value, timeOfSample, uncertaintyInMilliseconds) = value
             else:
@@ -222,6 +227,12 @@ class PowerController(Interface):
                 proactivelyReported=proactivelyReported, retrievable=retrievable)
         super(PowerController, self).__init__(iot, uncertaintyInMilliseconds)
 
+    def TurnOn(self, request):
+        self['powerState'] = ('ON', get_utc_timestamp(), self.uncertaintyInMilliseconds)
+
+    def TurnOff(self, request):
+        self['powerState'] = ('OFF', get_utc_timestamp(), self.uncertaintyInMilliseconds)
+
 class PowerLevelController(Interface):
     def __init__(self, iot=None, proactivelyReported=False, retrievable=False, uncertaintyInMilliseconds=0):
         self.interface = 'Alexa.PowerLevelController'
@@ -230,6 +241,14 @@ class PowerLevelController(Interface):
             Interface.Properties(self.interface, [ Interface.Property('powerLevel')], \
                 proactivelyReported=proactivelyReported, retrievable=retrievable)
         super(PowerLevelController, self).__init__(iot, uncertaintyInMilliseconds)
+
+    def SetPowerLevel(self, request):
+        self['powerLevel'] = (request.payload['powerLevel'], get_utc_timestamp(), self.uncertaintyInMilliseconds)
+
+    def AdjustPowerLevel(self, request):
+        v = self['powerLevel']+request.payload['powerLevelDelta']
+        v = v if v in range(100) else 0 if v < 0 else 100
+        self['powerLevel'] = (v, get_utc_timestamp(), self.uncertaintyInMilliseconds)
 
 class SceneController(Interface):
     def __init__(self, iot=None, proactivelyReported=False, supportsDeactivation=False):
@@ -244,14 +263,12 @@ class SceneController(Interface):
 
 class StepSpeaker(Interface):
     def __init__(self, iot=None, proactivelyReported=False, retrievable=False, uncertaintyInMilliseconds=0):
-
         self.interface = 'Alexa.StepSpeaker'
         self.version = '3'
         super(StepSpeaker, self).__init__(iot, uncertaintyInMilliseconds)
 
 class Speaker(Interface):
     def __init__(self, iot=None, proactivelyReported=False, retrievable=False, uncertaintyInMilliseconds=0):
-
         self.interface = 'Alexa.InputController'
         self.version = '3'
         self.properties = \
@@ -261,7 +278,6 @@ class Speaker(Interface):
 
 class TemperatureSensor(Interface):
     def __init__(self, iot=None, proactivelyReported=False, retrievable=False, uncertaintyInMilliseconds=0):
-
         self.interface = 'Alexa.TemperatureSensor'
         self.version = '3'
         self.properties = \
@@ -269,34 +285,22 @@ class TemperatureSensor(Interface):
                 proactivelyReported=proactivelyReported, retrievable=retrievable)
         super(TemperatureSensor, self).__init__(iot, uncertaintyInMilliseconds)
 
-class ThermostatControllerSingle(Interface):
-    def __init__(self, iot=None, proactivelyReported=False, retrievable=False, uncertaintyInMilliseconds=0):
-
+class ThermostatController(Interface):
+    def __init__(self, iot=None, proactivelyReported=False, retrievable=False, uncertaintyInMilliseconds=0, thermostatType='single'):
         self.interface = 'Alexa.ThermostatController'
         self.version = '3'
+        prop_list = [ Interface.Property('thermostatMode') ]
+        if thermostatType.lower() == 'single':
+            prop_list.append( Interface.Property('TargetSetpoint'))
+        elif thermostatType.lower() == 'dual':
+            prop_list.append( Interface.Property('lowerSetpoint'))
+            prop_list.append( Interface.Property('upperSetpoint'))
+        else:
+            prop_list.append( Interface.Property('TargetSetpoint'))
+            prop_list.append( Interface.Property('lowerSetpoint'))
+            prop_list.append( Interface.Property('upperSetpoint'))
+
         self.properties = \
-            Interface.Properties(self.interface, [ Interface.Property('targetSetpoint'), Interface.Property('thermostatMode') ], \
+            Interface.Properties(self.interface, prop_list, \
                 proactivelyReported=proactivelyReported, retrievable=retrievable)
         super(ThermostatControllerSingle, self).__init__(iot, uncertaintyInMilliseconds)
-
-class ThermostatControllerDual(Interface):
-    def __init__(self, iot=None, proactivelyReported=False, retrievable=False, uncertaintyInMilliseconds=0):
-
-        self.interface = 'Alexa.ThermostatController'
-        self.version = '3'
-        self.properties = \
-            Interface.Properties(self.interface, [ Interface.Property('lowerSetpoint'), Interface.Property('upperSetpoint'), \
-            Interface.Property('thermostatMode') ], \
-                proactivelyReported=proactivelyReported, retrievable=retrievable)
-        super(ThermostatControllerDual, self).__init__(iot, uncertaintyInMilliseconds)
-
-class ThermostatControllerTripleInterface):
-    def __init__(self, iot=None, proactivelyReported=False, retrievable=False, uncertaintyInMilliseconds=0):
-
-        self.interface = 'Alexa.ThermostatController'
-        self.version = '3'
-        self.properties = \
-            Interface.Properties(self.interface, [ Interface.Property('lowerSetpoint'), Interface.Property('upperSetpoint'), \
-            Interface.Property('targetSetpoint'), Interface.Property('thermostatMode') ], \
-                proactivelyReported=proactivelyReported, retrievable=retrievable)
-        super(ThermostatControllerTriple, self).__init__(iot, uncertaintyInMilliseconds)
