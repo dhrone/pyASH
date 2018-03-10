@@ -34,8 +34,10 @@ class Interface(object):
 
     def __setitem__(self, property, value):
         if self.iot:
-            if self.iot[property] != self.properties[property]:
-                self.iot[property] = self.properties[property]
+            if type(value) is tuple:
+                value = value[0]
+            if self.iot[property] != value:
+                self.iot[property] = value
         self.properties[property] = value
 
     class Properties(object):
@@ -275,6 +277,19 @@ class Speaker(Interface):
             Interface.Properties(self.interface, [ Interface.Property('volume'), Interface.Property('muted') ], \
                 proactivelyReported=proactivelyReported, retrievable=retrievable)
         super(Speaker, self).__init__(iot, uncertaintyInMilliseconds)
+
+    def SetVolume(self, request):
+        # Should really send an error if out of range
+        self['volume'] = request.payload['volume'] if request.payload['volume'] in range(100) else 0 if request.payload['volume'] < 0 else 100
+
+    def AdjustVolume(self, request):
+        v = self['volume']+request.payload['volume']
+        v = v if v in range(100) else 0 if v < 0 else 100
+        self['volume'] = (v, get_utc_timestamp(), self.uncertaintyInMilliseconds)
+
+    def SetMute(self, request):
+        self['muted'] = request.payload['mute']
+
 
 class TemperatureSensor(Interface):
     def __init__(self, iot=None, proactivelyReported=False, retrievable=False, uncertaintyInMilliseconds=0):
