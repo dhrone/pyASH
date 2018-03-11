@@ -143,6 +143,42 @@ def get_utc_timestamp(seconds=None):
 def get_uuid():
     return str(uuid.uuid4())
 
+# Derived from Tin Can Python (https://github.com/RusticiSoftware/TinCanPython)
+# Modified to support negative values and fixed what I think was a bug in the rstrip call for fractional seconds
+def iso8601(value):
+    # split seconds to larger units
+    negative= False if value.total_seconds() >= 0 else True
+    seconds = -value.total_seconds() if negative else value.total_seconds()
+    minutes, seconds = divmod(seconds, 60)
+    hours, minutes = divmod(minutes, 60)
+    days, hours = divmod(hours, 24)
+    days, hours, minutes = map(int, (days, hours, minutes))
+    seconds = round(seconds, 6)
+    ## build date
+    date = ''
+    if days:
+        date = '%sD' % days if not negative else '-%sD' % days
+    ## build time
+    time = u'T' if date else u'T' if not negative else u'T-'
+    # hours
+    bigger_exists = date or hours
+    if bigger_exists:
+        time += '{:01}H'.format(hours)
+    # minutes
+    bigger_exists = bigger_exists or minutes
+    if bigger_exists:
+      time += '{:01}M'.format(minutes)
+    # seconds
+    if seconds.is_integer():
+        seconds = '{:01}'.format(int(seconds))
+    else:
+        # 9 chars long w/leading 0, 6 digits after decimal
+        seconds = '%09.6f' % seconds
+        # remove trailing zeros
+        seconds = seconds.rstrip('0')
+    time += '{}S'.format(seconds)
+    return u'P' + date + time
+
 # The fix_xxx functions clean up capitalization issues with interfaces, directives, properties and terms
 # as these need to be exactly what Alexa Smart Home is expecting and are very easy to get wrong
 # They will log the action though so that you can clean the requests up later if desired.

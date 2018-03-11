@@ -1,4 +1,5 @@
 from iot import Iot
+from objects import *
 from utility import get_utc_timestamp
 
 
@@ -98,6 +99,19 @@ class Interface(object):
         def value(self, value):
             self.pvalue = value
 
+    def _setdirective(self, request, propertyName, payloadName, validRange=None):
+        # Should really send an error if out of range
+        v = request.payload[payloadName]
+        if validRange:
+            v = v if v in validRange else validRange[0] if v < validRange[0] else validRange[-1]
+        self[propertyName] = (v, get_utc_timestamp(), self.uncertaintyInMilliseconds)
+
+    def _adjustdirective(self, request, propertyName, payloadName, validRange=None):
+        v = self[propertyName]+request.payload[payloadName]
+        if validRange:
+            v = v if v in validRange else validRange[0] if v < validRange[0] else validRange[-1]
+        self[propertyName] = (v, get_utc_timestamp(), self.uncertaintyInMilliseconds)
+
 class BrightnessController(Interface):
     def __init__(self, iot=None, proactivelyReported=False, retrievable=False, uncertaintyInMilliseconds=0):
         self.interface = 'Alexa.BrightnessController'
@@ -106,6 +120,12 @@ class BrightnessController(Interface):
             Interface.Properties(self.interface, [ Interface.Property('brightness')], \
                 proactivelyReported=proactivelyReported, retrievable=retrievable)
         super(BrightnessController, self).__init__(iot, uncertaintyInMilliseconds)
+
+    def SetBrightness(self, request):
+        self._setdirective(request, 'brightness', 'brightness', range(101))
+
+    def AdjustBrightness(self, request):
+        self._adjustdirective(request, 'brightness', 'brightnessDelta', range(101))
 
 class Calendar(Interface):
     def __init__(self, proactivelyReported=False, retrievable=False):
@@ -116,6 +136,9 @@ class Calendar(Interface):
     @property
     def payload(self, organizerName, calendarEventId):
         return { 'organizerName': organizerName, 'calendarEventId':calendarEventId }
+
+    def GetCurrentMeeting(self, request):
+        raise NotImplementedError('No default directive for {0}'.format(self.__class__.__name__))
 
 class CameraStreamController(Interface):
     def __init__(self, cameraStreams=None):
@@ -139,6 +162,9 @@ class CameraStreamController(Interface):
         for item in self.cameraStreams:
             ret.append(item.json)
         return ret
+
+    def InitializeCameraStreams(self, request):
+        raise NotImplementedError('No default directive for {0}'.format(self.__class__.__name__))
 
 class ChannelController(Interface):
     def __init__(self, iot=None, proactivelyReported=False, retrievable=False, uncertaintyInMilliseconds=0):
@@ -182,6 +208,9 @@ class InputController(Interface):
                 proactivelyReported=proactivelyReported, retrievable=retrievable)
         super(InputController, self).__init__(iot, uncertaintyInMilliseconds)
 
+    def SelectInput(self, request):
+        self['input'] = (request.payload['input'], get_utc_timestamp(), self.uncertaintyInMilliseconds)
+
 class LockController(Interface):
     def __init__(self, iot=None, proactivelyReported=False, retrievable=False, uncertaintyInMilliseconds=0):
         self.interface = 'Alexa.LockController'
@@ -190,6 +219,14 @@ class LockController(Interface):
             Interface.Properties(self.interface, [ Interface.Property('lockState')], \
                 proactivelyReported=proactivelyReported, retrievable=retrievable)
         super(LockController, self).__init__(iot, uncertaintyInMilliseconds)
+
+    # If lock is slow, need to send deferred response
+    # Possibility that lock will jam which should be indicated by lockState=='JAMMED'
+    def Lock(self, request):
+        self['lockState'] = ('LOCKED', get_utc_timestamp(), self.uncertaintyInMilliseconds)
+
+    def Unlock(self, request):
+        self['lockState'] = ('UNLOCKED', get_utc_timestamp(), self.uncertaintyInMilliseconds)
 
 class MeetingClientController(Interface):
     def __init__(self, iot=None, proactivelyReported=False, retrievable=False, uncertaintyInMilliseconds=0):
@@ -209,6 +246,12 @@ class PercentageController(Interface):
             Interface.Properties(self.interface, [ Interface.Property('percentage')], \
                 proactivelyReported=proactivelyReported, retrievable=retrievable)
         super(PercentageController, self).__init__(iot, uncertaintyInMilliseconds)
+
+    def SetPercentage(self, request):
+        self._setdirective(request, 'percentage', 'percentage', range(101))
+
+    def AdjustPercentage(self, request):
+        self._adjustdirective(request, 'percentage', 'percentageDelta', range(101))
 
 class PlaybackController(Interface):
     def __init__(self, iot=None, proactivelyReported=False, retrievable=False, uncertaintyInMilliseconds=0):
@@ -245,12 +288,10 @@ class PowerLevelController(Interface):
         super(PowerLevelController, self).__init__(iot, uncertaintyInMilliseconds)
 
     def SetPowerLevel(self, request):
-        self['powerLevel'] = (request.payload['powerLevel'], get_utc_timestamp(), self.uncertaintyInMilliseconds)
+        self._setdirective(request, 'powerLevel', 'powerLevel', range(101))
 
     def AdjustPowerLevel(self, request):
-        v = self['powerLevel']+request.payload['powerLevelDelta']
-        v = v if v in range(100) else 0 if v < 0 else 100
-        self['powerLevel'] = (v, get_utc_timestamp(), self.uncertaintyInMilliseconds)
+        self._adjustdirective(request, 'powerLevel', 'powerLevelDelta', range(101))
 
 class SceneController(Interface):
     def __init__(self, iot=None, proactivelyReported=False, supportsDeactivation=False):
@@ -269,6 +310,13 @@ class StepSpeaker(Interface):
         self.version = '3'
         super(StepSpeaker, self).__init__(iot, uncertaintyInMilliseconds)
 
+    # Assumes that iot['volume'] is used to tell the speaker how much to increase or decrease the volume by
+    def SetVolume(self, request):
+        self._setdirective(request, 'volume', 'volumeSteps', range(101))
+
+    def SetMute(self, request):
+        self['muted'] = (request.payload['mute'], get_utc_timestamp(), self.uncertaintyInMilliseconds)
+
 class Speaker(Interface):
     def __init__(self, iot=None, proactivelyReported=False, retrievable=False, uncertaintyInMilliseconds=0):
         self.interface = 'Alexa.InputController'
@@ -279,16 +327,13 @@ class Speaker(Interface):
         super(Speaker, self).__init__(iot, uncertaintyInMilliseconds)
 
     def SetVolume(self, request):
-        # Should really send an error if out of range
-        self['volume'] = request.payload['volume'] if request.payload['volume'] in range(100) else 0 if request.payload['volume'] < 0 else 100
+        self._setdirective(request, 'volume', 'volume', range(101))
 
     def AdjustVolume(self, request):
-        v = self['volume']+request.payload['volume']
-        v = v if v in range(100) else 0 if v < 0 else 100
-        self['volume'] = (v, get_utc_timestamp(), self.uncertaintyInMilliseconds)
+        self._adjustdirective(request, 'volume', 'volume', range(101))
 
     def SetMute(self, request):
-        self['muted'] = request.payload['mute']
+        self['muted'] = (request.payload['mute'], get_utc_timestamp(), self.uncertaintyInMilliseconds)
 
 
 class TemperatureSensor(Interface):
@@ -319,3 +364,22 @@ class ThermostatController(Interface):
             Interface.Properties(self.interface, prop_list, \
                 proactivelyReported=proactivelyReported, retrievable=retrievable)
         super(ThermostatControllerSingle, self).__init__(iot, uncertaintyInMilliseconds)
+
+    def SetTargetTemperature(self, request):
+        if 'targetSetpoint' in request.payload:
+            self['targetSetpoint'] = (Temperature(request.payload['targetSetpoint']), get_utc_timestamp(), self.uncertaintyInMilliseconds)
+        if 'lowerSetpoint' in request.payload:
+            self['lowerSetpoint'] = (Temperature(request.payload['lowerSetpoint']), get_utc_timestamp(), self.uncertaintyInMilliseconds)
+        if 'upperSetpoint' in request.payload:
+            self['upperSetpoint'] = (Temperature(request.payload['upperSetpoint']), get_utc_timestamp(), self.uncertaintyInMilliseconds)
+
+    # Documentation only shows targetSetpoint being adjust.  Not 100% sure what to do with dual mode thermostats
+    # Also not sure what range to enforce
+    def AdjustTargetTemperature(self, request):
+        tsp = Temperature(request.payload['targetSetpointDelta'])
+        tsp.value = self['targetSetpoint'].value + tsp.value
+        self['targetSetpoint'] = (tsp, get_utc_timestamp(), self.uncertaintyInMilliseconds)
+
+    def SetThermostatMode(self, request):
+        tm = ThermostatMode(request.payload['thermostatMode'])
+        self['thermostatMode'] = (tm, get_utc_timestamp(), self.uncertaintyInMilliseconds)

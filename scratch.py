@@ -27,3 +27,44 @@ from concept import *
 from dhroneTV import iotTV
 iot = iotTV('avmctrl_den')
 pc = PowerController(iot)
+
+ts = 86404
+m, s = divmod(ts, 60)
+h, m = divmod(m, 60)
+d, h = divmod(h, 24)
+print ('{0}D{1}H{2}M{3}S'.format(d,h,m,s))
+
+def iso8601(value):
+    # split seconds to larger units
+    negative= False if value.total_seconds() >= 0 else True
+    seconds = -value.total_seconds() if negative else value.total_seconds()
+    minutes, seconds = divmod(seconds, 60)
+    hours, minutes = divmod(minutes, 60)
+    days, hours = divmod(hours, 24)
+    days, hours, minutes = map(int, (days, hours, minutes))
+    seconds = round(seconds, 6)
+    ## build date
+    date = ''
+    if days:
+        date = '%sD' % days if not negative else '-%sD' % days
+    ## build time
+    time = u'T' if date else u'T' if not negative else u'T-'
+    # hours
+    bigger_exists = date or hours
+    if bigger_exists:
+        time += '{:02}H'.format(hours)
+    # minutes
+    bigger_exists = bigger_exists or minutes
+    if bigger_exists:
+      time += '{:02}M'.format(minutes)
+    # seconds
+    print (seconds)
+    if seconds.is_integer():
+        seconds = '{:02}'.format(int(seconds))
+    else:
+        # 9 chars long w/leading 0, 6 digits after decimal
+        seconds = '%09.6f' % seconds
+        # remove trailing zeros
+        seconds = seconds.rstrip('0')
+    time += '{}S'.format(seconds)
+    return u'P' + date + time

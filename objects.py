@@ -4,6 +4,8 @@
 #
 
 import re
+import json
+from datetime import timedelta
 
 # pyASH imports
 from utility import *
@@ -13,7 +15,14 @@ import logging
 logger = logging.getLogger(__name__)
 logger.setLevel(LOGLEVEL)
 
-class CameraStream():
+class ashobject(object):
+
+    def __str__(self):
+        if hasattr(self,'json'):
+            return json.dumps(self.json, indent=4)
+        return ''
+
+class CameraStream(ashobject):
     def __init__(self, json=None):
         self.resolution_value = self.Resolution()
         self.resolutions_value = {}
@@ -204,7 +213,7 @@ class CameraStream():
             self.resolution = item
             self.resolutions_value[(self.resolution.width,self.resolution.height)] = self.Resolution(item)
 
-class Channel():
+class Channel(ashobject):
     def __init__(self, number=None, callSign=None, affiliateCallSign=None, uri=None, json=None):
         self.number = json.get('number') if json else number
         self.callSign = json.get('callSign') if json else callSign
@@ -220,7 +229,7 @@ class Channel():
         ret['uri'] = self.uri
         return { k : v for k,v in ret.items() if v }
 
-class ChannelMetadata():
+class ChannelMetadata(ashobject):
     def __init__(self, name=None, image=None, json=None):
         self.name = json.get('name') if json else name
         self.image = json.get('image') if json else image
@@ -232,7 +241,7 @@ class ChannelMetadata():
         ret['image'] = self.image
         return { k : v for k,v in ret.items() if v }
 
-class Color():
+class Color(ashobject):
     def __init__(self, hue=None, saturation=None, brightness=None, json=None):
         self.hue = json.get('hue') if json else hue
         self.saturation = json.get('saturation') if json else saturation
@@ -246,7 +255,35 @@ class Color():
         ret['brightness'] = self.brightness
         return { k : v for k,v in ret.items() if v }
 
-class FoodQuantity():
+class Duration(ashobject):
+    def __init__(self, duration):
+        if type(duration) == str:
+            m = re.match('^PT([-+])?(?:([0-9]+)D)?(?:([0-9]+)H)?(?:([0-9]+)M)?(?:([0-9]+)S)?$', duration)
+            if not m:
+                raise ValueError('{0} is not a valid duration'.format(duration))
+            (days, hours, minutes, seconds) = map( self._int, m.groups()[1:] )
+            sign = m.groups()[0]
+            self.totalSeconds = days*24*60*60 + hours*60*60 + minutes*60 + seconds
+            self.totalSeconds = -self.totalSeconds if sign and sign=='-' else self.totalSeconds
+        elif type(duration) in [int, float]:
+            self.totalSeconds = int(duration)
+        elif isinstance(duration, timedelta):
+            self.totalSeconds = int(timedelta.total_seconds())
+        else:
+            raise TypeError('{0} is not a valid Duration'.format(duration))
+
+    def _int(self, val):
+        try:
+            val = int(val)
+        except:
+            val = 0
+        return val
+
+    @property
+    def json(self):
+        return iso8601(timedelta(seconds=self.totalSeconds))
+
+class FoodQuantity(ashobject):
     def __init__(self, foodQuantityType=None, value=None, unit=None, size=None, json=None):
         self.foodQuantityType = json.get('@type') if json else foodQuantityType
         self.value = json.get('value') if json else value
@@ -268,7 +305,7 @@ class FoodQuantity():
             ret['size'] = self.size
         return ret
 
-class FoodItem():
+class FoodItem(ashobject):
     def __init__(self, name=None, category=None, quantity=None, json=None):
         self.name = json.get('name') if json else name
         self.category = json.get('category') if json else category
@@ -286,7 +323,7 @@ class FoodItem():
         }
 
 
-class PowerLevel():
+class PowerLevel(ashobject):
     def __init__(self, powerLevelType=None, value=None, json=None):
         self.powerLevelType = json.get('@type') if json else powerLevelType
         self.value = json.get('value') if json else value
@@ -295,31 +332,31 @@ class PowerLevel():
         if type(self.value) == str:
             self.value = self.value if re.match('^[0-9]+$',self.value) else None
         if not self.value:
-            raise ValueError('{0} is not a valid powerLevel type')
+            raise ValueError('{0} is not a valid powerLevel'.format(self.value))
 
     @property
     def json(self):
         return { '@type': self.powerLevelType, 'value': self.value }
 
-class Temperature():
-    def __init__(self, value=None, scale=None, json=None):
+class Temperature(ashobject):
+    def __init__(self, value=None, scale='FAHRENHEIT', json=None):
         self.value = json.get('value') if json else value
         self.scale = json.get('scale') if json else scale
 
         self.scale = validateValue(self.scale, ['FAHRENHEIT', 'CELSIUS'], '{0} is not a valid temperature scale')
-        if type(self.value) == str:
+        if type(self.value) in [str, int]:
             try:
-                x = float(self.value)
+                self.value = float(self.value)
             except:
                 self.value = None
         if not self.value:
-            raise ValueError('{0} is not a valid powerLevel type')
+            raise ValueError('{0} is not a valid Temperature'.format(self.value))
 
     @property
     def json(self):
         return { 'value': self.value, 'scale': self.scale }
 
-class ThermostatMode():
+class ThermostatMode(ashobject):
     class Value():
         def __init__(self, value=None, customName=None, json=None):
             self.value = json.get('value') if json else value

@@ -48,7 +48,7 @@ class Interface(object):
     @property
     @staticmethod
     def capability():
-        return { 'type':'AlexaInterface': 'interface':Interface.interface, 'version': Interface.version, 'properties': Interface.properties.discover  }
+        return { 'type':'AlexaInterface', 'interface':Interface.interface, 'version': Interface.version, 'properties': Interface.properties.discover  }
     class Properties(object):
         def __init__(self, properties, proactivelyReported, retrievable):
             properties = properties if type(properties) == list else [ properties ]

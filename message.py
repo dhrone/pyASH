@@ -201,12 +201,12 @@ class Duration(PropertyElement):
 
         if total_seconds < 0:
             days = int(total_seconds/86400)
-            rs = total_seconds-(days*86400)
-            hours = int(rs/3600)
-            rs = rs - (hours*3600)
-            minutes = int(rs/60)
-            rs = rs - (minutes*60)
-            seconds = int(rs)
+            total_seconds = total_seconds-(days*86400)
+            hours = int(total_seconds/3600)
+            total_seconds = total_seconds - (hours*3600)
+            minutes = int(total_seconds/60)
+            total_seconds = total_seconds - (minutes*60)
+            seconds = int(total_seconds)
         else:
             days = int(total_seconds/86400)
             hours = int(value.seconds/3600)
