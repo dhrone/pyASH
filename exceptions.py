@@ -28,6 +28,11 @@ class ENDPOINT_BUSY(InterfaceException):
     pass
 
 class ENDPOINT_LOW_POWER(InterfaceException):
+    def __init__(self, message, percentageState=None, *args, **kwargs):
+        if percentageState:
+            self.payload = { 'percentageState': percentageState }
+        super(ENDPOINT_LOW_POWER, self).__init__(message, *args, **kwargs)
+
     pass
 
 class ENDPOINT_UNREACHABLE(InterfaceException):
@@ -121,20 +126,21 @@ class REMOTE_START_DISABLED(InterfaceException):
 class NOT_SUBSCRIBED(InterfaceException):
     pass
 
-# Custom Exceptions
-class MissingCredentialException(Exception):
+# OAUTH2 Exceptions
+class OAUTH2_CredentialMissing(Exception):
     pass
 
+class OAUTH2_AccessGrantFailed(Exception):
+    pass
+
+class OAUTH2_PermissionDenied(Exception):
+    pass
+
+class OAUTH2_BadRequest(Exception):
+    pass
+
+# Miscellanious Exceptions
 class MissingRequiredValueException(Exception):
-    pass
-
-class FailedAuthorizationException(Exception):
-    pass
-
-class BadRequestException(IOError):
-    pass
-
-class TokenMissingException(Exception):
     pass
 
 class UserNotFoundException(Exception):

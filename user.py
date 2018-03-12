@@ -11,7 +11,7 @@ from decimal import Decimal
 
 # pyASH imports
 from exceptions import *
-from db import Tokens,Things, Persist, UUIDemail, UUIDuserid
+from db import Tokens, Things, Persist, UUIDemail, UUIDuserid
 from message import Capability, Request, Response, defaultResponse
 from endpoint import Endpoint
 

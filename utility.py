@@ -7,6 +7,7 @@ import logging
 import time
 import uuid
 import os
+import configparser
 import requests
 import boto3
 from boto3.dynamodb.conditions import Key, Attr
@@ -243,11 +244,11 @@ def validateReturnCode(status_code):
     if status_code == 401:
         errmsg = 'Permission denied.  Unable to retrieve profile.'
         logger.warn(errmsg)
-        raise FailedAuthorizationException(errmsg)
+        raise OAUTH2_PermissionDenied(errmsg)
     elif status_code == 400:
         errmsg = 'Bad request.  Unable to retrieve profile.'
         logger.warn(errmsg)
-        raise BadRequestException(errmsg)
+        raise OAUTH2_BadRequest(errmsg)
     elif status_code != 200:
         errmsg = 'Unable to retrieve profile.  Error code returned was {0}'.format(r.status_code)
         logger.warn(errmsg)
@@ -266,20 +267,36 @@ def getUserProfile(accessToken):
     validateReturnCode(r.status_code)
     return r.json()
 
-def refreshAccessToken(refreshToken):
+
+def _getOauth2Credentials():
     try:
-        # Get stored credentials for the LWA service
-        lwa_client_id = os.environ['oauth2_client_id']
-        lwa_client_secret = os.environ['oauth2_client_secret']
+        # Try to get credentials from environmental variables
+        oauth2_client_id = os.environ['oauth2_client_id']
+        oauth2_client_secret = os.environ['oauth2_client_secret']
     except KeyError:
-        errmsg = 'Missing oauth2 credentials.  Unable to retrieve tokens'
-        logger.critical(errmsg)
-        raise MissingCredentialException(errmsg)
+        oauth2_client_id = None
+        oauth2_client_secret = None
+
+    if not oauth2_client_id or not oauth2_client_secret:
+        try:
+            # Try to get them from the pyASH config file
+            config = configparser.ConfigParser()
+            config.read('./.pyASH/config')
+            oauth2_client_id = config['DEFAULT']['oauth2_client_id']
+            oauth2_client_secret = config['DEFAULT']['oauth2_client_secret']
+        except:
+            errmsg = 'Unable to retrieve oauth2 credentials.  Must set oauth2_client_id and oauth2_client_secret as environment variables or within the pyASH config file'
+            logger.critical(errmsg)
+            raise OAUTH2_CredentialMissing(errmsg)
+    return (oauth2_client_id, oauth2_client_secret)
+
+def refreshAccessToken(refreshToken):
+    oauth2_client_id, oauth2_client_secret = _getOauth2Credentials()
 
     payload = {
         'grant_type':'refresh_token',
-        'client_id':lwa_client_id,
-        'client_secret':lwa_client_secret,
+        'client_id':oauth2_client_id,
+        'client_secret':oauth2_client_secret,
     }
 
     r = requests.post("https://api.amazon.com/auth/o2/token", data=payload)
@@ -293,20 +310,13 @@ def refreshAccessToken(refreshToken):
         raise TokenMissingException(errmsg)
 
 def getAccessTokenFromCode(code):
-    try:
-        # Get stored credentials for the LWA service
-        lwa_client_id = os.environ['oauth2_client_id']
-        lwa_client_secret = os.environ['oauth2_client_secret']
-    except KeyError:
-        errmsg = 'Missing oauth2 credentials.  Unable to retrieve tokens'
-        logger.critical(errmsg)
-        raise MissingCredentialException(errmsg)
+    oauth2_client_id, oauth2_client_secret = _getOauth2Credentials()
 
     payload = {
         'grant_type':'authorization_code',
         'code': d.code,
-        'client_id':lwa_client_id,
-        'client_secret':lwa_client_secret,
+        'client_id':oauth2_client_id,
+        'client_secret':oauth2_client_secret,
     }
 
     r = requests.post("https://api.amazon.com/auth/o2/token", data=payload)
@@ -317,4 +327,4 @@ def getAccessTokenFromCode(code):
     except KeyError:
         errmsg = 'Tokens not in response'
         logger.warn(errmsg)
-        raise TokenMissingException(errmsg)
+        raise OAUTH2_AccessGrantFailed(errmsg)
