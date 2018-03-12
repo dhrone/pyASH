@@ -58,3 +58,6 @@ def interface(interface=None, directives=None):
         def __init__(self, cls):
             self.__baseclass__ = cls
         def __call__(self, *cls_args)
+
+https://stackoverflow.com/questions/9906144/python-decorate-a-class-by-defining-the-decorator-as-a-class
+http://scottlobdell.me/2015/04/decorators-arguments-python/        
