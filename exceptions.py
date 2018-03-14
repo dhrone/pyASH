@@ -154,3 +154,6 @@ class NoMethodToHandleDirectiveException(Exception):
 
 class NoIOThandlerProvidedException(Exception):
 	pass
+
+class OnlyOneIOTallowedPerEndpoint(Exception):
+	pass

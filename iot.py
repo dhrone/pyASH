@@ -5,6 +5,7 @@
 
 import json
 import time
+from abc import ABC, abstractmethod
 import boto3
 from botocore.exceptions import ClientError
 
@@ -16,59 +17,56 @@ import logging
 logger = logging.getLogger(__name__)
 logger.setLevel(LOGLEVEL)
 
-class Iot(object):
-    uncertainty = { }
 
-    def __init__(self, endpointId, region=DEFAULT_IOTREGION, consideredStaleAfter=2):
+def doNothing(obj, value):
+    return value
+
+class IotBase(ABC):
+    def __init__(self, endpointId, consideredStaleAfter=2):
         self.endpointId = endpointId
-        self.region = region
-        self.client = boto3.client('iot-data', region_name=region)
         self.setTransforms()
         self.reportedState = {}
         self.reportedStateTimeStamp = {}
         self.lastGet = 0
         self.consideredStaleAfter = consideredStaleAfter
 
-        self._get()
+        self.get()
 
-    @staticmethod
-    def _getThingName(endpointId):
-        return endpointId
+    def getThingName(self):
+        return self.endpointId
 
-    def _get(self):
-        thingData = json.loads(self.client.get_thing_shadow(thingName=self.endpointId)['payload'].read().decode('utf-8'))
-        self.reportedState = thingData['state']['reported']
-        self.reportedStateTimeStamp = thingData['metadata']['reported']
-        self.lastGet = time.time()
+    @abstractmethod
+    def get(self):
+        pass
 
-    def _put(self, newState):
-        item = {'state': {'desired': newState}}
-        # Send desired changes to shadow
-        bdata = json.dumps(item).encode('utf-8')
-        response = self.client.update_thing_shadow(thingName=self.endpointId, payload = bdata)
-        currentTime = int(time.time())
-        for item in newState:
-            self.reportedStateTimeStamp[item] = {'timestamp': currentTime}
+    @abstractmethod
+    def put(self, newState):
+        pass
+
+    @property
+    @abstractmethod
+    def timeStamps(self):
+        pass
 
     def _stale(self):
         return True if self.lastGet + self.consideredStaleAfter < time.time() else False
 
     def __getitem__(self, property):
         if self._stale():
-            self._get()
+            self.get()
         (method, variable) = self._getMethodVariable(property, 'to')
         return method(self, self.reportedState[variable])
 
     def __setitem__(self, property, value):
         (method, variable) = self._getMethodVariable(property, 'from')
-        self._put({variable : method(self, value)})
+        self.put({variable : method(self, value)})
 
     def _getMethodVariable(self,property, direction='from'):
         fromtoProperties = self.fromPropertybyProperty if direction.lower() == 'from' else self.toPropertybyProperty
         if Iot.validateProperty(property) in fromtoProperties:
             (method, variable) = fromtoProperties[property]
         else:
-            method = self.doNothing
+            method = doNothing
             variable = property
         if variable not in self.reportedState:
             raise KeyError
@@ -80,31 +78,19 @@ class Iot(object):
             (method, property) = fromtoVariables[variable]
         else:
             property = Iot.validateProperty(variable)
-            method = self.doNothing
+            method = doNothing
         return (method, property)
-
-    @property
-    def timeStamps(self):
-        ret = {}
-        for variable in self.reportedState:
-            try:
-                (method, property) = self._getMethodProperty(variable, 'to')
-                ret[property] = self.reportedStateTimeStamp[variable]['timestamp']
-            except ValueError:
-                # If a variable can not be translated from device to property then skip it
-                pass
-        return ret
 
     def batchSet(self, propdict):
         vars = {}
         for property in propdict:
             (method, variable) = self._getMethodVariable(property, 'to')
             vars[variable] = method(self, propdict[property])
-        self._put(vars)
+        self.put(vars)
 
     def batchGet(self):
         if self._stale():
-            self._get()
+            self.get()
         ret = {}
         for variable in self.reportedState:
             try:
@@ -115,11 +101,7 @@ class Iot(object):
         return ret
 
     def refresh(self):
-        self._get()
-
-    @staticmethod
-    def doNothing(value):
-        return value
+        self.get()
 
     @staticmethod
     def validateProperty(property):
@@ -153,9 +135,6 @@ class Iot(object):
         return decorateinterface
 
     def setTransforms(self):
-        """dict(str, function): All actions the appliance supports and their corresponding (unbound)
-        method references. Action names are formatted for the DiscoverAppliancesRequest.
-        """
         self.fromPropertybyProperty = {}
         self.toPropertybyProperty = {}
         self.fromPropertybyVariable = {}
@@ -168,3 +147,40 @@ class Iot(object):
                 for property in getattr(method, '_transformToList', {}):
                     self.toPropertybyProperty[property] = (method, getattr(method, '_transformToList', {}).get(property))
                     self.toPropertybyVariable[getattr(method, '_transformToList', {}).get(property)] = (method, property)
+
+class Iot(IotBase):
+    def __init__(self, endpointId, region=DEFAULT_IOTREGION, consideredStaleAfter=2):
+        self.client = None
+        self.region = region
+        super(Iot, self).__init__(endpointId, consideredStaleAfter)
+
+    def get(self):
+        if not self.client:
+            self.client = boto3.client('iot-data', region_name=self.region)
+        thingData = json.loads(self.client.get_thing_shadow(thingName=self.getThingName())['payload'].read().decode('utf-8'))
+        self.reportedState = thingData['state']['reported']
+        self.reportedStateTimeStamp = thingData['metadata']['reported']
+        self.lastGet = time.time()
+
+    def put(self, newState):
+        if not self.client:
+            self.client = boto3.client('iot-data', region_name=self.region)
+        item = {'state': {'desired': newState}}
+        # Send desired changes to shadow
+        bdata = json.dumps(item).encode('utf-8')
+        response = self.client.update_thing_shadow(thingName=self.getThingName(), payload = bdata)
+        currentTime = int(time.time())
+        for item in newState:
+            self.reportedStateTimeStamp[item] = {'timestamp': currentTime}
+
+    @property
+    def timeStamps(self):
+        ret = {}
+        for variable in self.reportedState:
+            try:
+                (method, property) = self._getMethodProperty(variable, 'to')
+                ret[property] = self.reportedStateTimeStamp[variable]['timestamp']
+            except ValueError:
+                # If a variable can not be translated from device to property then skip it
+                pass
+        return ret

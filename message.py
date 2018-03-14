@@ -1104,21 +1104,13 @@ class Endpoints():
         self.value.append(endpoint.get_json())
 
 class Properties_supported(ResponseElement):
-    def __init__(self, values, proactivelyReported='', retrievable=''):
+    def __init__(self, values):
         super(Properties_supported, self).__init__()
 
         # If a single string is passed in, convert it to an array
-        if type(values) == str:
-            values = [ values ]
+        values = values if type(values) is list else [ values ]
 
-        self.json = {
-            'supported': []
-        }
-        if type(proactivelyReported) == bool:
-            self.json['proactivelyReported'] = proactivelyReported
-        if type(retrievable) == bool:
-            self.json['retrievable'] = retrievable
-
+        self.json = { 'supported': [] }
         for item in values:
             prop = { 'name': item }
             self.json['supported'].append(prop)
@@ -1128,25 +1120,17 @@ class Capability(ResponseElement):
         super(Capability, self).__init__()
 
         interface = fix_interface(interface)
-
-        if type(property_names) != list:
-            property_names = [ property_names ]
+        property_names = property_names if type(property_names) is list else [ property_names ]
 
         for i in range(len(property_names)):
             property_names[i] = fix_property(interface, property_names[i])
 
-
         # Correct type if a numeric value provided for version
-        if type(version) == int:
-            version = str(version)
+        version = str(version)
 
-        self.json = {
-            'type': 'AlexaInterface',
-            'interface': interface,
-            'version':version,
-        }
+        self.json = { 'type': 'AlexaInterface', 'interface': interface, 'version':version }
         if property_names:
-            properties_supported = Properties_supported(property_names, proactivelyReported, retrievable).get_json()
+            properties_supported = Properties_supported(property_names).get_json()
             if 'supported' in properties_supported:
                 if properties_supported['supported']:
                     self.json['properties'] = properties_supported
@@ -1160,6 +1144,8 @@ class Capability(ResponseElement):
             self.json['cameraStreamConfigurations'] = cameraStreamConfigurations
         if type(proactivelyReported) == bool:
             self.json['proactivelyReported'] = proactivelyReported
+        if type(retrievable) is bool:
+            self.json['retrievable'] = retrievable
         if type(supportsDeactivation) == bool:
             self.json['supportsDeactivation'] = supportsDeactivation
 

@@ -2,7 +2,7 @@ dAdjustVolumeDown = { "directive": { "header": { "namespace": "Alexa.Speaker", "
 dAdjustVolumeUp = { "directive": { "header": { "namespace": "Alexa.Speaker", "name": "AdjustVolume", "messageId": "5f8a426e-01e4-4cc9-8b79-65f8bd0fd8a4", "correlationToken": "dFMb0z+PgpgdDmluhJ1LddFvSqZ/jCc8ptlAKulUj90jSqg==", "payloadVersion": "3"},"endpoint": { "scope": { "type": "BearerToken", "token": "access-token-from-skill" }, "endpointId": "avmctrl_den", "cookie": { } }, "payload": { "volume": 10 } } }
 from dhroneTV import dhroneTV, dhroneTVScene, iotTV
 from user import DbUser
-user = DbUser(endpointClasses=[dhroneTV, dhroneTVScene], iotcls=iotTV)
+user = DbUser(endpointClasses=[dhroneTV, dhroneTVScene])
 from message import Request
 reqDown = Request(dAdjustVolumeDown)
 reqUp   = Request(dAdjustVolumeUp)
@@ -22,42 +22,55 @@ class C(object):
 
 method_list = [func for func in dir(dhroneTV) if isinstance(getattr(dhroneTV, func),Iot)]
 
+from dhroneTV import dhroneTV, dhroneTVScene, iotTV
+a = dhroneTV('avmctrl_den', 'b')
+a.iot['volume']
 
-from concept import *
-from dhroneTV import iotTV
-iot = iotTV('avmctrl_den')
-pc = PowerController(iot)
 
-ts = 86404
-m, s = divmod(ts, 60)
-h, m = divmod(m, 60)
-d, h = divmod(h, 24)
-print ('{0}D{1}H{2}M{3}S'.format(d,h,m,s))
+def addinterface(interface):
+    def wrapper(*args, **kwargs):
+        for i in args:
+            print('addinterface arg: {0}'.format(args))
+        for k, v in kwargs.items():
+            print('addinterface kwargs {0}:{1}'.format(k,v))
+        if hasattr(func, _secret):
+            func._secret.append(interface)
+        else:
+            func._secret = [ interface ]
+        return func
+    if hasattr(addinterface, '_secret'):
+        wrapper._secret = addinterface._secret
+    return wrapper()
 
-class c(object):
-    pass
-
-def interface(*args, **kwargs):
-    print ('Arguments')
-    for i in args:
-        print(i)
-    print ('\nKeyworded Arguments')
-    for k, v in kwargs.items():
-        print('  {0}:{1}'.format(k,v))
-    def decorator(function):
-        sp = kwargs.get('directives')
-        print ('Setting {0}'.format(sp))
-        setattr(function,'_secretproperty', sp)
-        def wrapper(*args, **kwargs):
-            function(*args, **kwargs)
-        return wrapper
-    return decorator
-
-def interface(interface=None, directives=None):
+def interface(interface):
     class ClassWrapper:
         def __init__(self, cls):
-            self.__baseclass__ = cls
-        def __call__(self, *cls_args)
+            self.other_class = cls
+            if hasattr(self.other_class, '_secret_property'):
+                self.other_class._secret_property.append(interface)
+            else:
+                self.other_class._secret_property = [ interface ]
+            print ('__init__')
+        def __call__(self,*cls_ars):
+            other = self.other_class(*cls_ars)
+            other.__interface_to_handle__ = interface
+            print ('__call__')
+            return other
+    return ClassWrapper
 
-https://stackoverflow.com/questions/9906144/python-decorate-a-class-by-defining-the-decorator-as-a-class
-http://scottlobdell.me/2015/04/decorators-arguments-python/        
+@addinterface('Alexa.PowerController')
+@addinterface('Alexa.InputController')
+class c(object):
+    def __init__(self):
+        self.val = 0
+    def m(self):
+        if hasattr(self, '__interface_to_handle__'):
+            print (self.__interface_to_handle__)
+
+@decorator(" is now decorated.")
+class NormalClass:
+    def __init__(self, name):
+        self.field = name
+
+    def __repr__(self):
+        return str(self.field)

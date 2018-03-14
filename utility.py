@@ -37,7 +37,7 @@ VALID_PROPERTIES = {
     'Alexa.ColorController': ['color'],
     'Alexa.ColorTemperatureController': ['colorTemperatureInKelvin'],
     'Alexa.Cooking': ['cookingMode', 'cookCompletionTime', 'isCookCompletionTimeEstimated', 'cookStartTime', 'foodItem', 'isHolding' ],
-    'Alexa.Cooking.TimeController': ['cookTime', 'cookingPowerLevel'],
+    'Alexa.Cooking.TimeController': ['requestedCookTime', 'cookingPowerLevel'],
     'Alexa.Cooking.PresetController': ['presetName'],
     'Alexa.EndpointHealth': ['connectivity'],
     'Alexa.InputController': ['input'],
@@ -56,7 +56,8 @@ VALID_PROPERTIES = {
 }
 
 # If a directive is not included, it is assumed to not require any property
-REQUIRED_PROPERTIES = {
+### Incomplete.  Not sure if I needs this
+PROPERTIES_BY_DIRECTIVE = {
     'AdjustBrightness': 'brightness',
     'SetBrightness': 'brightness',
     'ChangeChannel': 'channel',
@@ -65,7 +66,9 @@ REQUIRED_PROPERTIES = {
     'DecreaseColorTemperature': 'colorTemperatureInKelvin',
     'IncreaseColorTemperature': 'colorTemperatureInKelvin',
     'SetColorTemperature': 'colorTemperatureInKelvin',
-    'SetCookingMode': 'cookingMode', 'cookCompletionTime'
+    'SetCookingMode': ['cookingMode', 'cookStartTime','cookCompletionTime', 'isCookCompletionTimeEstimated', 'foodItem' ],
+    'CookByPreset': 'presetName',
+    'CookByTime': ['requestedCookTime', 'cookingPowerLevel'],
     'TurnOn': 'powerState',
     'TurnOff': 'powerState'
 }

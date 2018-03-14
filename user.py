@@ -76,7 +76,8 @@ class User(ABC):
         if not endpoint:
             endpoint = self.endpointClasses[className](endpointId)
 
-        method = endpoint.getHandler(request)
+        ### This could be either a endpoint or an interface method.  Need to figure out how to initialize either
+        (method, cls) = endpoint.getHandler(request)
         if not method:
             raise NoMethodToHandleDirectiveException('No method to handle {0}:{1}'.format(request.namespace,request.directive))
 

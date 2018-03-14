@@ -9,6 +9,8 @@ class Interface(object):
     properties = None
 
     def __init__(self,iot=None, uncertaintyInMilliseconds=0):
+        self.interface = 'Alexa.'+self.__class__.__name__
+        self.version='3'
         self.uncertaintyInMilliseconds = uncertaintyInMilliseconds
         self.iot = iot
 
@@ -113,13 +115,11 @@ class Interface(object):
         self[propertyName] = (v, get_utc_timestamp(), self.uncertaintyInMilliseconds)
 
 class BrightnessController(Interface):
-    def __init__(self, iot=None, proactivelyReported=False, retrievable=False, uncertaintyInMilliseconds=0):
-        self.interface = 'Alexa.BrightnessController'
-        self.version = '3'
+    def __init__(self, iot=None, proactivelyReported=False, retrievable=False, uncertaintyInMilliseconds=0, *args, **kwargs):
+        super(BrightnessController, self).__init__(iot, uncertaintyInMilliseconds)
         self.properties = \
             Interface.Properties(self.interface, [ Interface.Property('brightness')], \
                 proactivelyReported=proactivelyReported, retrievable=retrievable)
-        super(BrightnessController, self).__init__(iot, uncertaintyInMilliseconds)
 
     def SetBrightness(self, request):
         self._setdirective(request, 'brightness', 'brightness', range(101))
@@ -128,10 +128,8 @@ class BrightnessController(Interface):
         self._adjustdirective(request, 'brightness', 'brightnessDelta', range(101))
 
 class Calendar(Interface):
-    def __init__(self, proactivelyReported=False, retrievable=False):
+    def __init__(self, proactivelyReported=False, retrievable=False, *args, **kwargs):
         super(Calendar, self).__init__()
-        self.interface = 'Alexa.Calendar'
-        self.version = '3'
 
     @property
     def payload(self, organizerName, calendarEventId):
@@ -141,10 +139,8 @@ class Calendar(Interface):
         raise NotImplementedError('No default directive for {0}'.format(self.__class__.__name__))
 
 class CameraStreamController(Interface):
-    def __init__(self, cameraStreams=None):
+    def __init__(self, cameraStreams=None, *args, **kwargs):
         super(CameraStreamController, self).__init__()
-        self.interface = 'Alexa.CameraStreamController'
-        self.version = '3'
         self.cameraStreamConfigurations_value = cameraStreams if type (cameraStreams) is list else [ cameraStreams ]
 
     @property
@@ -167,58 +163,46 @@ class CameraStreamController(Interface):
         raise NotImplementedError('No default directive for {0}'.format(self.__class__.__name__))
 
 class ChannelController(Interface):
-    def __init__(self, iot=None, proactivelyReported=False, retrievable=False, uncertaintyInMilliseconds=0):
-        self.interface = 'Alexa.ChannelController'
-        self.version = '3'
+    def __init__(self, iot=None, proactivelyReported=False, retrievable=False, uncertaintyInMilliseconds=0, *args, **kwargs):
+        super(ChannelController, self).__init__(iot, uncertaintyInMilliseconds)
         self.properties = \
             Interface.Properties(self.interface, [ Interface.Property('channel')], \
                 proactivelyReported=proactivelyReported, retrievable=retrievable)
-        super(ChannelController, self).__init__(iot, uncertaintyInMilliseconds)
 
 class ColorController(Interface):
-    def __init__(self, iot=None, proactivelyReported=False, retrievable=False, uncertaintyInMilliseconds=0):
-        self.interface = 'Alexa.ColorController'
-        self.version = '3'
+    def __init__(self, iot=None, proactivelyReported=False, retrievable=False, uncertaintyInMilliseconds=0, *args, **kwargs):
+        super(ColorController, self).__init__(iot, uncertaintyInMilliseconds)
         self.properties = \
             Interface.Properties(self.interface, [ Interface.Property('color')], \
                 proactivelyReported=proactivelyReported, retrievable=retrievable)
-        super(ColorController, self).__init__(iot, uncertaintyInMilliseconds)
 
 class ColorTemperatureController(Interface):
-    def __init__(self, iot=None, proactivelyReported=False, retrievable=False, uncertaintyInMilliseconds=0):
-        self.interface = 'Alexa.EndpointHealth'
-        self.version = '3'
+    def __init__(self, iot=None, proactivelyReported=False, retrievable=False, uncertaintyInMilliseconds=0, *args, **kwargs):
+        super(ColorTemperatureController, self).__init__(iot, uncertaintyInMilliseconds)
         self.properties = \
             Interface.Properties(self.interface, [ Interface.Property('colorTemperatureInKelvin')], \
                 proactivelyReported=proactivelyReported, retrievable=retrievable)
-        super(ColorTemperatureController, self).__init__(iot, uncertaintyInMilliseconds)
 
 class EndpointHealth(Interface):
-    def __init__(self, iot=None, proactivelyReported=False, retrievable=False, uncertaintyInMilliseconds=0):
-        self.interface = 'Alexa.ColorTemperatureController'
-        self.version = '3'
+    def __init__(self, iot=None, proactivelyReported=False, retrievable=False, uncertaintyInMilliseconds=0, *args, **kwargs):
         super(EndpointHealth, self).__init__(iot, uncertaintyInMilliseconds)
 
 class InputController(Interface):
-    def __init__(self, iot=None, proactivelyReported=False, retrievable=False, uncertaintyInMilliseconds=0):
-        self.interface = 'Alexa.InputController'
-        self.version = '3'
+    def __init__(self, iot=None, proactivelyReported=False, retrievable=False, uncertaintyInMilliseconds=0, *args, **kwargs):
+        super(InputController, self).__init__(iot, uncertaintyInMilliseconds)
         self.properties = \
             Interface.Properties(self.interface, [ Interface.Property('input')], \
                 proactivelyReported=proactivelyReported, retrievable=retrievable)
-        super(InputController, self).__init__(iot, uncertaintyInMilliseconds)
 
     def SelectInput(self, request):
         self['input'] = (request.payload['input'], get_utc_timestamp(), self.uncertaintyInMilliseconds)
 
 class LockController(Interface):
-    def __init__(self, iot=None, proactivelyReported=False, retrievable=False, uncertaintyInMilliseconds=0):
-        self.interface = 'Alexa.LockController'
-        self.version = '3'
+    def __init__(self, iot=None, proactivelyReported=False, retrievable=False, uncertaintyInMilliseconds=0, *args, **kwargs):
+        super(LockController, self).__init__(iot, uncertaintyInMilliseconds)
         self.properties = \
             Interface.Properties(self.interface, [ Interface.Property('lockState')], \
                 proactivelyReported=proactivelyReported, retrievable=retrievable)
-        super(LockController, self).__init__(iot, uncertaintyInMilliseconds)
 
     # If lock is slow, need to send deferred response
     # Possibility that lock will jam which should be indicated by lockState=='JAMMED'
@@ -229,9 +213,7 @@ class LockController(Interface):
         self['lockState'] = ('UNLOCKED', get_utc_timestamp(), self.uncertaintyInMilliseconds)
 
 class MeetingClientController(Interface):
-    def __init__(self, iot=None, proactivelyReported=False, retrievable=False, uncertaintyInMilliseconds=0):
-        self.interface = 'Alexa.MeetingClientController'
-        self.version = '3'
+    def __init__(self, iot=None, proactivelyReported=False, retrievable=False, uncertaintyInMilliseconds=0, *args, **kwargs):
         super(MeetingClientController, self).__init__(iot, uncertaintyInMilliseconds)
 
         # Needs special discovery logic
@@ -239,13 +221,11 @@ class MeetingClientController(Interface):
         # Uses generic response with no context object
 
 class PercentageController(Interface):
-    def __init__(self, iot=None, proactivelyReported=False, retrievable=False, uncertaintyInMilliseconds=0):
-        self.interface = 'Alexa.PercentageController'
-        self.version = '3'
+    def __init__(self, iot=None, proactivelyReported=False, retrievable=False, uncertaintyInMilliseconds=0, *args, **kwargs):
+        super(PercentageController, self).__init__(iot, uncertaintyInMilliseconds)
         self.properties = \
             Interface.Properties(self.interface, [ Interface.Property('percentage')], \
                 proactivelyReported=proactivelyReported, retrievable=retrievable)
-        super(PercentageController, self).__init__(iot, uncertaintyInMilliseconds)
 
     def SetPercentage(self, request):
         self._setdirective(request, 'percentage', 'percentage', range(101))
@@ -254,9 +234,7 @@ class PercentageController(Interface):
         self._adjustdirective(request, 'percentage', 'percentageDelta', range(101))
 
 class PlaybackController(Interface):
-    def __init__(self, iot=None, proactivelyReported=False, retrievable=False, uncertaintyInMilliseconds=0):
-        self.interface = 'Alexa.PlaybackController'
-        self.version = '3'
+    def __init__(self, iot=None, proactivelyReported=False, retrievable=False, uncertaintyInMilliseconds=0, *args, **kwargs):
         super(PlaybackController, self).__init__(iot, uncertaintyInMilliseconds)
 
         # Requires special discovery logic
@@ -264,13 +242,11 @@ class PlaybackController(Interface):
         # Response is just a generic message.  Weirdly the example shows a context but the properties are empty.
 
 class PowerController(Interface):
-    def __init__(self, iot=None, proactivelyReported=False, retrievable=False, uncertaintyInMilliseconds=0):
-        self.interface = 'Alexa.PowerController'
-        self.version = '3'
+    def __init__(self, iot=None, proactivelyReported=False, retrievable=False, uncertaintyInMilliseconds=0, *args, **kwargs):
+        super(PowerController, self).__init__(iot, uncertaintyInMilliseconds)
         self.properties = \
             Interface.Properties(self.interface, [ Interface.Property('powerState')], \
                 proactivelyReported=proactivelyReported, retrievable=retrievable)
-        super(PowerController, self).__init__(iot, uncertaintyInMilliseconds)
 
     def TurnOn(self, request):
         self['powerState'] = ('ON', get_utc_timestamp(), self.uncertaintyInMilliseconds)
@@ -279,13 +255,11 @@ class PowerController(Interface):
         self['powerState'] = ('OFF', get_utc_timestamp(), self.uncertaintyInMilliseconds)
 
 class PowerLevelController(Interface):
-    def __init__(self, iot=None, proactivelyReported=False, retrievable=False, uncertaintyInMilliseconds=0):
-        self.interface = 'Alexa.PowerLevelController'
-        self.version = '3'
+    def __init__(self, iot=None, proactivelyReported=False, retrievable=False, uncertaintyInMilliseconds=0, *args, **kwargs):
+        super(PowerLevelController, self).__init__(iot, uncertaintyInMilliseconds)
         self.properties = \
             Interface.Properties(self.interface, [ Interface.Property('powerLevel')], \
                 proactivelyReported=proactivelyReported, retrievable=retrievable)
-        super(PowerLevelController, self).__init__(iot, uncertaintyInMilliseconds)
 
     def SetPowerLevel(self, request):
         self._setdirective(request, 'powerLevel', 'powerLevel', range(101))
@@ -294,20 +268,17 @@ class PowerLevelController(Interface):
         self._adjustdirective(request, 'powerLevel', 'powerLevelDelta', range(101))
 
 class SceneController(Interface):
-    def __init__(self, iot=None, proactivelyReported=False, supportsDeactivation=False):
-        self.interface = 'Alexa.SceneController'
-        self.version = '3'
+    def __init__(self, iot=None, proactivelyReported=False, supportsDeactivation=False, *args, **kwargs):
+        super(SceneController, self).__init__(iot, uncertaintyInMilliseconds)
         self.proactivelyReported = proactivelyReported
         self.supportsDeactivation = supportsDeactivation
-        super(SceneController, self).__init__(iot, uncertaintyInMilliseconds)
+
     @property
     def jsonDiscover(self):
         return { 'type':'AlexaInterface', 'interface':self.interface, 'version': self.version, 'supportsDeactivation': self.supportsDeactivation, 'proactivelyReported': self.proactivelyReported }
 
 class StepSpeaker(Interface):
-    def __init__(self, iot=None, proactivelyReported=False, retrievable=False, uncertaintyInMilliseconds=0):
-        self.interface = 'Alexa.StepSpeaker'
-        self.version = '3'
+    def __init__(self, iot=None, proactivelyReported=False, retrievable=False, uncertaintyInMilliseconds=0, *args, **kwargs):
         super(StepSpeaker, self).__init__(iot, uncertaintyInMilliseconds)
 
     # Assumes that iot['volume'] is used to tell the speaker how much to increase or decrease the volume by
@@ -318,13 +289,11 @@ class StepSpeaker(Interface):
         self['muted'] = (request.payload['mute'], get_utc_timestamp(), self.uncertaintyInMilliseconds)
 
 class Speaker(Interface):
-    def __init__(self, iot=None, proactivelyReported=False, retrievable=False, uncertaintyInMilliseconds=0):
-        self.interface = 'Alexa.InputController'
-        self.version = '3'
+    def __init__(self, iot=None, proactivelyReported=False, retrievable=False, uncertaintyInMilliseconds=0, *args, **kwargs):
+        super(Speaker, self).__init__(iot, uncertaintyInMilliseconds)
         self.properties = \
             Interface.Properties(self.interface, [ Interface.Property('volume'), Interface.Property('muted') ], \
                 proactivelyReported=proactivelyReported, retrievable=retrievable)
-        super(Speaker, self).__init__(iot, uncertaintyInMilliseconds)
 
     def SetVolume(self, request):
         self._setdirective(request, 'volume', 'volume', range(101))
@@ -337,18 +306,15 @@ class Speaker(Interface):
 
 
 class TemperatureSensor(Interface):
-    def __init__(self, iot=None, proactivelyReported=False, retrievable=False, uncertaintyInMilliseconds=0):
-        self.interface = 'Alexa.TemperatureSensor'
-        self.version = '3'
+    def __init__(self, iot=None, proactivelyReported=False, retrievable=False, uncertaintyInMilliseconds=0, *args, **kwargs):
+        super(TemperatureSensor, self).__init__(iot, uncertaintyInMilliseconds)
         self.properties = \
             Interface.Properties(self.interface, [ Interface.Property('temperature') ], \
                 proactivelyReported=proactivelyReported, retrievable=retrievable)
-        super(TemperatureSensor, self).__init__(iot, uncertaintyInMilliseconds)
 
 class ThermostatController(Interface):
-    def __init__(self, iot=None, proactivelyReported=False, retrievable=False, uncertaintyInMilliseconds=0, thermostatType='single'):
-        self.interface = 'Alexa.ThermostatController'
-        self.version = '3'
+    def __init__(self, iot=None, proactivelyReported=False, retrievable=False, uncertaintyInMilliseconds=0, thermostatType='single', *args, **kwargs):
+        super(ThermostatControllerSingle, self).__init__(iot, uncertaintyInMilliseconds)
         prop_list = [ Interface.Property('thermostatMode') ]
         if thermostatType.lower() == 'single':
             prop_list.append( Interface.Property('TargetSetpoint'))
@@ -363,7 +329,6 @@ class ThermostatController(Interface):
         self.properties = \
             Interface.Properties(self.interface, prop_list, \
                 proactivelyReported=proactivelyReported, retrievable=retrievable)
-        super(ThermostatControllerSingle, self).__init__(iot, uncertaintyInMilliseconds)
 
     def SetTargetTemperature(self, request):
         if 'targetSetpoint' in request.payload:
@@ -383,3 +348,31 @@ class ThermostatController(Interface):
     def SetThermostatMode(self, request):
         tm = ThermostatMode(request.payload['thermostatMode'])
         self['thermostatMode'] = (tm, get_utc_timestamp(), self.uncertaintyInMilliseconds)
+
+def getInterfaceClass(interface):
+    if interface[0:6] == 'Alexa.':
+        interface = interface[6:]
+    ret = {
+        'BrightnessController': BrightnessController,
+        'Calendar': Calendar,
+        'CameraStreamController': CameraStreamController,
+        'ChannelController': ChannelController,
+        'ColorController': ColorController,
+        'ColorTemperatureController': ColorTemperatureController,
+        'EndpointHealth': EndpointHealth,
+        'InputController': InputController,
+        'LockController': LockController,
+        'MeetingClientController': MeetingClientController,
+        'PercentageController': PercentageController,
+        'PlaybackController': PlaybackController,
+        'PowerController': PowerController,
+        'PowerLevelController': PowerLevelController,
+        'SceneController': SceneController,
+        'StepSpeaker': StepSpeaker,
+        'Speaker': Speaker,
+        'TemperatureSensor': TemperatureSensor,
+        'ThermostatController': ThermostatController
+    }.get(interface, None)
+    if ret:
+        return ret
+    raise ValueError('{0} is not a valid interface'.format(interface))

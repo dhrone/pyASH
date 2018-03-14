@@ -9,6 +9,7 @@ from endpoint import Endpoint
 from iot import Iot
 from message import Request
 
+from interface import PowerController, Speaker
 from utility import LOGLEVEL
 
 # Setup logger
@@ -24,7 +25,7 @@ class iotTV(Iot):
 
     @Iot.transformToProperty('powerState', 'apower')
     def toPowerState(self, value):
-        return { True: 'ON', False: 'OFF'}.get(value, value) 
+        return { True: 'ON', False: 'OFF'}.get(value, value)
 
     @Iot.transformFromProperty('input', 'asource')
     def fromInput(self, value):
@@ -50,23 +51,29 @@ class iotTV(Iot):
     def toVolume(self, value):
         return value * 10
 
+@Endpoint.addInterface(PowerController, proactivelyReported=True, retrievable=True, uncertaintyInMilliseconds=0) ### Need to think through how to specify uncertainty for a property
+@Endpoint.addInterface(Speaker)
+@Endpoint.addIot(iotTV)
 class dhroneTV(Endpoint):
     manufacturerName = 'dhrone'
     description = 'iotTV controller by dhrone'
     displayCategories = 'OTHER'
+    proactivelyReported = False
+    retrievable=False
+    uncertaintyInMilliseconds=0
 
     class Iot(iotTV):
         pass
 
-    @Endpoint.register(['TurnOn'])
+    @Endpoint.addDirective(['TurnOn'])
     def TurnOn(self, request):
         self.iot['powerState'] = True
 
-    @Endpoint.register
+    @Endpoint.addDirective
     def TurnOff(self, request):
         self.iot['powerState'] = False
 
-    @Endpoint.register(['AdjustVolume','SetVolume'], properties='volume')
+    @Endpoint.addDirective(['AdjustVolume','SetVolume'])
     def Volume(self, request):
         if request.directive == 'AdjustVolume':
             v = self.iot['volume'] + request.payload['volume']
@@ -74,11 +81,11 @@ class dhroneTV(Endpoint):
         else:
             self.iot['volume'] = request.payload['volume']
 
-#    @Endpoint.register
+#    @Endpoint.addDirective
 #    def SetMute(self, request, iot):
 #        iot['muted'] = request.payload['mute']
 
-    @Endpoint.register
+    @Endpoint.addDirective
     def SelectInput(self, request, iot):
         self.iot['asource'] = request.payload['input']
 
@@ -88,17 +95,16 @@ class dhroneTVScene(Endpoint):
     displayCategories = 'SCENE_TRIGGER'
 
     class Iot(iotTV):
-        @staticmethod
-        def _getThingName(endpointId):
-            return endpointId.split(':')[0]
+        def getThingName(self):
+            return self.endpointId.split(':')[0]
 
-    @Endpoint.register
+    @Endpoint.addDirective
     def Activate(self, request):
         (endpointId, sceneId) = request.endpointId.split(':')
         ds = { 'epower':True, 'esource': 'HDMI1', 'input': 'SAT', 'powerState':True }
         self.iot.batchSet(ds)
 
-    @Endpoint.register
+    @Endpoint.addDirective
     def Deactivate(self, request):
         (endpointId, sceneId) = request.endpointId.split(':')
         ds = { 'epower': False, 'input': 'CD' }
