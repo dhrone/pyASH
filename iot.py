@@ -69,7 +69,7 @@ class IotBase(ABC):
             method = doNothing
             variable = property
         if variable not in self.reportedState:
-            raise KeyError
+            raise KeyError('{0} is not a valid value for this Iot device'.format(variable))
         return (method, variable)
 
     def _getMethodProperty(self, variable, direction='from'):
@@ -147,6 +147,33 @@ class IotBase(ABC):
                 for property in getattr(method, '_transformToList', {}):
                     self.toPropertybyProperty[property] = (method, getattr(method, '_transformToList', {}).get(property))
                     self.toPropertybyVariable[getattr(method, '_transformToList', {}).get(property)] = (method, property)
+
+class IotTest(IotBase):
+    def __init__(self, *args, **kwargs):
+        super(IotTest, self).__init__('endpointId')
+        # Initialize reportedState so it has an entry for every possible property
+        currentTime = int(time.time())
+        for k,v in VALID_PROPERTIES.items():
+            for p in v:
+                self.reportedState[p] = None
+                self.reportedStateTimeStamp[p] = {'timestamp': currentTime}
+
+    def get(self):
+        pass
+
+    def put(self, newState):
+        currentTime = int(time.time())
+        for item in newState:
+            print ('Storing {0}:{1}'.format(item,newState[item]))
+            self.reportedState[item] = newState[item]
+            self.reportedStateTimeStamp[item] = {'timestamp': currentTime}
+    @property
+    def timeStamps(self):
+        ret = {}
+        for property in self.reportedState:
+            ret[property] = self.reportedStateTimeStamp[property]['timestamp']
+        return ret
+
 
 class Iot(IotBase):
     def __init__(self, endpointId, region=DEFAULT_IOTREGION, consideredStaleAfter=2):

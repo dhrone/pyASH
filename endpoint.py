@@ -34,10 +34,10 @@ class Endpoint(object):
     manufacturerName = 'pyASH'
     description = 'Generic device by pyASH'
     displayCategories = 'OTHER'
-    proactivelyReported = False
-    retrievable = False
-    uncertaintyInMilliseconds = 0
-    supportsDeactivation = False
+    proactivelyReported = None
+    retrievable = None
+    uncertaintyInMilliseconds = None
+    supportsDeactivation = None
     cookie = None
     endpointIdPattern = None
 
@@ -49,20 +49,22 @@ class Endpoint(object):
             self.manufacturerName = json.get('manufacturerName') if 'manufacturerName' in json else None
             self.description = json.get('description') if 'description' in json else None
             self.displayCategories = json.get('displayCategories') if 'displayCategories' in json else None
+            self.displayCategories = self.displayCategories if self.displayCategories is None or type(self.displayCategories) is list else [self.displayCategories]
             self.proactivelyReported = json.get('proactivelyReported') if 'proactivelyReported' in json else None
             self.retrievable = json.get('retrievable') if 'retrievable' in json else None
             self.supportsDeactivation = json.get('supportsDeactivation') if 'supportsDeactivation' in json else None
             self.cookie = json.get('cookie') if 'cookie' in json else None
         else:
             self.endpointId = endpointId
-            self.friendlyName = friendlyName if friendlyName else Endpoint.friendlyName
-            self.manufacturerName = manufacturerName if manufacturerName else Endpoint.manufacturerName
-            self.description = description if description else Endpoint.description
-            self.displayCategories = displayCategories if displayCategories else Endpoint.displayCategories
-            self.proactivelyReported = proactivelyReported if proactivelyReported else Endpoint.proactivelyReported
-            self.retrievable = retrievable if retrievable else Endpoint.retrievable
-            self.supportsDeactivation = supportsDeactivation if supportsDeactivation else Endpoint.supportsDeactivation
-            self.cookie = cookie if cookie else Endpoint.cookie
+            self.friendlyName = friendlyName if friendlyName is not None else Endpoint.friendlyName
+            self.manufacturerName = manufacturerName if manufacturerName is not None else Endpoint.manufacturerName
+            self.description = description if description is not None else Endpoint.description
+            self.displayCategories = displayCategories if displayCategories is not None else Endpoint.displayCategories
+            self.displayCategories = self.displayCategories if self.displayCategories is None or type(self.displayCategories) is list else [self.displayCategories]
+            self.proactivelyReported = proactivelyReported if proactivelyReported is not None else Endpoint.proactivelyReported
+            self.retrievable = retrievable if retrievable is not None else Endpoint.retrievable
+            self.supportsDeactivation = supportsDeactivation if supportsDeactivation is not None else Endpoint.supportsDeactivation
+            self.cookie = cookie if cookie is not None else Endpoint.cookie
 
         # Find and instantiate an Iot object if possible
         self.iotClass = self._findIot()
@@ -70,7 +72,7 @@ class Endpoint(object):
 
     @property
     def json(self):
-        return {
+        return {k:v for k,v in {
             'endpointId': self.endpointId,
             'className': self.__class__.__name__,
             'friendlyName': self.friendlyName,
@@ -81,7 +83,7 @@ class Endpoint(object):
             'retrievable': self.retrievable,
             'supportsDeactivation': self.supportsDeactivation,
             'cookie': self.cookie
-        }
+        }.items() if v is not None}
 
     @staticmethod
     def addInterface(interface, proactivelyReported=None, retrievable=None, uncertaintyInMilliseconds=None, supportsDeactivation = None):
@@ -106,9 +108,9 @@ class Endpoint(object):
 
     @staticmethod
     def addProperty(propertyName, proactivelyReported=None, retrievable=None, uncertaintyInMilliseconds=None):
-        _proactivelyReported = proactivelyReported if proactivelyReported else None
-        _retrievable = retrievable if retrievable else None
-        _uncertaintyInMilliseconds = uncertaintyInMilliseconds if uncertaintyInMilliseconds else None
+        _proactivelyReported = proactivelyReported if proactivelyReported is not None else None
+        _retrievable = retrievable if retrievable is not None else None
+        _uncertaintyInMilliseconds = uncertaintyInMillisecondsis is not None if uncertaintyInMilliseconds else None
 
         def wrapper(func):
             item = { 'property': propertyName, 'proactivelyReported': _proactivelyReported, 'retrievable': _retrievable, 'uncertaintyInMilliseconds': _uncertaintyInMilliseconds }
@@ -161,40 +163,68 @@ class Endpoint(object):
 
     @property
     def _getCapabilities(self):
-        ### Need to go through all of the potential capabilities per interface to make sure I am handling all of the special cases
-        ### Now that __interfaces__ and __directives__ are available this method needs to be rewritten.  Interfaces should generate capabilities.
-
-
-        interfaces = self._interfaces
         capabilities = [{
             "type": "AlexaInterface",
             "interface": "Alexa",
             "version": "3"
         }]
+
+        for object in self.generateInterfaces(iot=None):
+            capabilities.append(object.jsonDiscover)
+        return capabilities
+
+    @property
+    def _getProperties(self):
+        properties = []
+        for object in self.generateInterfaces(iot=self.iot):
+            properties += object.jsonResponse
+        return properties
+
+    def generateInterfaces(self,iot=None):
+        ret = []
         # Fix interface defaults
-        for k, interface in interfaces.items():
-            interface['proactivelyReported'] = interface['proactivelyReported'] if interface['proactivelyReported'] else self.proactivelyReported
-            interface['retrievable'] = interface['retrievable'] if interface['retrievable'] else self.retrievable
-            interface['uncertaintyInMilliseconds'] = interface['uncertaintyInMilliseconds'] if interface['uncertaintyInMilliseconds'] else self.uncertaintyInMilliseconds
+        for k, interface in self._interfaces.items():
+            interface['proactivelyReported'] = interface['proactivelyReported'] if interface['proactivelyReported'] is not None else self.proactivelyReported
+            interface['retrievable'] = interface['retrievable'] if interface['retrievable'] is not None else self.retrievable
+            interface['uncertaintyInMilliseconds'] = interface['uncertaintyInMilliseconds'] if interface['uncertaintyInMilliseconds'] is not None else self.uncertaintyInMilliseconds
 
             # For each interface, add capabilities
             interface['supportsDeactivation'] = interface['supportsDeactivation'] if interface['supportsDeactivation'] else self.supportsDeactivation
             object = interface['interface'] \
                 ( \
+                    iot=iot, \
                     proactivelyReported=interface['proactivelyReported'], \
                     retrievable = interface['retrievable'], \
                     uncertaintyInMilliseconds = interface['uncertaintyInMilliseconds'], \
                     supportsDeactivation = interface['supportsDeactivation']
                 )
-            capabilities.append(object.jsonDiscover)
-        return capabilities
+            ret.append( object )
+        return ret
 
     @property
     def jsonDiscover(self):
-        return EndpointResponse(self.endpointId, self.manufacturerName, self.friendlyName, self.description, self.displayCategories, self.cookie, self._getCapabilities, None, self.__class__.__name__).json
+        ### Need to sort out how to deal with endpointId
+        ### Difference between thingName which is what IOT needs
+        ### and endpointId sent to AWS and what is provided when the endpoint object is created
+        ### Should I REQUIRE that the classname of the endpoint be prepended to the endpointId
+        ### Or should I leave this up to the user object
 
-    def endpointResponse(self):
-        return EndpointResponse(self.endpointId, self.manufacturerName, self.friendlyName, self.description, self.displayCategories, self.cookie, self._getCapabilities, None, self.__class__.__name__)
+        ### Decided that user's get to set the endpointId.  Also...
+        ### Endpoints should keep endpointId and thing names separate.  Also...
+        ### Endpoints can contain multiple things
+        return { k:v for k,v in {
+            'endpointId' : self.endpointId
+            'manufacturerName' : self.manufacturerName,
+            'friendlyName' : self.friendlyName,
+            'description' : self.description,
+            'displayCategories' : self.displayCategories,
+            'cookie' : self.cookie,
+            'capabilities' : self._getCapabilities
+        }.items() if v is not None }
+
+    @property
+    def jsonResponse(self):
+        return self._getProperties
 
     @staticmethod
     def lookupInterface(interface):

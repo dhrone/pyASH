@@ -26,6 +26,10 @@ class Interface(object):
 
     @property
     def jsonResponse(self):
+        if self.iot:
+            timeStamps = self.iot.timeStamps
+            for item in self.properties.properties:
+                self.properties._set( item, (self.iot[item], timeStamps[item], self.uncertaintyInMilliseconds) )
         return self.properties.jsonResponse
 
     def __getitem__(self, property):

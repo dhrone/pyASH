@@ -33,6 +33,137 @@ logger.setLevel(LOGLEVEL)
 #
 # Handlers for AcceptGrant and Discover are mandatory so they are part of the class constructor
 
+class pyASH(object):
+    def __init__(self, user, version='3'):
+        self.user = user
+        self.version = version if type(version) is str else str(version)
+        if not self.version == '3': raise ValueError('pyAsh currently only supports API version 3')
+
+    def handleAcceptGrant(self, request):
+        # Provides tokens to user
+        try:
+            response = getAccessTokenFromCode(request['payload']['grant']['code'])
+            user.storeTokens(response['access_token'], response['refresh_token'], response['expires_in'])
+            return {
+                'event': {
+                    'header': Header('Alexa.Authorization', 'AcceptGrant.Response', payloadVersion=self.version).json,
+                    'payload': {}
+                }
+            }
+        except:
+            # Generate Error Response
+
+    def handleDiscovery(self, request):
+        # Requires endpoints from user
+        try:
+            ret = []
+            endpoints = self.user.getEndpoints(request)
+            for ep in endpoints:
+                ret.append(ep.jsonDiscover)
+            return {
+                'event': {
+                    'header': Header('Alexa.Discovery', 'Discover.Response', payloadVersion=self.version).json
+                    'payload': {
+                        'endpoints': ret
+                    }
+                }
+            }
+        except:
+            # Generate Error Response
+
+    def handleReportState(seld, request):
+        # Requires endpoints from user
+        try:
+            ret = []
+            endpoint = self.user.getEndpoint(request)
+            return {
+                'context': {
+                    'properties': endpoint.jsonResponse
+                },
+                'event': {
+                    'header': Header('Alexa', 'StateReport', correlationToken=request.correlationToken, payloadVersion=self.version).json,
+                    'endpoint': {
+                        'scope': {
+                            'type': 'BearerToken',
+                            'token': request.token
+                        },
+                        'endpointId' : endpoint.
+                    }
+                }
+            }
+
+
+
+    # From static
+    def handleDiscovery(self, request):
+        # Requires endpoints from user
+
+        # Need to determine the encoding of the endpointId
+
+        epResponses = []
+        for e in self.endpoints.values():
+            epResponses.append(e.endpointResponse())
+        return Response(request, epResponses)
+
+    # From DB
+    def handleDiscovery(self, request):
+        self.getUserProfileFromToken(request.token)
+        self.getUser(self.userId)
+        self._retrieveEndpoints()
+
+        epResponses = []
+        for e in self.endpoints.values():
+            epResponses.append(e.endpointResponse())
+        return Response(request, epResponses)
+
+    # from DB
+    def handleAcceptGrant(self, request):
+        response = self._getAccessTokenFromCode(request.code)
+    # From static
+    def handleAcceptGrant(self, request):
+        response = self._getAccessTokenFromCode(request.code)
+        profile = self._getUserProfile(self.accessToken)
+        print ("User {0}'s refreshToken is {1}".format(self.userName, self.refreshToken))
+
+    def handleDirective(self, request):
+
+        # Decode endpointId
+        (className, endpointId) = request.endpointId.split('|')
+        try:
+            endpoint = self.endpoints[endpointId]
+        except KeyError:
+            # Ok, endpoint wasn't found.  Let's see if we can find the class name
+            class = self.endpointClasses.get(className)
+            if not class:
+                raise EndpointNotFoundException('{0} not found'.format(request.endpointId))
+
+        # If no endpoint found but we have the class, create an instance to handle request
+        if not endpoint:
+            endpoint = self.endpointClasses[className](endpointId)
+
+        ### This could be either a endpoint or an interface method.  Need to figure out how to initialize either
+        (method, cls) = endpoint.getHandler(request)
+        if not method:
+            raise NoMethodToHandleDirectiveException('No method to handle {0}:{1}'.format(request.namespace,request.directive))
+
+        # bind the method to it's class
+        method = method.__get__(endpoint, endpoint.__class__)
+
+        response = method(request)
+        if response:
+            return response
+        return defaultResponse(request,endpoint.iot)
+
+    def lambda_handler(self, request, context=None):
+
+        if not request.namespace in VALID_DIRECTIVES:
+            raise INVALID_INTERFACE('{0} is not a valid directive'.format(request.namespace))
+        return {
+            'Alexa' : self.handleReportState,
+            'Alexa.Authorization' : self.handleAcceptGrant,
+            'Alexa.Discovery' : self.handleDiscovery,
+        }.get(request.namespace, self.handleDirective)(request)
+
 class ControllerInterface():
     def __init__(self, acceptgranthandler, discoverhandler):
         self.callbacks = {}

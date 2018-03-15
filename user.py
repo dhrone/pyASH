@@ -34,14 +34,19 @@ class User(ABC):
                 self.endpointClasses[item.__name__]=item
 
     @abstractmethod
-    def handleAcceptGrant(self, request):
+    def getEndpoints(self, request):
+        # Pull user token from request.
+        # Use it to retrieve user and then retrieve the user's endpoints
         pass
 
     @abstractmethod
-    def handleDiscovery(self, request):
+    def getEndpoint(self, request):
+        # Pull endpointId from request
+        # Use it to create endpoint for that endpointId
         pass
 
-    def handleReportState(seld, request):
+    @abstractmethod
+    def storeTokens(self, access, refresh, expires_in):
         pass
 
     def _getUserProfile(self, token):
@@ -60,73 +65,19 @@ class User(ABC):
         self._getUserProfile(self.accessToken)
         return response
 
-    def handleDirective(self, request):
-
-        # Decode endpointId
-        (className, endpointId) = request.endpointId.split('|')
-        try:
-            endpoint = self.endpoints[endpointId]
-        except KeyError:
-            # Ok, endpoint wasn't found.  Let's see if we can find the class name
-            class = self.endpointClasses.get(className)
-            if not class:
-                raise EndpointNotFoundException('{0} not found'.format(request.endpointId))
-
-        # If no endpoint found but we have the class, create an instance to handle request
-        if not endpoint:
-            endpoint = self.endpointClasses[className](endpointId)
-
-        ### This could be either a endpoint or an interface method.  Need to figure out how to initialize either
-        (method, cls) = endpoint.getHandler(request)
-        if not method:
-            raise NoMethodToHandleDirectiveException('No method to handle {0}:{1}'.format(request.namespace,request.directive))
-
-        # bind the method to it's class
-        method = method.__get__(endpoint, endpoint.__class__)
-
-        response = method(request)
-        if response:
-            return response
-        return defaultResponse(request,endpoint.iot)
-
-    def lambda_handler(self, request, context=None):
-
-        if not request.namespace in VALID_DIRECTIVES:
-            raise INVALID_INTERFACE('{0} is not a valid directive'.format(request.namespace))
-        return {
-            'Alexa' : self.handleReportState,
-            'Alexa.Authorization' : self.handleAcceptGrant,
-            'Alexa.Discovery' : self.handleDiscovery,
-        }.get(request.namespace, self.handleDirective)(request)
-
     def addEndpoint(self, endpoint):
         self.endpointClasses[endpoint.__class__.__name__] = endpoint.__class__
-        self.endpoints[endpoint.endpointID] = endpoint
+        self.endpoints[endpoint.endpointId] = endpoint
 
 class StaticUser(User):
     def __init__(self, endpoints=[], endpointClasses=[]):
         super(StaticUser, self).__init__(endpointClasses)
 
-        if type(endpoints) != list:
-            if isinstance(endpoints, Endpoint):
-                endpoints = [ endpoints ]
-            else:
-                raise TypeError('Must provide a list of endpoints')
+        endpoints = endpoints if type(endpoints) is list else [endpoints]
         for item in endpoints:
+            if not isinstance(item, Endpoint):
+                raise TypeError('{0} is not an endpoint'.format(item))
             self.addEndpoint(item)
-
-    def handleDiscovery(self, request):
-        # Need to determine the encoding of the endpointId
-
-        epResponses = []
-        for e in self.endpoints.values():
-            epResponses.append(e.endpointResponse())
-        return Response(request, epResponses)
-
-    def handleAcceptGrant(self, request):
-        response = self._getAccessTokenFromCode(request.code)
-        profile = self._getUserProfile(self.accessToken)
-        print ("User {0}'s refreshToken is {1}".format(self.userName, self.refreshToken))
 
 class DbUser(User):
     def __init__(self, endpointClasses=[], region='us-east-1', systemName = 'pyASH'):
@@ -135,19 +86,6 @@ class DbUser(User):
         self.region = region
         self.systemName = systemName
         self.uuid = None
-
-    def handleAcceptGrant(self, request):
-        response = self._getAccessTokenFromCode(request.code)
-
-    def handleDiscovery(self, request):
-        self.getUserProfileFromToken(request.token)
-        self.getUser(self.userId)
-        self._retrieveEndpoints()
-
-        epResponses = []
-        for e in self.endpoints.values():
-            epResponses.append(e.endpointResponse())
-        return Response(request, epResponses)
 
     def getUser(self, token=None, userId=None, userEmail=None):
         self.userId = userId

@@ -29,20 +29,20 @@ Options:
 
 
 Handling directives for supported interfaces
-  AWS provides endpointID and a user token
+  AWS provides endpointId and a user token
   AWS provides directive for interface (e.g. TurnOn for powerState)
   pyASH needs to know what device type to use to respond to the request
 
   How does pyASH decide which device type to use for the response?
   Options:
-    Use endpointID to look up device details in some repository
+    Use endpointId to look up device details in some repository
       Could be hard coded or from a db
     Infer the endpoint type based upon the requested interface/directive
-    Use some encoding in the issued endpointID (e.g. <type>:<id>)
+    Use some encoding in the issued endpointId (e.g. <type>:<id>)
 
 ReportState
-  AWS provides endpointID and user token
-  pyASH needs to look up thing from endpointID/token, determine the things' status and respond back
+  AWS provides endpointId and user token
+  pyASH needs to look up thing from endpointId/token, determine the things' status and respond back
 
 
 Database Structure
