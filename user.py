@@ -24,14 +24,9 @@ logger.setLevel(LOGLEVEL)
 
 class User(ABC):
 
-    def __init__(self, endpointClasses = []):
+    def __init__(self):
         self.endpoints = {}
         self.endpointClasses = {}
-        for item in endpointClasses:
-            if isinstance(item, Endpoint):
-                self.endpointClasses[item.__class__.__name__] = item.__class__
-            else:
-                self.endpointClasses[item.__name__]=item
 
     @abstractmethod
     def getEndpoints(self, request):
@@ -65,23 +60,45 @@ class User(ABC):
         self._getUserProfile(self.accessToken)
         return response
 
-    def addEndpoint(self, endpoint):
-        self.endpointClasses[endpoint.__class__.__name__] = endpoint.__class__
-        self.endpoints[endpoint.endpointId] = endpoint
+    @staticmethod
+    def _getEndpointId(cls, things):
+        if ':' in things:
+            raise ValueError(': symbol not allowed in thing names')
+        things = things if type(things) is list else [things]
+        return cls.__name__ + '|' + ':'.join(things)
+
+    @staticmethod
+    def _retrieveThings(endpointId):
+        (cls, things) = endpointId.split('|')
+        things = things.split(':')
+        return things
+
+    def _retrieveClass(self, endpointId):
+        (cls, things) = endpointId.split('|')
+        return self.endpointClasses[cls]
+
+    def addEndpoint(self, endpointClass, things=None, friendlyName=None, description=None, manufacturerName=None,displayCategories=None, proactivelyReported=None, retrievable=None, uncertaintyInMilliseconds=None, supportsDeactivation=None, cookie=None):
+        self.endpointClasses[endpointClass.__name__] = endpointClass
+        endpointId = self._getEndpointId(endpointClass, things)
+        self.endpoints[endpointId] = endpointClass(endpointId, things, friendlyName, description, manufacturerName,displayCategories, proactivelyReported, retrievable, uncertaintyInMilliseconds, supportsDeactivation, cookie)
+
 
 class StaticUser(User):
-    def __init__(self, endpoints=[], endpointClasses=[]):
-        super(StaticUser, self).__init__(endpointClasses)
+    def __init__(self):
+        super(StaticUser, self).__init__()
 
-        endpoints = endpoints if type(endpoints) is list else [endpoints]
-        for item in endpoints:
-            if not isinstance(item, Endpoint):
-                raise TypeError('{0} is not an endpoint'.format(item))
-            self.addEndpoint(item)
+    def getEndpoints(self, request):
+        return self.endpoints.values()
+
+    def getEndpoint(self, request):
+        return self.endpoints[request.endpointId]
+
+    def storeTokens(self, access, refresh, expires_in):
+        print ('ACCESSGRANT Refresh[{0}], Access[{1}], Expires_In [{2}]'.format(access,refresh,expires_in))
 
 class DbUser(User):
-    def __init__(self, endpointClasses=[], region='us-east-1', systemName = 'pyASH'):
-        super(DbUser, self).__init__(endpointClasses)
+    def __init__(self, region='us-east-1', systemName = 'pyASH'):
+        super(DbUser, self).__init__()
 
         self.region = region
         self.systemName = systemName

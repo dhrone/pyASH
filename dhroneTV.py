@@ -110,10 +110,18 @@ class dhroneTVScene(Endpoint):
         ds = { 'epower': False, 'input': 'CD' }
         self.iot.batchSet(ds)
 
-#user = StaticUser(dhroneTV('avmctrl_den'), dhroneTVScene('avmctrl_den:scene1'))
-#user = DbUser(endpointClasses=[dhroneTV, dhroneTVScene])
+#user = StaticUser()
+#user.addEndpoint(endpointClass=dhroneTV, things='avmctrl_den', friendlyName='Sound', description='Sound by dhrone')
+#user.addEndpoint(endpointClass=dhroneTVScene, things='avmctrl_den', friendlyName='TV', description='TV by dhrone'))
 #ash = pyASH(user)
 #lambda_handler = ash.lambda_handler
+
+if __name__ == u'lambda_function':
+    user = StaticUser()
+    user.addEndpoint(endpointClass=dhroneTV, things='avmctrl_den', friendlyName='Sound', description='Sound by dhrone')
+    user.addEndpoint(endpointClass=dhroneTVScene, things='avmctrl_den', friendlyName='TV', description='TV by dhrone')
+
+    pyash = pyASH(user)
 
 if __name__ == u'__main__':
     from user import DbUser
@@ -124,6 +132,6 @@ if __name__ == u'__main__':
 
     user.createUser('ron@ritchey.org')
 
-    user.addEndpoint(dhroneTV('avmctrl_den','Sound', 'Sound by dhrone'))
-    user.addEndpoint(dhroneTVScene('avmctrl_den:scene-1', 'TV', 'TV by dhrone'))
+    user.addEndpoint(endpointClass=dhroneTV, things='avmctrl_den', friendlyName='Sound', description='Sound by dhrone')
+    user.addEndpoint(endpointClass=dhroneTVScene, things='avmctrl_den', friendlyName='TV', description='TV by dhrone')
     user.commit()

@@ -15,23 +15,12 @@ from datetime import datetime
 from datetime import timedelta
 
 from utility import *
+from message import Header
 
 # Setup logger
 logger = logging.getLogger(__name__)
 logger.setLevel(LOGLEVEL)
 
-
-# ControllerInterface class -- Function router for implementing an Alexa Smart Home application
-#
-# Two main methods...
-# register_callback -- Registers a function to handle specific requests
-#     When register_callback is called without a directive name, the function provided will be
-#     registered for all directives supported by that interface
-# process_request -- Accepts a alexa smart home request, and then invokes the appropriate function
-#     All functions are expected to accept a json formatted request as received from
-#     the Alexa Smart Home service and return a properly formatted response message
-#
-# Handlers for AcceptGrant and Discover are mandatory so they are part of the class constructor
 
 class pyASH(object):
     def __init__(self, user, version='3'):
@@ -52,6 +41,7 @@ class pyASH(object):
             }
         except:
             # Generate Error Response
+            pass
 
     def handleDiscovery(self, request):
         # Requires endpoints from user
@@ -62,7 +52,7 @@ class pyASH(object):
                 ret.append(ep.jsonDiscover)
             return {
                 'event': {
-                    'header': Header('Alexa.Discovery', 'Discover.Response', payloadVersion=self.version).json
+                    'header': Header('Alexa.Discovery', 'Discover.Response', payloadVersion=self.version).json,
                     'payload': {
                         'endpoints': ret
                     }
@@ -70,11 +60,11 @@ class pyASH(object):
             }
         except:
             # Generate Error Response
+            pass
 
     def handleReportState(seld, request):
         # Requires endpoints from user
         try:
-            ret = []
             endpoint = self.user.getEndpoint(request)
             return {
                 'context': {
@@ -87,128 +77,65 @@ class pyASH(object):
                             'type': 'BearerToken',
                             'token': request.token
                         },
-                        'endpointId' : endpoint.
-                    }
+                        'endpointId' : endpoint.endpointId
+                    },
+                    'payload': {}
                 }
             }
-
-
-
-    # From static
-    def handleDiscovery(self, request):
-        # Requires endpoints from user
-
-        # Need to determine the encoding of the endpointId
-
-        epResponses = []
-        for e in self.endpoints.values():
-            epResponses.append(e.endpointResponse())
-        return Response(request, epResponses)
-
-    # From DB
-    def handleDiscovery(self, request):
-        self.getUserProfileFromToken(request.token)
-        self.getUser(self.userId)
-        self._retrieveEndpoints()
-
-        epResponses = []
-        for e in self.endpoints.values():
-            epResponses.append(e.endpointResponse())
-        return Response(request, epResponses)
-
-    # from DB
-    def handleAcceptGrant(self, request):
-        response = self._getAccessTokenFromCode(request.code)
-    # From static
-    def handleAcceptGrant(self, request):
-        response = self._getAccessTokenFromCode(request.code)
-        profile = self._getUserProfile(self.accessToken)
-        print ("User {0}'s refreshToken is {1}".format(self.userName, self.refreshToken))
+        except:
+            # Deal with failure
+            pass
 
     def handleDirective(self, request):
 
-        # Decode endpointId
-        (className, endpointId) = request.endpointId.split('|')
         try:
-            endpoint = self.endpoints[endpointId]
-        except KeyError:
-            # Ok, endpoint wasn't found.  Let's see if we can find the class name
-            class = self.endpointClasses.get(className)
-            if not class:
-                raise EndpointNotFoundException('{0} not found'.format(request.endpointId))
+            endpoint = self.user.getEndpoint(request)
+            cls, handler = endpoint.getHandler(request)
+            things = self.user._retrieveThings(request.endpointId)
+            method = handler.__get__(cls(things=things), cls)
 
-        # If no endpoint found but we have the class, create an instance to handle request
-        if not endpoint:
-            endpoint = self.endpointClasses[className](endpointId)
+            ret = method(request)
+            if ret:
+                return ret
 
-        ### This could be either a endpoint or an interface method.  Need to figure out how to initialize either
-        (method, cls) = endpoint.getHandler(request)
-        if not method:
-            raise NoMethodToHandleDirectiveException('No method to handle {0}:{1}'.format(request.namespace,request.directive))
+            time.sleep(1) # Allow time for update to be processed
 
-        # bind the method to it's class
-        method = method.__get__(endpoint, endpoint.__class__)
+            endpoint.iots[0].refresh()
+            interface = endpoint._interfaces[request.namespace]['interface'](endpoint.iots[0])
+            return {
+                'context': {
+                    'properties': interface.jsonResponse
+                },
+                'event': {
+                    'header': Header('Alexa', 'Response', correlationToken=request.correlationToken, payloadVersion=self.version).json,
+                    'endpoint': {
+                        'scope': {
+                            'type': 'BearerToken',
+                            'token': request.token
+                        },
+                        'endpointId' : endpoint.endpointId
+                    },
+                    'payload': {}
+                }
+            }
+        except Exception as e:
+            print (e)
+            # Deal with failure
 
-        response = method(request)
-        if response:
-            return response
-        return defaultResponse(request,endpoint.iot)
+
+
 
     def lambda_handler(self, request, context=None):
 
         if not request.namespace in VALID_DIRECTIVES:
-            raise INVALID_INTERFACE('{0} is not a valid directive'.format(request.namespace))
+            raise INVALID_INTERFACE('{0}:{1} is not a valid directive'.format(request.namespace, request.directive))
+        if request.directive not in VALID_DIRECTIVES[request.namespace]:
+            raise INVALID_DIRECTIVE('{0}:{1} is not a valid directive'.format(request.namespace, request.directive))
         return {
             'Alexa' : self.handleReportState,
             'Alexa.Authorization' : self.handleAcceptGrant,
             'Alexa.Discovery' : self.handleDiscovery,
         }.get(request.namespace, self.handleDirective)(request)
-
-class ControllerInterface():
-    def __init__(self, acceptgranthandler, discoverhandler):
-        self.callbacks = {}
-        if not callable(acceptgranthandler):
-            raise TypeError('The acceptgranthandler must be a function.  Type received was {0}'.format(type(acceptgranthandler)))
-        else:
-            self.register_callback(acceptgranthandler, 'Alexa.Authorization', 'AcceptGrant')
-
-        if not callable(discoverhandler):
-            raise TypeError('The discoverhandler must be a function.  Type received was {0}'.format(type(discovershandler)))
-        else:
-            self.register_callback(discoverhandler, 'Alexa.Discovery', 'Discover')
-
-    def register_callback(self, func, interface, directive=None ):
-
-        if not callable(func):
-            raise TypeError('Callback function must be callable')
-
-        interface = fix_interface(interface)
-
-        if directive is None:
-            for n in VALID_DIRECTIVES[interface]:
-                self.callbacks[(interface, n)]=func
-        else:
-            directive = fix_directive(interface, directive)
-            self.callbacks[(interface, directive)]=func
-
-
-    def process_request(self, request):
-        r = Request(request)
-
-        if r.namespace not in VALID_PROPERTIES:
-            raise ValueError('{0} is not a valid namespace'.format(r.namespace))
-
-        if r.name not in VALID_DIRECTIVES[r.namespace]:
-            raise ValueError('{0} is not a valid directive for {1}'.format(r.name, r.namespace))
-
-        if (r.namespace,r.name) not in self.callbacks:
-            raise KeyError('[{0}][{1}] does not have a callback handler'.format(r.namespace, r.name))
-
-        res = self.callbacks[(r.namespace, r.name)](request)
-        if not isinstance(res, Response) and not isinstance(res, ErrorResponse):
-            raise TypeError('Callback [{0}][{1}] returned an invalid response.  Type returned was {2}'.format(r.namespace, r.name, str(type(res))))
-
-        return res
 
 if __name__ == u'__main__':
 

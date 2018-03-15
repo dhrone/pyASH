@@ -39,12 +39,12 @@ class Endpoint(object):
     uncertaintyInMilliseconds = None
     supportsDeactivation = None
     cookie = None
-    endpointIdPattern = None
 
-    def __init__(self, endpointId=None, friendlyName = None, description = None, manufacturerName=None, displayCategories=None, proactivelyReported=None, retrievable=None, supportsDeactivation=None, cookie=None, json=None):
+    def __init__(self, endpointId=None, things=None, friendlyName = None, description = None, manufacturerName=None, displayCategories=None, proactivelyReported=None, retrievable=None, supportsDeactivation=None, cookie=None, json=None):
 
         if json:
             self.endpointId = json.get('endpointId') if 'endpointId' in json else None
+            self.things = json.get('things') if 'things' in json else None
             self.friendlyName = json.get('friendlyName') if 'friendlyName' in json else None
             self.manufacturerName = json.get('manufacturerName') if 'manufacturerName' in json else None
             self.description = json.get('description') if 'description' in json else None
@@ -56,6 +56,7 @@ class Endpoint(object):
             self.cookie = json.get('cookie') if 'cookie' in json else None
         else:
             self.endpointId = endpointId
+            self.things = things
             self.friendlyName = friendlyName if friendlyName is not None else Endpoint.friendlyName
             self.manufacturerName = manufacturerName if manufacturerName is not None else Endpoint.manufacturerName
             self.description = description if description is not None else Endpoint.description
@@ -66,9 +67,15 @@ class Endpoint(object):
             self.supportsDeactivation = supportsDeactivation if supportsDeactivation is not None else Endpoint.supportsDeactivation
             self.cookie = cookie if cookie is not None else Endpoint.cookie
 
-        # Find and instantiate an Iot object if possible
-        self.iotClass = self._findIot()
-        self.iot = self.iotClass(self.endpointId) if self.iotClass and self.endpointId else None
+        self.things = self.things if type(self.things) is list else [self.things] if self.things is not None else None
+        # Find and instantiate an array of Iot objects if possible and needed
+        self.iots = []
+        if self.things:
+            self.iotClass = self._findIot()
+            if self.iotClass:
+                for thing in self.things:
+                    self.iots.append( self.iotClass(thing) )
+        self.iot = self.iots[0] if self.iots else None
 
     @property
     def json(self):
@@ -213,7 +220,7 @@ class Endpoint(object):
         ### Endpoints should keep endpointId and thing names separate.  Also...
         ### Endpoints can contain multiple things
         return { k:v for k,v in {
-            'endpointId' : self.endpointId
+            'endpointId' : self.endpointId,
             'manufacturerName' : self.manufacturerName,
             'friendlyName' : self.friendlyName,
             'description' : self.description,
@@ -318,6 +325,7 @@ class Endpoint(object):
         for i in ret:
             if i[0] == request.namespace and i[1] == request.directive:
                 return ret[i]
+        raise NoMethodToHandleDirectiveException('No method to handle {0}:{1}'.format(request.namespace,request.directive))
 
     # See if an Iot class was included and return it if yes
     def _findIot(self):
