@@ -56,6 +56,9 @@ class INVALID_AUTHORIZATION_CREDENTIAL(InterfaceException):
 class INVALID_DIRECTIVE(InterfaceException):
     pass
 
+class INVALID_INTERFACE(InterfaceException):
+    pass
+
 class INVALID_VALUE(InterfaceException):
     pass
 

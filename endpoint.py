@@ -166,7 +166,11 @@ class Endpoint(object):
 
 
         interfaces = self._interfaces
-        capabilities = []
+        capabilities = [{
+            "type": "AlexaInterface",
+            "interface": "Alexa",
+            "version": "3"
+        }]
         # Fix interface defaults
         for k, interface in interfaces.items():
             interface['proactivelyReported'] = interface['proactivelyReported'] if interface['proactivelyReported'] else self.proactivelyReported
@@ -185,28 +189,11 @@ class Endpoint(object):
             capabilities.append(object.jsonDiscover)
         return capabilities
 
-        '''
-        ip_list = self._properties
-        cps = [Capability('Alexa')] # All endpoints should report this generic capability
-        for interface in ip_list:
-            if len(ip_list[interface]):
-                for property in ip_list[interface]:
-                    # Main use case.  Handles most of the capabilities
-                    cps.append( Capability(interface, property, self.proactivelyReported, self.retrievable) )
-            else:
-                # Handles all of the special cases
-                if interface == 'Alexa.SceneController':
-                    cps.append( Capability(interface, proactivelyReported=self.proactivelyReported, supportsDeactivation = self.supportsDeactivation) )
-                elif interface == 'Alexa.CameraStreamController':
-                    pass
-                else:
-                    # Handles all of the normal non-property use-cases
-                    cps.append( Capability(interface, self.proactivelyReported, self.retrievable) )
-        return cps
-        '''
+    @property
+    def jsonDiscover(self):
+        return EndpointResponse(self.endpointId, self.manufacturerName, self.friendlyName, self.description, self.displayCategories, self.cookie, self._getCapabilities, None, self.__class__.__name__).json
 
     def endpointResponse(self):
-        # endpointId, manufacturerName='', friendlyName='', description='', displayCategories=[], cookie='', capabilities=[], token={}
         return EndpointResponse(self.endpointId, self.manufacturerName, self.friendlyName, self.description, self.displayCategories, self.cookie, self._getCapabilities, None, self.__class__.__name__)
 
     @staticmethod

@@ -90,37 +90,14 @@ class User(ABC):
         return defaultResponse(request,endpoint.iot)
 
     def lambda_handler(self, request, context=None):
-        def doNothing(request):
 
+        if not request.namespace in VALID_DIRECTIVES:
+            raise INVALID_INTERFACE('{0} is not a valid directive'.format(request.namespace))
         return {
             'Alexa' : self.handleReportState,
             'Alexa.Authorization' : self.handleAcceptGrant,
             'Alexa.Discovery' : self.handleDiscovery,
-            'Alexa.BrightnessController' : self.handleDirective,
-            'Alexa.Calendar' :
-            'Alexa.CameraStreamController' :
-            'Alexa.ChannelController' :
-            'Alexa.ColorController' :
-            'Alexa.ColorTemperatureController' : self.handleDirective,
-            'Alexa.Cooking' :
-            'Alexa.Cooking.TimeController' :
-            'Alexa.Cooking.PresetController' :
-            'Alexa.EndpointHealth' :
-            'Alexa.InputController' : self.handleDirective,
-            'Alexa.LockController' : self.handleDirective,
-            'Alexa.MeetingClientController' :
-            'Alexa.PercentageController' : self.handleDirective,
-            'Alexa.PlaybackController' : self.handleDirective,
-            'Alexa.PowerController' : self.handleDirective,
-            'Alexa.PowerLevelController' : self.handleDirective,
-            'Alexa.SceneController' : self.handleDirective,
-            'Alexa.Speaker' : self.handleDirective,
-            'Alexa.StepSpeaker' : self.handleDirective,
-            'Alexa.TemperatureSensor' : self.handleDirective,
-            'Alexa.ThermostatController' :
-            'Alexa.TimeHoldController' :
-        }.get(request.namespace)(request)
-
+        }.get(request.namespace, self.handleDirective)(request)
 
     def addEndpoint(self, endpoint):
         self.endpointClasses[endpoint.__class__.__name__] = endpoint.__class__
