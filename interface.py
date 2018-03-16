@@ -8,11 +8,12 @@ class Interface(object):
     version = None
     properties = None
 
-    def __init__(self,iot=None, uncertaintyInMilliseconds=0):
+    def __init__(self,iots=None, uncertaintyInMilliseconds=0):
         self.interface = 'Alexa.'+self.__class__.__name__
         self.version='3'
         self.uncertaintyInMilliseconds = uncertaintyInMilliseconds
-        self.iot = iot
+        self.iots = iots if type(iots) is list else [iots] if iots is not None else None
+        self.iot = self.iots[0] if type(self.iots) is list else None
 
     @property
     def capability(self):
