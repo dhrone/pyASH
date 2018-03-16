@@ -112,19 +112,3 @@ class Persist(object):
                 else:
                     raise
         return False
-
-class Things(Persist):
-    def __init__(self, uuid='', systemName=DEFAULT_SYSTEM_NAME, region=DEFAULT_REGION):
-        super(Things, self).__init__(uuid, 'uuid', 'Things')
-
-class Tokens(Persist):
-    def __init__(self, userId='', systemName=DEFAULT_SYSTEM_NAME, region=DEFAULT_REGION):
-        super(Tokens, self).__init__(userId, 'userId', 'Tokens')
-
-class UUIDemail(Persist):
-    def __init__(self, email='', systemName=DEFAULT_SYSTEM_NAME, region=DEFAULT_REGION):
-        super(UUIDemail, self).__init__(email, 'email', 'UUIDlookupEmail')
-
-class UUIDuserid(Persist):
-    def __init__(self, userId='', systemName=DEFAULT_SYSTEM_NAME, region=DEFAULT_REGION):
-        super(UUIDuserid, self).__init__(userId, 'userId', 'UUIDlookupUserId')

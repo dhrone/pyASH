@@ -197,7 +197,7 @@ def fix_interface(interface):
             logger.warn('Adjusted interface from {0} to {1}'.format(interface, i))
             return i
 
-    raise ValueError('{0} is not a valid interface'.format(interface))
+    raise INVALID_DIRECTIVE('{0} is not a valid interface'.format(interface))
 
 def fix_directive(interface, directive):
     interface = fix_interface(interface)
@@ -212,7 +212,7 @@ def fix_directive(interface, directive):
             logger.warn('Adjusted directive from {0} to {1}'.format(directive, d))
             return d
     directives = directives[:len(directives)-2] if len(directives)>=2 else directives
-    raise ValueError('{0} is not a valid directive for interface {1}.  Valid values are {2}'.format(directive, interface, directives))
+    raise INVALID_DIRECTIVE('{0} is not a valid directive for interface {1}.  Valid values are {2}'.format(directive, interface, directives))
 
 def fix_property(interface, property):
     interface = fix_interface(interface)
@@ -243,20 +243,17 @@ def fix_term(term):
 
 
 # Oauth2 utilities
-def validateReturnCode(status_code):
-    if status_code == 401:
-        errmsg = 'Permission denied.  Unable to retrieve profile.'
-        logger.warn(errmsg)
-        raise OAUTH2_PermissionDenied(errmsg)
-    elif status_code == 400:
-        errmsg = 'Bad request.  Unable to retrieve profile.'
-        logger.warn(errmsg)
-        raise OAUTH2_BadRequest(errmsg)
-    elif status_code != 200:
-        errmsg = 'Unable to retrieve profile.  Error code returned was {0}'.format(r.status_code)
-        logger.warn(errmsg)
-        raise IOError(errmsg)
-    return status_code
+def validateReturnCode(response):
+    error = response.json().get('error')
+    error_description = response.json().get('error_description')
+
+    if response.status_code in [401,403,405]:
+        raise OAUTH2_PermissionDenied(error, error_description)
+    elif response.status_code == 400:
+        raise EXPIRED_AUTHORIZATION_CREDENTIAL(error, error_description)
+    elif response.status_code != 200:
+        raise OAUTH2_IOError(error, error_description)
+    return response.status_code
 
 def validateValue(value, validList, errmsg=None):
     if value.upper() in map(str.upper, validList):
@@ -267,9 +264,8 @@ def validateValue(value, validList, errmsg=None):
 def getUserProfile(accessToken):
     payload = { 'access_token': accessToken }
     r = requests.get("https://api.amazon.com/user/profile", params=payload)
-    validateReturnCode(r.status_code)
+    validateReturnCode(r)
     return r.json()
-
 
 def _getOauth2Credentials():
     try:
@@ -303,7 +299,7 @@ def refreshAccessToken(refreshToken):
     }
 
     r = requests.post("https://api.amazon.com/auth/o2/token", data=payload)
-    validateReturnCode(r.status_code)
+    validateReturnCode(r)
 
     try:
         return r.json()
@@ -323,11 +319,6 @@ def getAccessTokenFromCode(code):
     }
 
     r = requests.post("https://api.amazon.com/auth/o2/token", data=payload)
-    validateReturnCode(r.status_code)
+    validateReturnCode(r)
 
-    try:
-        return r.json()
-    except KeyError:
-        errmsg = 'Tokens not in response'
-        logger.warn(errmsg)
-        raise OAUTH2_AccessGrantFailed(errmsg)
+    return r.json()

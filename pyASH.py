@@ -15,11 +15,14 @@ from datetime import datetime
 from datetime import timedelta
 
 from utility import *
-from message import Header
+from message import Header, Request
 
 # Setup logger
 logger = logging.getLogger(__name__)
 logger.setLevel(LOGLEVEL)
+
+def test_func(val):
+    assert False
 
 
 class pyASH(object):
@@ -28,20 +31,38 @@ class pyASH(object):
         self.version = version if type(version) is str else str(version)
         if not self.version == '3': raise ValueError('pyAsh currently only supports API version 3')
 
+    @staticmethod
+    def _header(namespace, name, correlationToken=''):
+        messageId = get_uuid()
+        json = { 'namespace': namespace, 'name':name, 'messageId': messageId, 'payloadVersion': '3' }
+        if correlationToken: json['correlationToken'] = correlationToken
+        return json
+
+    @classmethod
+    def _errorResponse(cls, request, e):
+        json = {
+            'event': {
+                'header': cls._header('Alexa', 'ErrorResponse', request.correlationToken),
+                'payload': e.payload
+            }
+        }
+        if hasattr(request, 'endpointId'): json['event']['endpointId'] = { 'endpointId': request.endpointId }
+        return json
+
     def handleAcceptGrant(self, request):
         # Provides tokens to user
         try:
-            response = getAccessTokenFromCode(request['payload']['grant']['code'])
-            user.storeTokens(response['access_token'], response['refresh_token'], response['expires_in'])
+            user.getTokens(request)
             return {
                 'event': {
-                    'header': Header('Alexa.Authorization', 'AcceptGrant.Response', payloadVersion=self.version).json,
+                    'header': self._header('Alexa.Authorization', 'AcceptGrant.Response'),
                     'payload': {}
                 }
             }
+        except InterfaceException as e:
+            return self._errorResponse(request, e)
         except:
-            # Generate Error Response
-            pass
+            raise
 
     def handleDiscovery(self, request):
         # Requires endpoints from user
@@ -52,15 +73,17 @@ class pyASH(object):
                 ret.append(ep.jsonDiscover)
             return {
                 'event': {
-                    'header': Header('Alexa.Discovery', 'Discover.Response', payloadVersion=self.version).json,
+                    'header': self._header('Alexa.Discovery', 'Discover.Response'),
                     'payload': {
                         'endpoints': ret
                     }
                 }
             }
+        except InterfaceException as e:
+            return self._errorResponse(request, e)
         except:
-            # Generate Error Response
-            pass
+            raise
+
 
     def handleReportState(seld, request):
         # Requires endpoints from user
@@ -71,7 +94,7 @@ class pyASH(object):
                     'properties': endpoint.jsonResponse
                 },
                 'event': {
-                    'header': Header('Alexa', 'StateReport', correlationToken=request.correlationToken, payloadVersion=self.version).json,
+                    'header': self._header('Alexa', 'StateReport', correlationToken=request.correlationToken),
                     'endpoint': {
                         'scope': {
                             'type': 'BearerToken',
@@ -82,9 +105,10 @@ class pyASH(object):
                     'payload': {}
                 }
             }
+        except InterfaceException as e:
+            return self._errorResponse(request, e)
         except:
-            # Deal with failure
-            pass
+            raise
 
     def handleDirective(self, request):
 
@@ -92,45 +116,42 @@ class pyASH(object):
             endpoint = self.user.getEndpoint(request)
             cls, handler = endpoint.getHandler(request)
             things = self.user._retrieveThings(request.endpointId)
-            method = handler.__get__(cls(things=things), cls)
+            method = handler.__get__(cls(iots=endpoint.iots), cls)
 
             ret = method(request)
             if ret:
                 return ret
 
-            time.sleep(1) # Allow time for update to be processed
+            waitStarted = time.time()
+            waitFor = 5
+            while not endpoint.iots[0].updateFinished():
+                if time.time() > waitStarted+waitFor:
+                    raise ENDPOINT_UNREACHABLE('Timed out waiting for endpoint to update')
 
-            endpoint.iots[0].refresh()
             interface = endpoint._interfaces[request.namespace]['interface'](endpoint.iots[0])
             return {
                 'context': {
                     'properties': interface.jsonResponse
                 },
                 'event': {
-                    'header': Header('Alexa', 'Response', correlationToken=request.correlationToken, payloadVersion=self.version).json,
+                    'header': self._header('Alexa', 'Response', request.correlationToken),
                     'endpoint': {
-                        'scope': {
-                            'type': 'BearerToken',
-                            'token': request.token
-                        },
                         'endpointId' : endpoint.endpointId
                     },
                     'payload': {}
                 }
             }
-        except Exception as e:
-            print (e)
-            # Deal with failure
-
-
-
+        except InterfaceException as e:
+            return self._errorResponse(request, e)
+        except OAUTH2_EXCEPTION as e:
+            raise
+        except MISCELLANIOUS_EXCEPTION as e:
+            raise
+        except:
+            raise
 
     def lambda_handler(self, request, context=None):
-
-        if not request.namespace in VALID_DIRECTIVES:
-            raise INVALID_INTERFACE('{0}:{1} is not a valid directive'.format(request.namespace, request.directive))
-        if request.directive not in VALID_DIRECTIVES[request.namespace]:
-            raise INVALID_DIRECTIVE('{0}:{1} is not a valid directive'.format(request.namespace, request.directive))
+        request = Request(request)
         return {
             'Alexa' : self.handleReportState,
             'Alexa.Authorization' : self.handleAcceptGrant,

@@ -48,7 +48,7 @@ ReportState
 Database Structure
 
 Tokens
-userID (pk)
+userId (pk)
 tokens dict of the users' token data
 
 Things

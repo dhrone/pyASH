@@ -48,6 +48,9 @@ class IotBase(ABC):
     def timeStamps(self):
         pass
 
+    def updateFinished(self):
+        return True
+
     def _stale(self):
         return True if self.lastGet + self.consideredStaleAfter < time.time() else False
 
@@ -151,28 +154,64 @@ class IotBase(ABC):
 class IotTest(IotBase):
     def __init__(self, *args, **kwargs):
         super(IotTest, self).__init__('endpointId')
-        # Initialize reportedState so it has an entry for every possible property
+
         currentTime = int(time.time())
-        for k,v in VALID_PROPERTIES.items():
-            for p in v:
-                self.reportedState[p] = None
-                self.reportedStateTimeStamp[p] = {'timestamp': currentTime}
+        # If no initial values provided then create dummy entries for all possible properties
+        if not hasattr(self, '__initials__'):
+            for k,v in VALID_PROPERTIES.items():
+                for p in v:
+                    self.reportedState[p] = None
+                    self.reportedStateTimeStamp[p] = {'timestamp': currentTime}
+        else:
+        # Else initialize with the provided initial values
+            for k,v in self.__initials__.items():
+                self.reportedState[k] = v
+                self.reportedStateTimeStamp[k] = {'timestamp': currentTime}
+
 
     def get(self):
-        pass
+        try:
+            with open('IotTest.json') as json_file:
+                df = json.load(json_file)
+                self.reportedState = df['reportedState']
+                self.reportedStateTimeStamp = df['reportedStateTimeStamp']
+        except FileNotFoundError:
+            pass
 
     def put(self, newState):
         currentTime = int(time.time())
         for item in newState:
             print ('Storing {0}:{1}'.format(item,newState[item]))
             self.reportedState[item] = newState[item]
-            self.reportedStateTimeStamp[item] = {'timestamp': currentTime}
+            self.reportedStateTimeStamp[item] = {'timestamp': currentTime }
+        df = {'reportedState': self.reportedState, 'reportedStateTimeStamp': self.reportedStateTimeStamp }
+        with open('IotTest.json','w') as outfile:
+            json.dump(df, outfile)
+
     @property
     def timeStamps(self):
         ret = {}
-        for property in self.reportedState:
-            ret[property] = self.reportedStateTimeStamp[property]['timestamp']
+        for variable in self.reportedState:
+            try:
+                (method, property) = self._getMethodProperty(variable, 'to')
+                ret[property] = self.reportedStateTimeStamp[variable]['timestamp']
+            except ValueError:
+                # If a variable can not be translated from device to property then skip it
+                pass
         return ret
+
+    @staticmethod
+    def initial(name, value):
+
+        def wrapper(func):
+            if hasattr(func, '__initials__'):
+                func.__initials__[name] = value
+            else:
+                func.__initials__ = { name: value }
+            return func
+
+        return wrapper
+
 
 
 class Iot(IotBase):
@@ -188,6 +227,7 @@ class Iot(IotBase):
         self.reportedState = thingData['state']['reported']
         self.reportedStateTimeStamp = thingData['metadata']['reported']
         self.lastGet = time.time()
+        return thingData
 
     def put(self, newState):
         if not self.client:
@@ -199,6 +239,16 @@ class Iot(IotBase):
         currentTime = int(time.time())
         for item in newState:
             self.reportedStateTimeStamp[item] = {'timestamp': currentTime}
+
+    def updateFinished(self, timeout=5):
+        start = time.time()
+        while start+timeout > time.time():
+            ret = self.get()
+            if 'delta' in ret['state']:
+                time.sleep(.1)
+                continue
+            return True
+        return False
 
     @property
     def timeStamps(self):

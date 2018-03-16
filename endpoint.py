@@ -40,8 +40,7 @@ class Endpoint(object):
     supportsDeactivation = None
     cookie = None
 
-    def __init__(self, endpointId=None, things=None, friendlyName = None, description = None, manufacturerName=None, displayCategories=None, proactivelyReported=None, retrievable=None, supportsDeactivation=None, cookie=None, json=None):
-
+    def __init__(self, endpointId=None, things=None, friendlyName = None, description = None, manufacturerName=None, displayCategories=None, proactivelyReported=None, retrievable=None, uncertaintyInMilliseconds=None, supportsDeactivation=None, cookie=None, json=None, iots=None):
         if json:
             self.endpointId = json.get('endpointId') if 'endpointId' in json else None
             self.things = json.get('things') if 'things' in json else None
@@ -52,8 +51,10 @@ class Endpoint(object):
             self.displayCategories = self.displayCategories if self.displayCategories is None or type(self.displayCategories) is list else [self.displayCategories]
             self.proactivelyReported = json.get('proactivelyReported') if 'proactivelyReported' in json else None
             self.retrievable = json.get('retrievable') if 'retrievable' in json else None
+            self.uncertaintyInMilliseconds = json.get('uncertaintyInMilliseconds') if 'uncertaintyInMilliseconds' in json else None
             self.supportsDeactivation = json.get('supportsDeactivation') if 'supportsDeactivation' in json else None
             self.cookie = json.get('cookie') if 'cookie' in json else None
+            self.iots = iots if 'iots' in json else None
         else:
             self.endpointId = endpointId
             self.things = things
@@ -64,17 +65,20 @@ class Endpoint(object):
             self.displayCategories = self.displayCategories if self.displayCategories is None or type(self.displayCategories) is list else [self.displayCategories]
             self.proactivelyReported = proactivelyReported if proactivelyReported is not None else Endpoint.proactivelyReported
             self.retrievable = retrievable if retrievable is not None else Endpoint.retrievable
+            self.uncertaintyInMilliseconds = uncertaintyInMilliseconds if uncertaintyInMilliseconds is not None else Endpoint.uncertaintyInMilliseconds
             self.supportsDeactivation = supportsDeactivation if supportsDeactivation is not None else Endpoint.supportsDeactivation
             self.cookie = cookie if cookie is not None else Endpoint.cookie
+            self.iots = iots
 
         self.things = self.things if type(self.things) is list else [self.things] if self.things is not None else None
         # Find and instantiate an array of Iot objects if possible and needed
-        self.iots = []
-        if self.things:
-            self.iotClass = self._findIot()
-            if self.iotClass:
-                for thing in self.things:
-                    self.iots.append( self.iotClass(thing) )
+        if not self.iots:
+            self.iots = []
+            if self.things:
+                self.iotClass = self._findIot()
+                if self.iotClass:
+                    for thing in self.things:
+                        self.iots.append( self.iotClass(thing) )
         self.iot = self.iots[0] if self.iots else None
 
     @property
@@ -82,12 +86,14 @@ class Endpoint(object):
         return {k:v for k,v in {
             'endpointId': self.endpointId,
             'className': self.__class__.__name__,
+            'things': self.things,
             'friendlyName': self.friendlyName,
             'manufacturerName': self.manufacturerName,
             'description': self.description,
             'displayCategories': self.displayCategories,
             'proactivelyReported': self.proactivelyReported,
             'retrievable': self.retrievable,
+            'uncertaintyInMilliseconds': self.uncertaintyInMilliseconds,
             'supportsDeactivation': self.supportsDeactivation,
             'cookie': self.cookie
         }.items() if v is not None}
@@ -238,7 +244,7 @@ class Endpoint(object):
         for item in VALID_DIRECTIVES:
             if interface == item:
                 return interface
-        raise ValueError('{0} is not a valid interface'.format(interface))
+        raise INVALID_DIRECTIVE('{0} is not a valid interface'.format(interface))
 
     @staticmethod
     def lookupInterfaceFromDirective(directive):
@@ -246,7 +252,7 @@ class Endpoint(object):
             for item in VALID_DIRECTIVES[interface]:
                 if directive == item:
                     return interface
-        raise ValueError('{0} is not a valid directive'.format(directive))
+        raise INVALID_DIRECTIVE('{0} is not a valid directive'.format(directive))
 
     @staticmethod
     def lookupDirective(directive, interface=''):
@@ -260,8 +266,8 @@ class Endpoint(object):
                     if directive == item:
                         return directive
         if interface:
-            raise ValueError('{0} is not a valid directive for interface {1}'.format(directive,interface))
-        raise ValueError('{0} is not a valid directive'.format(directive))
+            raise INVALID_DIRECTIVE('{0} is not a valid directive for interface {1}'.format(directive,interface))
+        raise INVALID_DIRECTIVE('{0} is not a valid directive'.format(directive))
 
     @staticmethod
     def getEndpointId(thingName):
@@ -325,7 +331,7 @@ class Endpoint(object):
         for i in ret:
             if i[0] == request.namespace and i[1] == request.directive:
                 return ret[i]
-        raise NoMethodToHandleDirectiveException('No method to handle {0}:{1}'.format(request.namespace,request.directive))
+        raise INVALID_DIRECTIVE('{0} has no method to handle {0}:{1}'.format(self.__class__.__name__,request.namespace,request.directive))
 
     # See if an Iot class was included and return it if yes
     def _findIot(self):

@@ -56,9 +56,6 @@ class INVALID_AUTHORIZATION_CREDENTIAL(InterfaceException):
 class INVALID_DIRECTIVE(InterfaceException):
     pass
 
-class INVALID_INTERFACE(InterfaceException):
-    pass
-
 class INVALID_VALUE(InterfaceException):
     pass
 
@@ -130,33 +127,44 @@ class NOT_SUBSCRIBED(InterfaceException):
     pass
 
 # OAUTH2 Exceptions
-class OAUTH2_CredentialMissing(Exception):
+class OAUTH2_EXCEPTION(Exception):
     pass
 
-class OAUTH2_AccessGrantFailed(Exception):
+class OAUTH2_CredentialMissing(OAUTH2_EXCEPTION):
     pass
 
-class OAUTH2_PermissionDenied(Exception):
+class OAUTH2_AccessGrantFailed(OAUTH2_EXCEPTION):
     pass
 
-class OAUTH2_BadRequest(Exception):
+class OAUTH2_PermissionDenied(OAUTH2_EXCEPTION):
+    pass
+
+class OAUTH2_BadRequest(OAUTH2_EXCEPTION):
+    pass
+
+class OAUTH2_IOError(OAUTH2_EXCEPTION):
     pass
 
 # Miscellanious Exceptions
-class MissingRequiredValueException(Exception):
+class MISCELLANIOUS_EXCEPTION(Exception):
+    pass
+class MissingRequiredValueException(MISCELLANIOUS_EXCEPTION):
     pass
 
-class UserNotFoundException(Exception):
+class UserNotFoundException(MISCELLANIOUS_EXCEPTION):
 	pass
 
-class EndpointNotFoundException(Exception):
+class UserNotInitialized(MISCELLANIOUS_EXCEPTION):
+    pass
+
+class EndpointNotFoundException(MISCELLANIOUS_EXCEPTION):
 	pass
 
-class NoMethodToHandleDirectiveException(Exception):
+class NoMethodToHandleDirectiveException(MISCELLANIOUS_EXCEPTION):
 	pass
 
-class NoIOThandlerProvidedException(Exception):
+class NoIOThandlerProvidedException(MISCELLANIOUS_EXCEPTION):
 	pass
 
-class OnlyOneIOTallowedPerEndpoint(Exception):
+class OnlyOneIOTallowedPerEndpoint(MISCELLANIOUS_EXCEPTION):
 	pass

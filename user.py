@@ -4,17 +4,17 @@
 #
 from abc import ABC, abstractmethod
 import json
+import time
 import re
 import boto3
 from botocore.vendored import requests
 from decimal import Decimal
 
 # pyASH imports
-from exceptions import *
-from db import Tokens, Things, Persist, UUIDemail, UUIDuserid
+from db import Persist
 from message import Capability, Request, Response, defaultResponse
 from endpoint import Endpoint
-
+from exceptions import *
 from utility import *
 
 # Setup logger
@@ -30,35 +30,21 @@ class User(ABC):
 
     @abstractmethod
     def getEndpoints(self, request):
-        # Pull user token from request.
-        # Use it to retrieve user and then retrieve the user's endpoints
         pass
 
     @abstractmethod
     def getEndpoint(self, request):
-        # Pull endpointId from request
-        # Use it to create endpoint for that endpointId
         pass
 
     @abstractmethod
     def storeTokens(self, access, refresh, expires_in):
         pass
 
-    def _getUserProfile(self, token):
-        response = getUserProfile(token)
-        self.userID = response['user_id']
-        self.userName = response['name']
-        self.userEmail = response['email']
-        return response
-
-    def _getAccessTokensFromCode(self, code):
-        response = getAccessTokenFromCode(code)
-        self.accessToken = response['access_token']
-        self.refreshToken = response['refresh_token']
+    def _storeTokens(self, access, refresh, expires_in):
+        self.accessToken = access
+        self.refreshToken = refresh
+        self.accessTokenExpires = expires_in
         self.accessTokenTimestamp = time.time()
-        self.accessTokenExpires = response['expires_in']
-        self._getUserProfile(self.accessToken)
-        return response
 
     @staticmethod
     def _getEndpointId(cls, things):
@@ -77,11 +63,14 @@ class User(ABC):
         (cls, things) = endpointId.split('|')
         return self.endpointClasses[cls]
 
-    def addEndpoint(self, endpointClass, things=None, friendlyName=None, description=None, manufacturerName=None,displayCategories=None, proactivelyReported=None, retrievable=None, uncertaintyInMilliseconds=None, supportsDeactivation=None, cookie=None):
+    def getTokens(self, request):
+        response = getAccessTokenFromCode(request['payload']['grant']['code'])
+        self.storeTokens(response['access_token'], response['refresh_token'], response['expires_in'])
+
+    def addEndpoint(self, endpointClass, things=None,   friendlyName=None, description=None, manufacturerName=None,displayCategories=None, proactivelyReported=None, retrievable=None, uncertaintyInMilliseconds=None, supportsDeactivation=None, cookie=None):
         self.endpointClasses[endpointClass.__name__] = endpointClass
         endpointId = self._getEndpointId(endpointClass, things)
         self.endpoints[endpointId] = endpointClass(endpointId, things, friendlyName, description, manufacturerName,displayCategories, proactivelyReported, retrievable, uncertaintyInMilliseconds, supportsDeactivation, cookie)
-
 
 class StaticUser(User):
     def __init__(self):
@@ -91,20 +80,69 @@ class StaticUser(User):
         return self.endpoints.values()
 
     def getEndpoint(self, request):
-        return self.endpoints[request.endpointId]
+        try:
+            return self.endpoints[request.endpointId]
+        except KeyError:
+            raise NO_SUCH_ENDPOINT('{0} is not a valid endpoint'.format(request.endpointId))
 
     def storeTokens(self, access, refresh, expires_in):
+        self._storeTokens(access, refresh, expires_in)
         print ('ACCESSGRANT Refresh[{0}], Access[{1}], Expires_In [{2}]'.format(access,refresh,expires_in))
 
+class DemoUser(StaticUser):
+    def getTokens(self, request):
+        try:
+            response = getAccessTokenFromCode(request['payload']['grant']['code'])
+        except:
+            # Return dummy values if unable to retrieve real user profile
+            request = { 'access_token': '<access token>', 'refresh_token':'<refresh token>', 'expires_in': 3600 }
+        self.storeTokens(response['access_token'], response['refresh_token'], response['expires_in'])
+
 class DbUser(User):
-    def __init__(self, region='us-east-1', systemName = 'pyASH'):
+    def __init__(self, endpointClasses=None, userEmail=None, userId=None, region='us-east-1', systemName = 'pyASH'):
         super(DbUser, self).__init__()
 
         self.region = region
         self.systemName = systemName
         self.uuid = None
 
-    def getUser(self, token=None, userId=None, userEmail=None):
+        if endpointClasses:
+            endpointClasses = endpointClasses if type(endpointClasses) is list else [ endpointClasses ]
+            for cls in endpointClasses:
+                self.endpointClasses[cls.__name__] = cls
+
+        if userId or userEmail:
+            self._getUser(userId=userId, userEmail=userEmail)
+            if not self.uuid:
+                un = userId if userId else userEmail
+                raise UserNotFoundException('Could not find {0}'.format(un))
+
+    def getEndpoints(self, request):
+        self._getUser(token=request.token)
+        self._retrieveEndpoints()
+        return self.endpoints.values()
+
+    def getEndpoint(self, request):
+        self._getUser(token=request.token)
+        self._retrieveEndpoints()
+        try:
+            return self.endpoints[request.endpointId]
+        except KeyError:
+            raise NO_SUCH_ENDPOINT('{0} is not a valid endpoint'.format(request.endpointId))
+
+    def storeTokens(self, access, refresh, expires_in):
+        self._getUser(token=access)
+        self._storeTokens(access, refresh, expires_in)
+        self._persistTokens()
+        dbUUIDuserid = UUIDuserid(self.userId)
+        dbUUIDuserid['uuid'] = self.uuid
+
+
+    def addEndpoint(self, endpointClass, things=None,   friendlyName=None, description=None, manufacturerName=None,displayCategories=None, proactivelyReported=None, retrievable=None, uncertaintyInMilliseconds=None, supportsDeactivation=None, cookie=None):
+        super(DbUser, self).addEndpoint(endpointClass, things,   friendlyName, description, manufacturerName,displayCategories, proactivelyReported, retrievable, uncertaintyInMilliseconds, supportsDeactivation, cookie)
+        self._persistEndpoints()
+
+    def _getUser(self, token=None, userId=None, userEmail=None):
         self.userId = userId
         self.userName = None
         self.userEmail = userEmail
@@ -141,11 +179,12 @@ class DbUser(User):
         if res:
             self.uuid = res
             return self.uuid
-        raise UserNotFoundException
+        msg = 'No user with UserId of {0}'.format(self.userId) if self.userId else 'No user with Email address of {0}'.format(self.userEmail) if self.userEmail else 'No ability to retrieve user.  Both userId and userEmail not provided'
+        raise UserNotFoundException(msg)
 
     def _getUserProfileFromToken(self):
         response = getUserProfile(self.accessToken)
-        self.userID = response['userId']
+        self.userId = response['user_id']
         self.userName = response['name']
         self.userEmail = response['email']
         self._getUserUUID()
@@ -158,7 +197,7 @@ class DbUser(User):
         self.userEmail = dbTokens['userEmail']
         if dbTokens['accessTokenTimestamp'] + dbTokens['accessTokenExpires'] < time.time():
             # Need to refresh access token
-            self._refreshAccessToken()
+            self._getTokens('REFRESH')
         else:
             self.accessToken = dbTokens['accessToken']
             self.accessTokenTimestamp = dbTokens['accessTokenTimestamp']
@@ -172,7 +211,7 @@ class DbUser(User):
             uuid = get_uuid()
             dbUUIDemail['uuid'] = uuid
         print ('creating user {0} with uuid {1}'.format(email, uuid))
-        self.getUser(userEmail=email)
+        self._getUser(userEmail=email)
 
     def commit(self):
         self._persistEndpoints()
@@ -210,12 +249,6 @@ class DbUser(User):
         self.accessTokenTimestamp = time.time()
         self._persistTokens()
 
-    def _getAccessTokenFromCode(self):
-        self._getTokens('CODE')
-
-    def _refreshAccessToken(self):
-        self._getTokens('REFRESH')
-
     def _persistTokens(self):
         dbTokens = Tokens(self.userId)
         dbTokens['values'] = {
@@ -228,17 +261,36 @@ class DbUser(User):
         }
 
     def _persistEndpoints(self):
-        if self.uuid and self.endpoints:
+        if self.uuid:
             dbThings = Things(self.uuid)
             json_list = []
             for item in self.endpoints.values():
                 json_list.append(item.json)
             dbThings['endpoints'] = json_list
+        else:
+            raise UserNotInitialized('UUID not set.  _persistEndpoints likely called prior to _getUser')
 
     def _retrieveEndpoints(self):
         self.endpoints = {}
         dbThings = Things(self.uuid)
         json_list = dbThings['endpoints']
-        for item in json_list:
-            cls = self.endpointClasses[item['className']]
-            self.endpoints[item['endpointId']] = cls(json=item)
+        if json_list:
+            for item in json_list:
+                cls = self.endpointClasses[item['className']]
+                self.endpoints[item['endpointId']] = cls(json=item)
+
+class Things(Persist):
+    def __init__(self, uuid='', systemName=DEFAULT_SYSTEM_NAME, region=DEFAULT_REGION):
+        super(Things, self).__init__(uuid, 'uuid', 'Things')
+
+class Tokens(Persist):
+    def __init__(self, userId='', systemName=DEFAULT_SYSTEM_NAME, region=DEFAULT_REGION):
+        super(Tokens, self).__init__(userId, 'userId', 'Tokens')
+
+class UUIDemail(Persist):
+    def __init__(self, email='', systemName=DEFAULT_SYSTEM_NAME, region=DEFAULT_REGION):
+        super(UUIDemail, self).__init__(email, 'email', 'UUIDlookupEmail')
+
+class UUIDuserid(Persist):
+    def __init__(self, userId='', systemName=DEFAULT_SYSTEM_NAME, region=DEFAULT_REGION):
+        super(UUIDuserid, self).__init__(userId, 'userId', 'UUIDlookupUserId')
