@@ -15,7 +15,8 @@ from datetime import datetime
 from datetime import timedelta
 
 from utility import *
-from message import Header, Request
+from message import Request
+from response import HEADER
 
 # Setup logger
 logger = logging.getLogger(__name__)
@@ -31,18 +32,11 @@ class pyASH(object):
         self.version = version if type(version) is str else str(version)
         if not self.version == '3': raise ValueError('pyAsh currently only supports API version 3')
 
-    @staticmethod
-    def _header(namespace, name, correlationToken=''):
-        messageId = get_uuid()
-        json = { 'namespace': namespace, 'name':name, 'messageId': messageId, 'payloadVersion': '3' }
-        if correlationToken: json['correlationToken'] = correlationToken
-        return json
-
     @classmethod
     def _errorResponse(cls, request, e):
         json = {
             'event': {
-                'header': cls._header('Alexa', 'ErrorResponse', request.correlationToken),
+                'header': HEADER('Alexa', 'ErrorResponse', request.correlationToken),
                 'payload': e.payload
             }
         }
@@ -55,7 +49,7 @@ class pyASH(object):
             user.getTokens(request)
             return {
                 'event': {
-                    'header': self._header('Alexa.Authorization', 'AcceptGrant.Response'),
+                    'header': HEADER('Alexa.Authorization', 'AcceptGrant.Response'),
                     'payload': {}
                 }
             }
@@ -73,7 +67,7 @@ class pyASH(object):
                 ret.append(ep.jsonDiscover)
             return {
                 'event': {
-                    'header': self._header('Alexa.Discovery', 'Discover.Response'),
+                    'header': HEADER('Alexa.Discovery', 'Discover.Response'),
                     'payload': {
                         'endpoints': ret
                     }
@@ -94,7 +88,7 @@ class pyASH(object):
                     'properties': endpoint.jsonResponse
                 },
                 'event': {
-                    'header': self._header('Alexa', 'StateReport', correlationToken=request.correlationToken),
+                    'header': HEADER('Alexa', 'StateReport', correlationToken=request.correlationToken),
                     'endpoint': {
                         'scope': {
                             'type': 'BearerToken',
@@ -134,7 +128,7 @@ class pyASH(object):
                     'properties': interface.jsonResponse
                 },
                 'event': {
-                    'header': self._header('Alexa', 'Response', request.correlationToken),
+                    'header': HEADER('Alexa', 'Response', request.correlationToken),
                     'endpoint': {
                         'endpointId' : endpoint.endpointId
                     },

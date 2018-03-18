@@ -1155,7 +1155,7 @@ class EndpointResponse(ResponseElement):
         super(EndpointResponse, self).__init__()
 
         # Encode classname into endpointId if classname supplied
-        endpointId = '{0}|{1}'.format(className,endpointId) if className else endpointId
+        endpointId = '{0}:{1}'.format(className,endpointId) if className else endpointId
         if token:
             self.json = { 'endpointId': endpointId, 'scope': { 'type':'BearerToken', 'token': token }}
         else:

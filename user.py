@@ -51,12 +51,13 @@ class User(ABC):
         if ':' in things:
             raise ValueError(': symbol not allowed in thing names')
         things = things if type(things) is list else [things]
-        return cls.__name__ + '|' + ':'.join(things)
+        return cls.__name__ + ':' + ':'.join(things)
 
     @staticmethod
     def _retrieveThings(endpointId):
-        (cls, things) = endpointId.split('|')
-        things = things.split(':')
+        things = endpointId.split(':')
+        cls = things[0]
+        things = things[1:]
         return things
 
     def _retrieveClass(self, endpointId):

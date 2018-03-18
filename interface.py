@@ -32,14 +32,14 @@ class Interface(object):
         if self.iot:
             timeStamps = self.iot.timeStamps
             for item in self.properties.properties:
-                self.properties._set( item, (self.iot[item], timeStamps[item], self.uncertaintyInMilliseconds) )
+                self.properties._set( item, (self._formatForProperty(self.iot[item]), timeStamps[item], self.uncertaintyInMilliseconds) )
         return self.properties.jsonResponse
 
     def __getitem__(self, property):
         if self.iot:
             timeStamps = self.iot.timeStamps
             for item in self.properties.properties:
-                self.properties._set( item, (self.iot[item], timeStamps[item], self.uncertaintyInMilliseconds) )
+                self.properties._set( item, (self._formatForProperty(self.iot[item]), timeStamps[item], self.uncertaintyInMilliseconds) )
         return self.properties[property]
 
     def __setitem__(self, property, value):
@@ -47,8 +47,11 @@ class Interface(object):
             if type(value) is tuple:
                 value = value[0]
             if self.iot[property] != value:
-                self.iot[property] = value
+                self.iot[property] = self._formatForProperty(value)
         self.properties[property] = value
+
+    def _formatForProperty(self, value):
+        return value
 
     class Properties(object):
         def __init__(self, interface, properties, proactivelyReported, retrievable):
@@ -100,7 +103,7 @@ class Interface(object):
         @property
         def value(self):
             try:
-                return self.pvalue.json
+                return self.pvalue.jsonResponse
             except:
                 return self.pvalue
 
@@ -168,6 +171,10 @@ class ChannelController(Interface):
         self.properties = \
             Interface.Properties(self.interface, [ Interface.Property('channel')], \
                 proactivelyReported=proactivelyReported, retrievable=retrievable)
+
+    def _formatForProperty(self, value):
+        value = value.json if hasattr(value,'json') else value
+        return { k:v for k, v in value.items() if k in ['number','callSign','affiliateCallSign'] }
 
 class ColorController(Interface):
     def __init__(self, iots=None, proactivelyReported=False, retrievable=False, uncertaintyInMilliseconds=0, *args, **kwargs):

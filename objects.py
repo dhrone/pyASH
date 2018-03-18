@@ -138,7 +138,7 @@ class CameraStream(ashobject):
     @videoCodec.setter
     def videoCodec(self,value):
         value = value.upper() if value else None
-        self.videoCodec_value = value if value in ['H264', 'MPEG2', 'MJPEG', 'JPG'] else None
+        self.videoCodec_value = value if value in VALID_VIDEO_CODECS else None
         if not self.videoCodec_value and value:
             raise ValueError('{0} is not a valid Video Codec'.format(value))
 
@@ -162,9 +162,9 @@ class CameraStream(ashobject):
     @audioCodec.setter
     def audioCodec(self,value):
         value = value.upper() if value else None
-        self.audioCodec_value = value if value in ['H264', 'MPEG2', 'MJPEG', 'JPG'] else None
+        self.audioCodec_value = value if value in VALID_AUDIO_CODECS else None
         if not self.audioCodec_value and value:
-            raise ValueError('{0} is not a valid Video Codec'.format(value))
+            raise ValueError('{0} is not a valid Audio Codec'.format(value))
 
     @property
     def audioCodecs(self):
