@@ -183,6 +183,9 @@ class ColorController(Interface):
             Interface.Properties(self.interface, [ Interface.Property('color')], \
                 proactivelyReported=proactivelyReported, retrievable=retrievable)
 
+    def SetColor(self, request):
+        self._setdirective(request, 'color', 'color')
+
 class ColorTemperatureController(Interface):
     def __init__(self, iots=None, proactivelyReported=False, retrievable=False, uncertaintyInMilliseconds=0, *args, **kwargs):
         super(ColorTemperatureController, self).__init__(iots, uncertaintyInMilliseconds)
@@ -190,9 +193,15 @@ class ColorTemperatureController(Interface):
             Interface.Properties(self.interface, [ Interface.Property('colorTemperatureInKelvin')], \
                 proactivelyReported=proactivelyReported, retrievable=retrievable)
 
+    def SetColorTemperature(self, request):
+        self._setdirective(request, 'colorTemperatureInKelvin', 'colorTemperatureInKelvin')
+
 class EndpointHealth(Interface):
     def __init__(self, iots=None, proactivelyReported=False, retrievable=False, uncertaintyInMilliseconds=0, *args, **kwargs):
         super(EndpointHealth, self).__init__(iots, uncertaintyInMilliseconds)
+        self.properties = \
+            Interface.Properties(self.interface, [ Interface.Property('connectivity')], \
+                proactivelyReported=proactivelyReported, retrievable=retrievable)
 
 class InputController(Interface):
     def __init__(self, iots=None, proactivelyReported=False, retrievable=False, uncertaintyInMilliseconds=0, *args, **kwargs):

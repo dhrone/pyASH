@@ -40,7 +40,11 @@ class pyASH(object):
                 'payload': e.payload
             }
         }
-        if hasattr(request, 'endpointId'): json['event']['endpointId'] = { 'endpointId': request.endpointId }
+        if hasattr(request, 'endpointId'):
+            json['event']['endpoint'] = {'endpointId': request.endpointId }
+            if hasattr(request, 'scope'):
+                json['event']['endpoint']['scope'] = request.scope.value
+
         return json
 
     def handleAcceptGrant(self, request):
@@ -112,29 +116,37 @@ class pyASH(object):
             things = self.user._retrieveThings(request.endpointId)
             method = handler.__get__(cls(iots=endpoint.iots), cls)
 
+            healthif = endpoint._interfaces['Alexa.EndpointHealth']['interface'](endpoint.iots[0]) if 'Alexa.EndpointHealth' in endpoint._interfaces else None
+
             ret = method(request)
             if ret:
-                return ret
+                if healthif:
+                    if 'context' not in ret: ret['context'] = {}
+                    if 'properties' not in ret['context']: ret['context']['properties'] = []
+            else:
+                waitStarted = time.time()
+                waitFor = 5
+                while not endpoint.iots[0].updateFinished():
+                    if time.time() > waitStarted+waitFor:
+                        raise ENDPOINT_UNREACHABLE('Timed out waiting for endpoint to update')
 
-            waitStarted = time.time()
-            waitFor = 5
-            while not endpoint.iots[0].updateFinished():
-                if time.time() > waitStarted+waitFor:
-                    raise ENDPOINT_UNREACHABLE('Timed out waiting for endpoint to update')
-
-            interface = endpoint._interfaces[request.namespace]['interface'](endpoint.iots[0])
-            return {
-                'context': {
-                    'properties': interface.jsonResponse
-                },
-                'event': {
-                    'header': HEADER('Alexa', 'Response', request.correlationToken),
-                    'endpoint': {
-                        'endpointId' : endpoint.endpointId
+                interface = endpoint._interfaces[request.namespace]['interface'](endpoint.iots[0])
+                ret =  {
+                    'context': {
+                        'properties': interface.jsonResponse
                     },
-                    'payload': {}
+                    'event': {
+                        'header': HEADER('Alexa', 'Response', request.correlationToken),
+                        'endpoint': {
+                            'endpointId' : endpoint.endpointId
+                        },
+                        'payload': {}
+                    }
                 }
-            }
+            healthif = endpoint._interfaces['Alexa.EndpointHealth']['interface'](endpoint.iots[0]) if 'Alexa.EndpointHealth' in endpoint._interfaces else None
+            if healthif: ret['context']['properties'] += healthif.jsonResponse
+            if 'scope' in request.raw['directive']['endpoint']: ret['event']['endpoint']['scope'] = request.raw['directive']['endpoint']['scope']
+            return ret
         except InterfaceException as e:
             return self._errorResponse(request, e)
         except OAUTH2_EXCEPTION as e:

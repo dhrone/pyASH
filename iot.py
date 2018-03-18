@@ -25,8 +25,8 @@ class IotBase(ABC):
     def __init__(self, endpointId, consideredStaleAfter=2):
         self.endpointId = endpointId
         self.setTransforms()
-        self.reportedState = {}
-        self.reportedStateTimeStamp = {}
+        self.reportedState = { 'connectivity': {'value': 'OK'} }
+        self.reportedStateTimeStamp = { 'connectivity': {'timestamp': time.time() } }
         self.lastGet = 0
         self.consideredStaleAfter = consideredStaleAfter
 
@@ -49,6 +49,8 @@ class IotBase(ABC):
         pass
 
     def updateFinished(self):
+        self.reportedState['connectivity'] = {'value': 'OK'}
+        self.reportedStateTimeStamp['connectivity'] = {'timestamp': time.time() }
         return True
 
     def _stale(self):
@@ -61,7 +63,11 @@ class IotBase(ABC):
         return method(self, self.reportedState[variable])
 
     def __setitem__(self, property, value):
-        (method, variable) = self._getMethodVariable(property, 'from')
+        try:
+            (method, variable) = self._getMethodVariable(property, 'from')
+        except KeyError:
+            method = doNothing
+            variable = property
         self.put({variable : method(self, value)})
 
     def _getMethodVariable(self,property, direction='from'):
@@ -247,7 +253,11 @@ class Iot(IotBase):
             if 'delta' in ret['state']:
                 time.sleep(.1)
                 continue
+            self.reportedState['connectivity'] = {'value': 'OK'}
+            self.reportedStateTimeStamp['connectivity'] = {'timestamp': time.time() }
             return True
+        self.reportedState['connectivity'] = {'value': 'UNREACHABLE'}
+        self.reportedStateTimeStamp['connectivity'] = {'timestamp': time.time() }
         return False
 
     @property

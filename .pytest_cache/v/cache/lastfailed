@@ -1,4 +1,3 @@
 {
-  "jsonschema/tests/test_jsonschema_test_suite.py": true,
-  "test_pyASH.py::test_CameraStreamController_InitializeCameraStreams": true
+  "jsonschema/tests/test_jsonschema_test_suite.py": true
 }
