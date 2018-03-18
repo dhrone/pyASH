@@ -22,10 +22,6 @@ from response import HEADER
 logger = logging.getLogger(__name__)
 logger.setLevel(LOGLEVEL)
 
-def test_func(val):
-    assert False
-
-
 class pyASH(object):
     def __init__(self, user, version='3'):
         self.user = user
@@ -116,7 +112,7 @@ class pyASH(object):
             things = self.user._retrieveThings(request.endpointId)
             method = handler.__get__(cls(iots=endpoint.iots), cls)
 
-            healthif = endpoint._interfaces['Alexa.EndpointHealth']['interface'](endpoint.iots[0]) if 'Alexa.EndpointHealth' in endpoint._interfaces else None
+            healthif = endpoint.generateInterfaces(endpoint.iots[0])['Alexa.EndpointHealth'] if 'Alexa.EndpointHealth' in endpoint._interfaces else None
 
             ret = method(request)
             if ret:
@@ -130,7 +126,7 @@ class pyASH(object):
                     if time.time() > waitStarted+waitFor:
                         raise ENDPOINT_UNREACHABLE('Timed out waiting for endpoint to update')
 
-                interface = endpoint._interfaces[request.namespace]['interface'](endpoint.iots[0])
+                interface = endpoint.generateInterfaces(endpoint.iots[0])[request.namespace]
                 ret =  {
                     'context': {
                         'properties': interface.jsonResponse
@@ -143,7 +139,7 @@ class pyASH(object):
                         'payload': {}
                     }
                 }
-            healthif = endpoint._interfaces['Alexa.EndpointHealth']['interface'](endpoint.iots[0]) if 'Alexa.EndpointHealth' in endpoint._interfaces else None
+            healthif = endpoint.generateInterfaces(endpoint.iots[0])['Alexa.EndpointHealth'] if 'Alexa.EndpointHealth' in endpoint._interfaces else None
             if healthif: ret['context']['properties'] += healthif.jsonResponse
             if 'scope' in request.raw['directive']['endpoint']: ret['event']['endpoint']['scope'] = request.raw['directive']['endpoint']['scope']
             return ret

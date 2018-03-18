@@ -81,14 +81,6 @@ class dhroneTV(Endpoint):
         else:
             self.iot['volume'] = request.payload['volume']
 
-#    @Endpoint.addDirective
-#    def SetMute(self, request, iot):
-#        iot['muted'] = request.payload['mute']
-
-    @Endpoint.addDirective
-    def SelectInput(self, request, iot):
-        self.iot['asource'] = request.payload['input']
-
 class dhroneTVScene(Endpoint):
     manufacturerName = 'dhrone'
     description = 'iotTV controller by dhrone'

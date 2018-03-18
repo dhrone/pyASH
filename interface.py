@@ -10,12 +10,12 @@ class Interface(object):
     version = None
     properties = None
 
-    def __init__(self,iots=None, uncertaintyInMilliseconds=0):
+    def __init__(self,iot=None, iots=None, uncertaintyInMilliseconds=0):
         self.interface = 'Alexa.'+self.__class__.__name__
         self.version='3'
         self.uncertaintyInMilliseconds = uncertaintyInMilliseconds
         self.iots = iots if type(iots) is list else [iots] if iots is not None else None
-        self.iot = self.iots[0] if type(self.iots) is list else None
+        self.iot = self.iots[0] if type(self.iots) is list else iot
 
     @property
     def capability(self):
@@ -29,17 +29,23 @@ class Interface(object):
 
     @property
     def jsonResponse(self):
+        if not self.properties: return None
         if self.iot:
             timeStamps = self.iot.timeStamps
-            for item in self.properties.properties:
-                self.properties._set( item, (self._formatForProperty(self.iot[item]), timeStamps[item], self.uncertaintyInMilliseconds) )
+            for item, value in self.properties.properties.items():
+                uncertaintyInMilliseconds = value.uncertaintyInMilliseconds if value.uncertaintyInMilliseconds is not None else self.uncertaintyInMilliseconds
+                self.properties._set( item, (self._formatForProperty(self.iot[item]), timeStamps[item], uncertaintyInMilliseconds) )
+        else:
+            for k, prop in self.properties.properties.items():
+                prop.uncertaintyInMilliseconds = prop.uncertaintyInMilliseconds if prop.uncertaintyInMilliseconds is not None else self.uncertaintyInMilliseconds
         return self.properties.jsonResponse
 
     def __getitem__(self, property):
         if self.iot:
             timeStamps = self.iot.timeStamps
-            for item in self.properties.properties:
-                self.properties._set( item, (self._formatForProperty(self.iot[item]), timeStamps[item], self.uncertaintyInMilliseconds) )
+            for item, value in self.properties.properties.items():
+                uncertaintyInMilliseconds = value.uncertaintyInMilliseconds if value.uncertaintyInMilliseconds is not None else self.uncertaintyInMilliseconds
+                self.properties._set( item, (self._formatForProperty(self.iot[item]), timeStamps[item], uncertaintyInMilliseconds) )
         return self.properties[property]
 
     def __setitem__(self, property, value):
@@ -54,13 +60,15 @@ class Interface(object):
         return value
 
     class Properties(object):
-        def __init__(self, interface, properties, proactivelyReported, retrievable):
+        def __init__(self, interface, properties, proactivelyReported, retrievable, uncertaintyInMilliseconds = None):
             properties = properties if type(properties) == list else [ properties ]
             self.interface = interface
             self.properties = {}
             self.proactivelyReported = proactivelyReported
             self.retrievable = retrievable
+            self.uncertaintyInMilliseconds = uncertaintyInMilliseconds
             for item in properties:
+                if item.uncertaintyInMilliseconds is None: item.uncertaintyInMilliseconds = uncertaintyInMilliseconds
                 self.properties[item.name] = item
 
         def __getitem__(self, property):
@@ -74,7 +82,14 @@ class Interface(object):
                 (value, timeOfSample, uncertaintyInMilliseconds) = value
             else:
                 timeOfSample = time.time()
-                uncertaintyInMilliseconds = 0
+                uncertaintyInMilliseconds = self.uncertaintyInMilliseconds
+
+            # Check uncertaintyInMilliseconds if it exists and is not Null, otherwise take the value receieved
+            uncertaintyInMilliseconds = self.properties[property].uncertaintyInMilliseconds if property in self.properties and self.properties[property].uncertaintyInMilliseconds is not None else uncertaintyInMilliseconds
+
+            # If the property version and the received version are None, use the default for the Properties object
+            uncertaintyInMilliseconds = uncertaintyInMilliseconds if uncertaintyInMilliseconds is not None else self.uncertaintyInMilliseconds
+
             self.properties[property].value = value
             self.properties[property].timeOfSample = timeOfSample
             self.properties[property].uncertaintyInMilliseconds = uncertaintyInMilliseconds
@@ -94,7 +109,7 @@ class Interface(object):
             return proplist
 
     class Property(object):
-        def __init__(self, name, value=None, timeOfSample = time.time(), uncertaintyInMilliseconds=0):
+        def __init__(self, name, value=None, timeOfSample = time.time(), uncertaintyInMilliseconds=None):
             self.name = name
             self.pvalue = value
             self.uncertaintyInMilliseconds = uncertaintyInMilliseconds
@@ -125,8 +140,9 @@ class Interface(object):
         self[propertyName] = (v, get_utc_timestamp(), self.uncertaintyInMilliseconds)
 
 class BrightnessController(Interface):
-    def __init__(self, iots=None, proactivelyReported=False, retrievable=False, uncertaintyInMilliseconds=0, *args, **kwargs):
-        super(BrightnessController, self).__init__(iots, uncertaintyInMilliseconds)
+    def __init__(self, iots=None, proactivelyReported=False, retrievable=False, uncertaintyInMilliseconds=0, iot=None, *args, **kwargs):
+        super(BrightnessController, self).__init__(iots=iots, iot=iot, uncertaintyInMilliseconds=uncertaintyInMilliseconds)
+
         self.properties = \
             Interface.Properties(self.interface, [ Interface.Property('brightness')], \
                 proactivelyReported=proactivelyReported, retrievable=retrievable)
@@ -147,27 +163,20 @@ class Calendar(Interface):
 class CameraStreamController(Interface):
     def __init__(self, cameraStreams=None, *args, **kwargs):
         super(CameraStreamController, self).__init__()
-        self.cameraStreamConfigurations_value = cameraStreams if type (cameraStreams) is list else [ cameraStreams ]
+        self.cameraStreamConfigurations_value = cameraStreams if type (cameraStreams) is list else [ cameraStreams ] if cameraStreams is not None else None
 
     @property
     def jsonDiscover(self):
         cameraStreams = []
-        for item in self.cameraStreamConfigurations_value:
-            cameraStreams.append(item.json)
+        if self.cameraStreamConfigurations_value:
+            for item in self.cameraStreamConfigurations_value:
+                cameraStreams.append(item.json)
 
         return { 'type': 'AlexaInterface', 'interface': self.interface, 'version': self.version, 'cameraStreamConfigurations': cameraStreams }
 
-    #  Need to figure out how to get the selected cameraStream into this class!!
-    @property
-    def jsonResponse(self, cameraStreams):
-        ret = []
-        for item in self.cameraStreams:
-            ret.append(item.json)
-        return ret
-
 class ChannelController(Interface):
-    def __init__(self, iots=None, proactivelyReported=False, retrievable=False, uncertaintyInMilliseconds=0, *args, **kwargs):
-        super(ChannelController, self).__init__(iots, uncertaintyInMilliseconds)
+    def __init__(self, iots=None, proactivelyReported=False, retrievable=False, uncertaintyInMilliseconds=0, iot=None, *args, **kwargs):
+        super(ChannelController, self).__init__(iots=iots, iot=iot, uncertaintyInMilliseconds=uncertaintyInMilliseconds)
         self.properties = \
             Interface.Properties(self.interface, [ Interface.Property('channel')], \
                 proactivelyReported=proactivelyReported, retrievable=retrievable)
@@ -177,8 +186,8 @@ class ChannelController(Interface):
         return { k:v for k, v in value.items() if k in ['number','callSign','affiliateCallSign'] }
 
 class ColorController(Interface):
-    def __init__(self, iots=None, proactivelyReported=False, retrievable=False, uncertaintyInMilliseconds=0, *args, **kwargs):
-        super(ColorController, self).__init__(iots, uncertaintyInMilliseconds)
+    def __init__(self, iots=None, proactivelyReported=False, retrievable=False, uncertaintyInMilliseconds=0, iot=None, *args, **kwargs):
+        super(ColorController, self).__init__(iots=iots, iot=iot, uncertaintyInMilliseconds=uncertaintyInMilliseconds)
         self.properties = \
             Interface.Properties(self.interface, [ Interface.Property('color')], \
                 proactivelyReported=proactivelyReported, retrievable=retrievable)
@@ -187,25 +196,37 @@ class ColorController(Interface):
         self._setdirective(request, 'color', 'color')
 
 class ColorTemperatureController(Interface):
-    def __init__(self, iots=None, proactivelyReported=False, retrievable=False, uncertaintyInMilliseconds=0, *args, **kwargs):
-        super(ColorTemperatureController, self).__init__(iots, uncertaintyInMilliseconds)
+    def __init__(self, iots=None, proactivelyReported=False, retrievable=False, uncertaintyInMilliseconds=0, iot=None, *args, **kwargs):
+        super(ColorTemperatureController, self).__init__(iots=iots, iot=iot, uncertaintyInMilliseconds=uncertaintyInMilliseconds)
         self.properties = \
             Interface.Properties(self.interface, [ Interface.Property('colorTemperatureInKelvin')], \
                 proactivelyReported=proactivelyReported, retrievable=retrievable)
 
     def SetColorTemperature(self, request):
-        self._setdirective(request, 'colorTemperatureInKelvin', 'colorTemperatureInKelvin')
+        self._setdirective(request, 'colorTemperatureInKelvin', 'colorTemperatureInKelvin', range(1000,10001))
+
+    def IncreaseColorTemperature(self, request):
+        ranges_of_cool = [1000, 2200, 2700, 4000, 5500, 7000, 10000]
+        v = [x for x in ranges_of_cool if x > self['colorTemperatureInKelvin']+500 ]
+        v = v[0] if v else ranges_of_cool[-1]
+        self['colorTemperatureInKelvin'] = (v, get_utc_timestamp(), self.uncertaintyInMilliseconds)
+
+    def DecreaseColorTemperature(self, request):
+        ranges_of_cool = [1000, 2200, 2700, 4000, 5500, 7000, 10000]
+        v = [x for x in ranges_of_cool if x < self['colorTemperatureInKelvin']-500 ]
+        v = v[-1] if v else ranges_of_cool[0]
+        self['colorTemperatureInKelvin'] = (v, get_utc_timestamp(), self.uncertaintyInMilliseconds)
 
 class EndpointHealth(Interface):
-    def __init__(self, iots=None, proactivelyReported=False, retrievable=False, uncertaintyInMilliseconds=0, *args, **kwargs):
-        super(EndpointHealth, self).__init__(iots, uncertaintyInMilliseconds)
+    def __init__(self, iots=None, proactivelyReported=False, retrievable=False, uncertaintyInMilliseconds=0, iot=None, *args, **kwargs):
+        super(EndpointHealth, self).__init__(iots=iots, iot=iot, uncertaintyInMilliseconds=uncertaintyInMilliseconds)
         self.properties = \
             Interface.Properties(self.interface, [ Interface.Property('connectivity')], \
                 proactivelyReported=proactivelyReported, retrievable=retrievable)
 
 class InputController(Interface):
-    def __init__(self, iots=None, proactivelyReported=False, retrievable=False, uncertaintyInMilliseconds=0, *args, **kwargs):
-        super(InputController, self).__init__(iots, uncertaintyInMilliseconds)
+    def __init__(self, iots=None, proactivelyReported=False, retrievable=False, uncertaintyInMilliseconds=0, iot=None, *args, **kwargs):
+        super(InputController, self).__init__(iots=iots, iot=iot, uncertaintyInMilliseconds=uncertaintyInMilliseconds)
         self.properties = \
             Interface.Properties(self.interface, [ Interface.Property('input')], \
                 proactivelyReported=proactivelyReported, retrievable=retrievable)
@@ -214,8 +235,8 @@ class InputController(Interface):
         self['input'] = (request.payload['input'], get_utc_timestamp(), self.uncertaintyInMilliseconds)
 
 class LockController(Interface):
-    def __init__(self, iots=None, proactivelyReported=False, retrievable=False, uncertaintyInMilliseconds=0, *args, **kwargs):
-        super(LockController, self).__init__(iots, uncertaintyInMilliseconds)
+    def __init__(self, iots=None, proactivelyReported=False, retrievable=False, uncertaintyInMilliseconds=0, iot=None, *args, **kwargs):
+        super(LockController, self).__init__(iots=iots, iot=iot, uncertaintyInMilliseconds=uncertaintyInMilliseconds)
         self.properties = \
             Interface.Properties(self.interface, [ Interface.Property('lockState')], \
                 proactivelyReported=proactivelyReported, retrievable=retrievable)
@@ -229,16 +250,16 @@ class LockController(Interface):
         self['lockState'] = ('UNLOCKED', get_utc_timestamp(), self.uncertaintyInMilliseconds)
 
 class MeetingClientController(Interface):
-    def __init__(self, iots=None, proactivelyReported=False, retrievable=False, uncertaintyInMilliseconds=0, *args, **kwargs):
-        super(MeetingClientController, self).__init__(iots, uncertaintyInMilliseconds)
+    def __init__(self, iots=None, proactivelyReported=False, retrievable=False, uncertaintyInMilliseconds=0, iot=None, *args, **kwargs):
+        super(MeetingClientController, self).__init__(iots=iots, iot=iot, uncertaintyInMilliseconds=uncertaintyInMilliseconds)
 
         # Needs special discovery logic
         # Need to add another structure for meeting.  See https://developer.amazon.com/docs/device-apis/alexa-meetingclientcontroller.html#properties payload details
         # Uses generic response with no context object
 
 class PercentageController(Interface):
-    def __init__(self, iots=None, proactivelyReported=False, retrievable=False, uncertaintyInMilliseconds=0, *args, **kwargs):
-        super(PercentageController, self).__init__(iots, uncertaintyInMilliseconds)
+    def __init__(self, iots=None, proactivelyReported=False, retrievable=False, uncertaintyInMilliseconds=0, iot=None, *args, **kwargs):
+        super(PercentageController, self).__init__(iots=iots, iot=iot, uncertaintyInMilliseconds=uncertaintyInMilliseconds)
         self.properties = \
             Interface.Properties(self.interface, [ Interface.Property('percentage')], \
                 proactivelyReported=proactivelyReported, retrievable=retrievable)
@@ -250,16 +271,16 @@ class PercentageController(Interface):
         self._adjustdirective(request, 'percentage', 'percentageDelta', range(101))
 
 class PlaybackController(Interface):
-    def __init__(self, iots=None, proactivelyReported=False, retrievable=False, uncertaintyInMilliseconds=0, *args, **kwargs):
-        super(PlaybackController, self).__init__(iots, uncertaintyInMilliseconds)
+    def __init__(self, iots=None, proactivelyReported=False, retrievable=False, uncertaintyInMilliseconds=0, iot=None, *args, **kwargs):
+        super(PlaybackController, self).__init__(iots=iots, iot=iot, uncertaintyInMilliseconds=uncertaintyInMilliseconds)
 
         # Requires special discovery logic
         # Basicallly receives player state events and needs to command that action for the device
         # Response is just a generic message.  Weirdly the example shows a context but the properties are empty.
 
 class PowerController(Interface):
-    def __init__(self, iots=None, proactivelyReported=False, retrievable=False, uncertaintyInMilliseconds=0, *args, **kwargs):
-        super(PowerController, self).__init__(iots, uncertaintyInMilliseconds)
+    def __init__(self, iots=None, proactivelyReported=False, retrievable=False, uncertaintyInMilliseconds=0, iot=None, *args, **kwargs):
+        super(PowerController, self).__init__(iots=iots, iot=iot, uncertaintyInMilliseconds=uncertaintyInMilliseconds)
         self.properties = \
             Interface.Properties(self.interface, [ Interface.Property('powerState')], \
                 proactivelyReported=proactivelyReported, retrievable=retrievable)
@@ -271,8 +292,8 @@ class PowerController(Interface):
         self['powerState'] = ('OFF', get_utc_timestamp(), self.uncertaintyInMilliseconds)
 
 class PowerLevelController(Interface):
-    def __init__(self, iots=None, proactivelyReported=False, retrievable=False, uncertaintyInMilliseconds=0, *args, **kwargs):
-        super(PowerLevelController, self).__init__(iots, uncertaintyInMilliseconds)
+    def __init__(self, iots=None, proactivelyReported=False, retrievable=False, uncertaintyInMilliseconds=0, iot=None, *args, **kwargs):
+        super(PowerLevelController, self).__init__(iots=iots, iot=iot, uncertaintyInMilliseconds=uncertaintyInMilliseconds)
         self.properties = \
             Interface.Properties(self.interface, [ Interface.Property('powerLevel')], \
                 proactivelyReported=proactivelyReported, retrievable=retrievable)
@@ -285,7 +306,7 @@ class PowerLevelController(Interface):
 
 class SceneController(Interface):
     def __init__(self, iots=None, proactivelyReported=False, supportsDeactivation=False, *args, **kwargs):
-        super(SceneController, self).__init__(iots, uncertaintyInMilliseconds)
+        super(SceneController, self).__init__(iots=iots, iot=iot, uncertaintyInMilliseconds=uncertaintyInMilliseconds)
         self.proactivelyReported = proactivelyReported
         self.supportsDeactivation = supportsDeactivation
 
@@ -294,8 +315,8 @@ class SceneController(Interface):
         return { 'type':'AlexaInterface', 'interface':self.interface, 'version': self.version, 'supportsDeactivation': self.supportsDeactivation, 'proactivelyReported': self.proactivelyReported }
 
 class StepSpeaker(Interface):
-    def __init__(self, iots=None, proactivelyReported=False, retrievable=False, uncertaintyInMilliseconds=0, *args, **kwargs):
-        super(StepSpeaker, self).__init__(iots, uncertaintyInMilliseconds)
+    def __init__(self, iots=None, proactivelyReported=False, retrievable=False, uncertaintyInMilliseconds=0, iot=None, *args, **kwargs):
+        super(StepSpeaker, self).__init__(iots=iots, iot=iot, uncertaintyInMilliseconds=uncertaintyInMilliseconds)
 
     # Assumes that iot['volume'] is used to tell the speaker how much to increase or decrease the volume by
     def SetVolume(self, request):
@@ -305,8 +326,8 @@ class StepSpeaker(Interface):
         self['muted'] = (request.payload['mute'], get_utc_timestamp(), self.uncertaintyInMilliseconds)
 
 class Speaker(Interface):
-    def __init__(self, iots=None, proactivelyReported=False, retrievable=False, uncertaintyInMilliseconds=0, *args, **kwargs):
-        super(Speaker, self).__init__(iots, uncertaintyInMilliseconds)
+    def __init__(self, iots=None, proactivelyReported=False, retrievable=False, uncertaintyInMilliseconds=0, iot=None, *args, **kwargs):
+        super(Speaker, self).__init__(iots=iots, iot=iot, uncertaintyInMilliseconds=uncertaintyInMilliseconds)
         self.properties = \
             Interface.Properties(self.interface, [ Interface.Property('volume'), Interface.Property('muted') ], \
                 proactivelyReported=proactivelyReported, retrievable=retrievable)
@@ -322,15 +343,15 @@ class Speaker(Interface):
 
 
 class TemperatureSensor(Interface):
-    def __init__(self, iots=None, proactivelyReported=False, retrievable=False, uncertaintyInMilliseconds=0, *args, **kwargs):
-        super(TemperatureSensor, self).__init__(iots, uncertaintyInMilliseconds)
+    def __init__(self, iots=None, proactivelyReported=False, retrievable=False, uncertaintyInMilliseconds=0, iot=None, *args, **kwargs):
+        super(TemperatureSensor, self).__init__(iots=iots, iot=iot, uncertaintyInMilliseconds=uncertaintyInMilliseconds)
         self.properties = \
             Interface.Properties(self.interface, [ Interface.Property('temperature') ], \
                 proactivelyReported=proactivelyReported, retrievable=retrievable)
 
 class ThermostatController(Interface):
-    def __init__(self, iots=None, proactivelyReported=False, retrievable=False, uncertaintyInMilliseconds=0, thermostatType='single', *args, **kwargs):
-        super(ThermostatControllerSingle, self).__init__(iots, uncertaintyInMilliseconds)
+    def __init__(self, iots=None, proactivelyReported=False, retrievable=False, uncertaintyInMilliseconds=0, iot=None, thermostatType='single', *args, **kwargs):
+        super(ThermostatControllerSingle, self).__init__(iots=iots, iot=iot, uncertaintyInMilliseconds=uncertaintyInMilliseconds)
         prop_list = [ Interface.Property('thermostatMode') ]
         if thermostatType.lower() == 'single':
             prop_list.append( Interface.Property('TargetSetpoint'))

@@ -56,3 +56,38 @@ accessToken = 'Atza|IwEBIEpleooa2Maoj29jRgfZ4WqO7TEZru_yI7jSGFcP41F1VfoNMFa5JH5w
 accessToken = 'Atza|IwEBIAHnt6lXI-ZKo31P6GIivTq5_oPUqi7TIocQwDxjjqD8E9J_A9qeujd5uhPzbTh0GyANyAEuaW4roS2xd0nU_uTGr9xdpIscQYO6duZvKZOmY72mmbNEqWabWaxh-uMr74jb32mT8THKHj2Ia7KTfvm5vvLBGLuvgTc-Af3J5wSEb4atXOxV6A1HgMk2kGdehpLLnyUzt56JZatmWfBTmsrqpx6vp4yOhv2rZl-nbE0O_DmQhnY9sTpM_AI7fOIZMO6I-L6yihY1VdPgtKFAPjpOF5DeKRLMDKemyI4mqQjOUUc_MQSaC-NhKDfSob5uTx7vChyyxXDwuH3v9rCNbQDTQrbo8giPgpYZHjTdB1KQSaQXAWkPnKLIN3NpjDwl7Rs9F106dYlM3J4nuFlMMJ0usmANt4rOxYv0a_PO12nOaGLrEI-w1GBXSnxc4ddj7Ze8PvViPbt0lazaHG0vyXKXlp-Ix5GYcmuiIlhYUGPfiTeDg61Gmda9CiRCD41UU7U'
 payload = { 'access_token': accessToken }
 r = requests.get("https://api.amazon.com/user/profile", params=payload)
+
+from test_pyASH import dhroneTV
+from user import DemoUser
+from pyASH import pyASH
+user = DemoUser()
+user.addEndpoint(endpointClass=dhroneTV, things='device_1', friendlyName='Sound', description='Sound by dhrone')
+pyash = pyASH(user)
+endpoint = pyash.user.endpoints['dhroneTV:device_1']
+from message import Request
+d = {
+    "directive": {
+        "header": {
+            "namespace": "Alexa.PowerLevelController",
+            "name": "SetPowerLevel",
+            "payloadVersion": "3",
+            "messageId": "1bd5d003-31b9-476f-ad03-71d471922820",
+            "correlationToken": "dFMb0z+PgpgdDmluhJ1LddFvSqZ/jCc8ptlAKulUj90jSqg=="
+        },
+        "endpoint": {
+            "scope": {
+                "type": "BearerToken",
+                "token": "access-token-from-skill"
+            },
+            "endpointId": "dhroneTV:device_1",
+            "cookie": {}
+        },
+        "payload": {
+            "powerLevel": 42
+        }
+    }
+}
+request = Request(d)
+cls, handler = endpoint.getHandler(request)
+method = handler.__get__(cls(iots=endpoint.iots), cls)
+interface = endpoint.generateInterfaces(endpoint.iots[0])[request.namespace]

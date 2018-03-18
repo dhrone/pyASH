@@ -72,6 +72,11 @@ class iotTV(IotTest):
 @Endpoint.addInterface(BrightnessController)
 @Endpoint.addInterface(EndpointHealth)
 @Endpoint.addInterface(ColorController)
+@Endpoint.addInterface(ColorTemperatureController)
+@Endpoint.addInterface(InputController)
+@Endpoint.addInterface(LockController)
+@Endpoint.addInterface(PercentageController)
+@Endpoint.addInterface(PowerLevelController, uncertaintyInMilliseconds=200)
 @Endpoint.addIot(iotTV)
 class dhroneTV(Endpoint):
     manufacturerName = 'dhrone'
@@ -144,15 +149,6 @@ class dhroneTV(Endpoint):
                 'payload': payload
             }
         }
-
-#    @Endpoint.addDirective
-#    def SetMute(self, request, iot):
-#        iot['muted'] = request.payload['mute']
-
-    @Endpoint.addDirective
-    def SelectInput(self, request, iot):
-        self.iot['asource'] = request.payload['input']
-
 
 class dhroneTVScene(Endpoint):
     manufacturerName = 'dhrone'
@@ -954,6 +950,428 @@ def test_ColorController_SetColor(setup):
             "payload": {}
         }
     }
+    response = pyash.lambda_handler(request)
+    compareResults(expected_response, response)
+
+def test_ColorTemperatureController_SetColorTemperature(setup):
+    pyash = setup
+    pyash.user.endpoints['dhroneTV:device_1'].iot['colorTemperatureInKelvin']= 4000
+    request = {
+        "directive": {
+            "header": {
+                "namespace": "Alexa.ColorTemperatureController",
+                "name": "SetColorTemperature",
+                "payloadVersion": "3",
+                "messageId": "1bd5d003-31b9-476f-ad03-71d471922820",
+                "correlationToken": "dFMb0z+PgpgdDmluhJ1LddFvSqZ/jCc8ptlAKulUj90jSqg=="
+            },
+            "endpoint": {
+                "scope": {
+                    "type": "BearerToken",
+                    "token": "access-token-from-skill"
+                },
+                "endpointId": "dhroneTV:device_1",
+                "cookie": {}
+            },
+            "payload": {
+                "colorTemperatureInKelvin": 5000
+            }
+        }
+    }
+    expected_response = {
+        "context": {
+            "properties": [
+                {
+                    "namespace": "Alexa.ColorTemperatureController",
+                    "name": "colorTemperatureInKelvin",
+                    "value": 5000,
+                    "timeOfSample": "2017-09-27T18:30:30.45Z",
+                    "uncertaintyInMilliseconds": 0
+                },
+                {
+                    "namespace": "Alexa.EndpointHealth",
+                    "name": "connectivity",
+                    "value": {
+                        "value": "OK"
+                    },
+                    "timeOfSample": "2017-09-27T18:30:30.45Z",
+                    "uncertaintyInMilliseconds": 0
+                }
+            ]
+        },
+        "event": {
+            "header": {
+                "namespace": "Alexa",
+                "name": "Response",
+                "payloadVersion": "3",
+                "messageId": "5f8a426e-01e4-4cc9-8b79-65f8bd0fd8a4",
+                "correlationToken": "dFMb0z+PgpgdDmluhJ1LddFvSqZ/jCc8ptlAKulUj90jSqg=="
+            },
+            "endpoint": {
+                "scope": {
+                    "type": "BearerToken",
+                    "token": "access-token-from-Amazon"
+                },
+                "endpointId": "dhroneTV:device_1"
+            },
+            "payload": {}
+        }
+    }
+    response = pyash.lambda_handler(request)
+    compareResults(expected_response, response)
+
+def test_ColorTemperatureController_Increase_DecreaseColorTemperature(setup):
+    pyash = setup
+    pyash.user.endpoints['dhroneTV:device_1'].iot['colorTemperatureInKelvin']= 4000
+    request = {
+        "directive": {
+            "header": {
+                "namespace": "Alexa.ColorTemperatureController",
+                "name": "IncreaseColorTemperature",
+                "payloadVersion": "3",
+                "messageId": "1bd5d003-31b9-476f-ad03-71d471922820",
+                "correlationToken": "dFMb0z+PgpgdDmluhJ1LddFvSqZ/jCc8ptlAKulUj90jSqg=="
+            },
+            "endpoint": {
+                "scope": {
+                    "type": "BearerToken",
+                    "token": "access-token-from-skill"
+                },
+                "endpointId": "dhroneTV:device_1",
+                "cookie": {}
+            },
+            "payload": {}
+        }
+    }
+    expected_response = {
+        "context": {
+            "properties": [
+                {
+                    "namespace": "Alexa.ColorTemperatureController",
+                    "name": "colorTemperatureInKelvin",
+                    "value": 5500,
+                    "timeOfSample": "2017-09-27T18:30:30.45Z",
+                    "uncertaintyInMilliseconds": 0
+                },
+                {
+                    "namespace": "Alexa.EndpointHealth",
+                    "name": "connectivity",
+                    "value": {
+                        "value": "OK"
+                    },
+                    "timeOfSample": "2017-09-27T18:30:30.45Z",
+                    "uncertaintyInMilliseconds": 0
+                }
+            ]
+        },
+        "event": {
+            "header": {
+                "namespace": "Alexa",
+                "name": "Response",
+                "payloadVersion": "3",
+                "messageId": "5f8a426e-01e4-4cc9-8b79-65f8bd0fd8a4",
+                "correlationToken": "dFMb0z+PgpgdDmluhJ1LddFvSqZ/jCc8ptlAKulUj90jSqg=="
+            },
+            "endpoint": {
+                "scope": {
+                    "type": "BearerToken",
+                    "token": "access-token-from-Amazon"
+                },
+                "endpointId": "dhroneTV:device_1"
+            },
+            "payload": {}
+        }
+    }
+    response = pyash.lambda_handler(request)
+    compareResults(expected_response, response)
+
+    request['directive']['header']['name'] = 'DecreaseColorTemperature'
+    expected_response['context']['properties'][0]['value']=4000
+    response = pyash.lambda_handler(request)
+    compareResults(expected_response, response)
+
+def test_InputController_SelectInput(setup):
+    pyash = setup
+    pyash.user.endpoints['dhroneTV:device_1'].iot['input']= 'CD'
+    request = {
+        "directive": {
+            "header": {
+                "namespace": "Alexa.InputController",
+                "name": "SelectInput",
+                "payloadVersion": "3",
+                "messageId": "1bd5d003-31b9-476f-ad03-71d471922820",
+                "correlationToken": "dFMb0z+PgpgdDmluhJ1LddFvSqZ/jCc8ptlAKulUj90jSqg=="
+            },
+            "endpoint": {
+                "scope": {
+                    "type": "BearerToken",
+                    "token": "access-token-from-skill"
+                },
+                "endpointId": "dhroneTV:device_1",
+                "cookie": {}
+            },
+            "payload": {
+                "input": "HDMI1"
+            }
+        }
+    }
+    expected_response = {
+        "context": {
+            "properties": [
+                {
+                    "namespace": "Alexa.InputController",
+                    "name": "input",
+                    "value": "HDMI1",
+                    "timeOfSample": "2017-09-27T18:30:30.45Z",
+                    "uncertaintyInMilliseconds": 0
+                },
+                {
+                    "namespace": "Alexa.EndpointHealth",
+                    "name": "connectivity",
+                    "value": {
+                        "value": "OK"
+                    },
+                    "timeOfSample": "2017-09-27T18:30:30.45Z",
+                    "uncertaintyInMilliseconds": 0
+                }
+            ]
+        },
+        "event": {
+            "header": {
+                "namespace": "Alexa",
+                "name": "Response",
+                "payloadVersion": "3",
+                "messageId": "5f8a426e-01e4-4cc9-8b79-65f8bd0fd8a4",
+                "correlationToken": "dFMb0z+PgpgdDmluhJ1LddFvSqZ/jCc8ptlAKulUj90jSqg=="
+            },
+            "endpoint": {
+                "scope": {
+                    "type": "BearerToken",
+                    "token": "access-token-from-Amazon"
+                },
+                "endpointId": "dhroneTV:device_1"
+            },
+            "payload": {}
+        }
+    }
+    response = pyash.lambda_handler(request)
+    compareResults(expected_response, response)
+
+def test_LockController_LockUnlock(setup):
+    pyash = setup
+    pyash.user.endpoints['dhroneTV:device_1'].iot['lockState']= 'UNLOCKED'
+    request = {
+        "directive": {
+            "header": {
+                "namespace": "Alexa.LockController",
+                "name": "Lock",
+                "payloadVersion": "3",
+                "messageId": "1bd5d003-31b9-476f-ad03-71d471922820",
+                "correlationToken": "dFMb0z+PgpgdDmluhJ1LddFvSqZ/jCc8ptlAKulUj90jSqg=="
+            },
+            "endpoint": {
+                "scope": {
+                    "type": "BearerToken",
+                    "token": "access-token-from-skill"
+                },
+                "endpointId": "dhroneTV:device_1",
+                "cookie": {}
+            },
+            "payload": {}
+        }
+    }
+    expected_response = {
+        "context": {
+            "properties": [
+                {
+                    "namespace": "Alexa.LockController",
+                    "name": "lockState",
+                    "value": "LOCKED",
+                    "timeOfSample": "2017-09-27T18:30:30.45Z",
+                    "uncertaintyInMilliseconds": 0
+                },
+                {
+                    "namespace": "Alexa.EndpointHealth",
+                    "name": "connectivity",
+                    "value": {
+                        "value": "OK"
+                    },
+                    "timeOfSample": "2017-09-27T18:30:30.45Z",
+                    "uncertaintyInMilliseconds": 0
+                }
+            ]
+        },
+        "event": {
+            "header": {
+                "namespace": "Alexa",
+                "name": "Response",
+                "payloadVersion": "3",
+                "messageId": "5f8a426e-01e4-4cc9-8b79-65f8bd0fd8a4",
+                "correlationToken": "dFMb0z+PgpgdDmluhJ1LddFvSqZ/jCc8ptlAKulUj90jSqg=="
+            },
+            "endpoint": {
+                "scope": {
+                    "type": "BearerToken",
+                    "token": "access-token-from-Amazon"
+                },
+                "endpointId": "dhroneTV:device_1"
+            },
+            "payload": {}
+        }
+    }
+    response = pyash.lambda_handler(request)
+    compareResults(expected_response, response)
+
+    request['directive']['header']['name']='Unlock'
+    expected_response['context']['properties'][0]['value']='UNLOCKED'
+    response = pyash.lambda_handler(request)
+    compareResults(expected_response, response)
+
+def test_PercentageController_SetAdjust(setup):
+    pyash = setup
+    pyash.user.endpoints['dhroneTV:device_1'].iot['percentage']= 50
+    request = {
+        "directive": {
+            "header": {
+                "namespace": "Alexa.PercentageController",
+                "name": "SetPercentage",
+                "payloadVersion": "3",
+                "messageId": "1bd5d003-31b9-476f-ad03-71d471922820",
+                "correlationToken": "dFMb0z+PgpgdDmluhJ1LddFvSqZ/jCc8ptlAKulUj90jSqg=="
+            },
+            "endpoint": {
+                "scope": {
+                    "type": "BearerToken",
+                    "token": "access-token-from-skill"
+                },
+                "endpointId": "dhroneTV:device_1",
+                "cookie": {}
+            },
+            "payload": {
+                "percentage": 74
+            }
+        }
+    }
+    expected_response = {
+        "context": {
+            "properties": [
+                {
+                    "namespace": "Alexa.PercentageController",
+                    "name": "percentage",
+                    "value": 74,
+                    "timeOfSample": "2017-09-27T18:30:30.45Z",
+                    "uncertaintyInMilliseconds": 0
+                },
+                {
+                    "namespace": "Alexa.EndpointHealth",
+                    "name": "connectivity",
+                    "value": {
+                        "value": "OK"
+                    },
+                    "timeOfSample": "2017-09-27T18:30:30.45Z",
+                    "uncertaintyInMilliseconds": 0
+                }
+            ]
+        },
+        "event": {
+            "header": {
+                "namespace": "Alexa",
+                "name": "Response",
+                "payloadVersion": "3",
+                "messageId": "5f8a426e-01e4-4cc9-8b79-65f8bd0fd8a4",
+                "correlationToken": "dFMb0z+PgpgdDmluhJ1LddFvSqZ/jCc8ptlAKulUj90jSqg=="
+            },
+            "endpoint": {
+                "scope": {
+                    "type": "BearerToken",
+                    "token": "access-token-from-Amazon"
+                },
+                "endpointId": "dhroneTV:device_1"
+            },
+            "payload": {}
+        }
+    }
+
+    response = pyash.lambda_handler(request)
+    compareResults(expected_response, response)
+
+    request['directive']['header']['name']='AdjustPercentage'
+    request['directive']['payload']['percentageDelta']=-20
+    expected_response['context']['properties'][0]['value']=54
+    response = pyash.lambda_handler(request)
+    compareResults(expected_response, response)
+
+def test_PercentageController_SetAdjust(setup):
+    pyash = setup
+    pyash.user.endpoints['dhroneTV:device_1'].iot['powerLevel']= 50
+    request = {
+        "directive": {
+            "header": {
+                "namespace": "Alexa.PowerLevelController",
+                "name": "SetPowerLevel",
+                "payloadVersion": "3",
+                "messageId": "1bd5d003-31b9-476f-ad03-71d471922820",
+                "correlationToken": "dFMb0z+PgpgdDmluhJ1LddFvSqZ/jCc8ptlAKulUj90jSqg=="
+            },
+            "endpoint": {
+                "scope": {
+                    "type": "BearerToken",
+                    "token": "access-token-from-skill"
+                },
+                "endpointId": "dhroneTV:device_1",
+                "cookie": {}
+            },
+            "payload": {
+                "powerLevel": 42
+            }
+        }
+    }
+    expected_response = {
+        "context": {
+            "properties": [
+                {
+                    "namespace": "Alexa.PowerLevelController",
+                    "name": "powerLevel",
+                    "value": 42,
+                    "timeOfSample": "2017-09-27T18:30:30.45Z",
+                    "uncertaintyInMilliseconds": 200
+                },
+                {
+                    "namespace": "Alexa.EndpointHealth",
+                    "name": "connectivity",
+                    "value": {
+                        "value": "OK"
+                    },
+                    "timeOfSample": "2017-09-27T18:30:30.45Z",
+                    "uncertaintyInMilliseconds": 0
+                }
+            ]
+        },
+        "event": {
+            "header": {
+                "namespace": "Alexa",
+                "name": "Response",
+                "payloadVersion": "3",
+                "messageId": "5f8a426e-01e4-4cc9-8b79-65f8bd0fd8a4",
+                "correlationToken": "dFMb0z+PgpgdDmluhJ1LddFvSqZ/jCc8ptlAKulUj90jSqg=="
+            },
+            "endpoint": {
+                "scope": {
+                    "type": "BearerToken",
+                    "token": "access-token-from-Amazon"
+                },
+                "endpointId": "dhroneTV:device_1"
+            },
+            "payload": {}
+        }
+    }
+
+    response = pyash.lambda_handler(request)
+    compareResults(expected_response, response)
+
+    request['directive']['header']['name']='AdjustPowerLevel'
+    request['directive']['payload']['powerLevelDelta']=3
+    expected_response['context']['properties'][0]['value']=45
     response = pyash.lambda_handler(request)
     compareResults(expected_response, response)
 

@@ -58,16 +58,16 @@ class Endpoint(object):
         else:
             self.endpointId = endpointId
             self.things = things
-            self.friendlyName = friendlyName if friendlyName is not None else Endpoint.friendlyName
-            self.manufacturerName = manufacturerName if manufacturerName is not None else Endpoint.manufacturerName
-            self.description = description if description is not None else Endpoint.description
-            self.displayCategories = displayCategories if displayCategories is not None else Endpoint.displayCategories
+            self.friendlyName = friendlyName if friendlyName is not None else self.friendlyName
+            self.manufacturerName = manufacturerName if manufacturerName is not None else self.manufacturerName
+            self.description = description if description is not None else self.description
+            self.displayCategories = displayCategories if displayCategories is not None else self.displayCategories
             self.displayCategories = self.displayCategories if self.displayCategories is None or type(self.displayCategories) is list else [self.displayCategories]
-            self.proactivelyReported = proactivelyReported if proactivelyReported is not None else Endpoint.proactivelyReported
-            self.retrievable = retrievable if retrievable is not None else Endpoint.retrievable
-            self.uncertaintyInMilliseconds = uncertaintyInMilliseconds if uncertaintyInMilliseconds is not None else Endpoint.uncertaintyInMilliseconds
-            self.supportsDeactivation = supportsDeactivation if supportsDeactivation is not None else Endpoint.supportsDeactivation
-            self.cookie = cookie if cookie is not None else Endpoint.cookie
+            self.proactivelyReported = proactivelyReported if proactivelyReported is not None else self.proactivelyReported
+            self.retrievable = retrievable if retrievable is not None else self.retrievable
+            self.uncertaintyInMilliseconds = uncertaintyInMilliseconds if uncertaintyInMilliseconds is not None else self.uncertaintyInMilliseconds
+            self.supportsDeactivation = supportsDeactivation if supportsDeactivation is not None else self.supportsDeactivation
+            self.cookie = cookie if cookie is not None else self.cookie
             self.iots = iots
 
         self.things = self.things if type(self.things) is list else [self.things] if self.things is not None else None
@@ -182,19 +182,19 @@ class Endpoint(object):
             "version": "3"
         }]
 
-        for object in self.generateInterfaces(iot=None):
+        for object in self.generateInterfaces(iot=None).values():
             capabilities.append(object.jsonDiscover)
         return capabilities
 
     @property
     def _getProperties(self):
         properties = []
-        for object in self.generateInterfaces(iot=self.iot):
-            properties += object.jsonResponse
+        for object in self.generateInterfaces(iot=self.iot).values():
+            if object.jsonResponse: properties += object.jsonResponse
         return properties
 
     def generateInterfaces(self,iot=None):
-        ret = []
+        ret = {}
         # Fix interface defaults
         for k, interface in self._interfaces.items():
             interface['proactivelyReported'] = interface['proactivelyReported'] if interface['proactivelyReported'] is not None else self.proactivelyReported
@@ -203,6 +203,7 @@ class Endpoint(object):
 
             # For each interface, add capabilities
             interface['supportsDeactivation'] = interface['supportsDeactivation'] if interface['supportsDeactivation'] else self.supportsDeactivation
+
             object = interface['interface'] \
                 ( \
                     iot=iot, \
@@ -211,7 +212,7 @@ class Endpoint(object):
                     uncertaintyInMilliseconds = interface['uncertaintyInMilliseconds'], \
                     supportsDeactivation = interface['supportsDeactivation']
                 )
-            ret.append( object )
+            ret[k]=object
         return ret
 
     @property
