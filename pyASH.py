@@ -140,7 +140,10 @@ class pyASH(object):
                     }
                 }
             healthif = endpoint.generateInterfaces(endpoint.iots[0])['Alexa.EndpointHealth'] if 'Alexa.EndpointHealth' in endpoint._interfaces else None
-            if healthif: ret['context']['properties'] += healthif.jsonResponse
+            if healthif:
+                if 'context' not in ret: ret['context'] = {}
+                if 'properties' not in ret['context'] or ret['context']['properties'] is None: ret['context']['properties'] = []
+                ret['context']['properties'] += healthif.jsonResponse
             if 'scope' in request.raw['directive']['endpoint']: ret['event']['endpoint']['scope'] = request.raw['directive']['endpoint']['scope']
             return ret
         except InterfaceException as e:

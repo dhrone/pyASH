@@ -319,11 +319,16 @@ class StepSpeaker(Interface):
         super(StepSpeaker, self).__init__(iots=iots, iot=iot, uncertaintyInMilliseconds=uncertaintyInMilliseconds)
 
     # Assumes that iot['volume'] is used to tell the speaker how much to increase or decrease the volume by
-    def SetVolume(self, request):
-        self._setdirective(request, 'volume', 'volumeSteps', range(101))
+    def AdjustVolume(self, request):
+        if self.iot:
+            v = self.iot['volume']+request.payload['volumeSteps']
+            validRange = range(101)
+            v = v if v in validRange else validRange[0] if v < validRange[0] else validRange[-1]
+            self.iot['volume'] = v
 
     def SetMute(self, request):
-        self['muted'] = (request.payload['mute'], get_utc_timestamp(), self.uncertaintyInMilliseconds)
+        if self.iot:
+            self.iot['muted'] = request.payload['mute']
 
 class Speaker(Interface):
     def __init__(self, iots=None, proactivelyReported=False, retrievable=False, uncertaintyInMilliseconds=0, iot=None, *args, **kwargs):

@@ -77,6 +77,7 @@ class iotTV(IotTest):
 @Endpoint.addInterface(LockController)
 @Endpoint.addInterface(PercentageController)
 @Endpoint.addInterface(PowerLevelController, uncertaintyInMilliseconds=200)
+@Endpoint.addInterface(StepSpeaker)
 @Endpoint.addIot(iotTV)
 class dhroneTV(Endpoint):
     manufacturerName = 'dhrone'
@@ -180,8 +181,9 @@ def cleanse(r):
 
     if 'context' in r:
         if 'properties' in r['context']:
-            for p in r['context']['properties']:
-                if 'timeOfSample' in p: p['timeOfSample'] = 'TIMESTAMP'
+            if r['context']['properties'] is not None:
+                for p in r['context']['properties']:
+                    if 'timeOfSample' in p: p['timeOfSample'] = 'TIMESTAMP'
     if 'event' in r:
         if 'header' in r['event']:
             if 'messageId' in r['event']['header']: r['event']['header']['messageId'] = 'MESSAGEID'
@@ -1301,7 +1303,7 @@ def test_PercentageController_SetAdjust(setup):
     response = pyash.lambda_handler(request)
     compareResults(expected_response, response)
 
-def test_PercentageController_SetAdjust(setup):
+def test_PowerLevelController_SetAdjust(setup):
     pyash = setup
     pyash.user.endpoints['dhroneTV:device_1'].iot['powerLevel']= 50
     request = {
@@ -1372,6 +1374,74 @@ def test_PercentageController_SetAdjust(setup):
     request['directive']['header']['name']='AdjustPowerLevel'
     request['directive']['payload']['powerLevelDelta']=3
     expected_response['context']['properties'][0]['value']=45
+    response = pyash.lambda_handler(request)
+    compareResults(expected_response, response)
+
+def test_StepSpeaker_SetAdjust(setup):
+    pyash = setup
+    pyash.user.endpoints['dhroneTV:device_1'].iot['muted']= False
+    pyash.user.endpoints['dhroneTV:device_1'].iot['volume']= 50
+
+    request = {
+        "directive": {
+            "header": {
+                "namespace": "Alexa.StepSpeaker",
+                "name": "AdjustVolume",
+                "payloadVersion": "3",
+                "messageId": "1bd5d003-31b9-476f-ad03-71d471922820",
+                "correlationToken": "dFMb0z+PgpgdDmluhJ1LddFvSqZ/jCc8ptlAKulUj90jSqg=="
+            },
+            "endpoint": {
+                "scope": {
+                    "type": "BearerToken",
+                    "token": "access-token-from-skill"
+                },
+                "endpointId": "dhroneTV:device_1",
+                "cookie": {}
+            },
+            "payload": {
+                "volumeSteps": -20
+            }
+        }
+    }
+    expected_response = {
+        "context": {
+            "properties": [
+                {
+                    "namespace": "Alexa.EndpointHealth",
+                    "name": "connectivity",
+                    "value": {
+                        "value": "OK"
+                    },
+                    "timeOfSample": "2017-09-27T18:30:30.45Z",
+                    "uncertaintyInMilliseconds": 0
+                }
+            ]
+        },
+        "event": {
+            "header": {
+                "namespace": "Alexa",
+                "name": "Response",
+                "payloadVersion": "3",
+                "messageId": "5f8a426e-01e4-4cc9-8b79-65f8bd0fd8a4",
+                "correlationToken": "dFMb0z+PgpgdDmluhJ1LddFvSqZ/jCc8ptlAKulUj90jSqg=="
+            },
+            "endpoint": {
+                "scope": {
+                    "type": "BearerToken",
+                    "token": "access-token-from-Amazon"
+                },
+                "endpointId": "dhroneTV:device_1"
+            },
+            "payload": {}
+        }
+    }
+
+    response = pyash.lambda_handler(request)
+    compareResults(expected_response, response)
+
+    request['directive']['header']['name']='SetMute'
+    request['directive']['payload']['mute']= True
     response = pyash.lambda_handler(request)
     compareResults(expected_response, response)
 
