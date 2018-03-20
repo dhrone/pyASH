@@ -16,7 +16,7 @@ from datetime import timedelta
 
 from utility import *
 from message import Request
-from response import HEADER
+from objects import Header
 
 # Setup logger
 logger = logging.getLogger(__name__)
@@ -32,7 +32,7 @@ class pyASH(object):
     def _errorResponse(cls, request, e):
         json = {
             'event': {
-                'header': HEADER('Alexa', 'ErrorResponse', request.correlationToken),
+                'header': Header(namespace='Alexa', name='ErrorResponse', correlationToken=request.correlationToken).json,
                 'payload': e.payload
             }
         }
@@ -49,7 +49,7 @@ class pyASH(object):
             user.getTokens(request)
             return {
                 'event': {
-                    'header': HEADER('Alexa.Authorization', 'AcceptGrant.Response'),
+                    'header': Header(namespace='Alexa.Authorization', name='AcceptGrant.Response').json,
                     'payload': {}
                 }
             }
@@ -67,7 +67,7 @@ class pyASH(object):
                 ret.append(ep.jsonDiscover)
             return {
                 'event': {
-                    'header': HEADER('Alexa.Discovery', 'Discover.Response'),
+                    'header': Header(namespace='Alexa.Discovery', name='Discover.Response').json,
                     'payload': {
                         'endpoints': ret
                     }
@@ -88,7 +88,7 @@ class pyASH(object):
                     'properties': endpoint.jsonResponse
                 },
                 'event': {
-                    'header': HEADER('Alexa', 'StateReport', correlationToken=request.correlationToken),
+                    'header': Header(namespace='Alexa', name='StateReport', correlationToken=request.correlationToken).json,
                     'endpoint': {
                         'scope': {
                             'type': 'BearerToken',
@@ -132,7 +132,7 @@ class pyASH(object):
                         'properties': interface.jsonResponse
                     },
                     'event': {
-                        'header': HEADER('Alexa', 'Response', request.correlationToken),
+                        'header': Header(namespace='Alexa', name='Response', correlationToken=request.correlationToken).json,
                         'endpoint': {
                             'endpointId' : endpoint.endpointId
                         },

@@ -17,7 +17,7 @@ from iot import Iot, IotTest
 from user import DemoUser
 from pyASH import pyASH
 from message import Request
-from response import HEADER
+from objects import Header
 
 from interface import *
 from utility import LOGLEVEL
@@ -143,7 +143,7 @@ class dhroneTV(Endpoint):
         return {
             'context': {},
             'event': {
-                'header': HEADER('Alexa.CameraStreamController', 'Response', request.correlationToken),
+                'header': Header('Alexa.CameraStreamController', 'Response', request.correlationToken).json,
                 'endpoint': {
                     'endpointId': request.endpointId
                 },
