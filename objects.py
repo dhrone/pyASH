@@ -378,6 +378,23 @@ class Header(ashobject):
         self.json = { 'namespace': self.namespace, 'name':self.name, 'messageId': self.messageId, 'payloadVersion': '3' }
         if self.correlationToken is not None: self.json['correlationToken'] = self.correlationToken
 
+{
+    "id": "1234567",
+    "pin": "7654321",
+    "endpoint": "54.19.29.39",
+    "protocol": "sip",
+    "provider": "chime"
+}
+
+class Meeting(ashobject):
+    def __init__(self, id=None, pin=None, endpoint=None, protocol=None, provider=None,json=None):
+        self.id = id if id is not None else json.get('id') if json else None
+        self.pin = pin if pin is not None else json.get('pin') if json else None
+        self.endpoint = endpoint if endpoint is not None else json.get('endpoint') if json else None
+        self.protocol = protocol if protocol is not None else json.get('protocol') if json else None
+        self.provider = provider if provider is not None else json.get('provider') if json else None
+        self.json = { k:v for k, v in { 'id': self.id, 'pin':self.pin, 'endpoint': self.endpoint, 'protocol': self.protocol, 'provider': self.provider } if v is not None }
+
 class PowerLevel(ashobject):
     def __init__(self, powerLevelType=None, value=None, json=None):
         self.powerLevelType = json.get('@type') if json else powerLevelType
@@ -409,16 +426,16 @@ class Request(ashobject):
 
         self.header = Header(json=directive['header']) if 'header' in directive else None
         self.endpoint = Endpoint(json=directive['endpoint']) if 'endpoint' in directive else None
-        self.payload = Payload(json=directive['payload'] if 'payload' in directive else None
-
+        self.payload = Payload(json=directive['payload']) if 'payload' in directive else None
 
 class Payload(ashobject):
-    def __init__(self, scope=None, grant=None, grantee=None, cameraStreams=None, channel=None, channelMetadata=None, color=None, cookingMode=None, foodItem=None, presetName=None, cookTime=None, cookingPowerLevel=None, meeting=None, targetSetPoint=None, targetSetpointDelta=None, lowerSetpoint=None, upperSetpoint=None, thermostatMode=None, json=None):
+    def __init__(self, scope=None, grant=None, grantee=None, brightnessDelta=None, brightness=None, cameraStreams=None, channel=None, channelMetadata=None, color=None, cookingMode=None, foodItem=None, presetName=None, cookTime=None, cookingPowerLevel=None, meeting=None, targetSetpoint=None, targetSetpointDelta=None, lowerSetpoint=None, upperSetpoint=None, thermostatMode=None, json=None):
 
         self.scope = Token(json=scope) if scope is not None else Token(json=json.get('scope')) if json and json.get('scope') is not None else None
         self.grant = Grant(json=grant) if grant is not None else Grant(json=json.get('grant')) if json and json.get('grant') is not None else None
         self.grantee = Token(json=grantee) if grantee is not None else Token(json=json.get('grantee')) if json and json.get('grantee') is not None else None
-
+        self.brightness = ValueObject(brightness).value if brightness is not None else ValueObject(json['brightness']).value if json and 'brightness' in json else None
+        self.brightnessDelta = ValueObject(brightnessDelta).value if brightnessDelta is not None else ValueObject(json['brightnessDelta']).value if json and 'brightnessDelta' in json else None
         self.cameraStreams_value = cameraStreams if cameraStreams is not None else json.get('cameraStreams')
         if self.cameraStreams_value:
             self.cameraStreams = []
@@ -430,29 +447,59 @@ class Payload(ashobject):
         self.channel = Channel(json=channel) if channel is not None else Channel(json=json.get('channel')) if json and json.get('channel') is not None else None
         self.channelMetadata = ChannelMetadata(json=channelMetadata) if channelMetadata is not None else ChannelMetadata(json=json.get('channelMetadata')) if json and json.get('channelMetadata') is not None else None
         self.color = Color(json=color) if color is not None else Color(json=json.get('color')) if json and json.get('color') is not None else None
-        self.cookingMode = ValueObject(json=cookingMode) if cookingMode is not None else ValueObject(json=json['cookingMode']) if json and 'cookingMode' in json else None
+        self.cookingMode = ValueObject(json=cookingMode).value if cookingMode is not None else ValueObject(json=json['cookingMode']).value if json and 'cookingMode' in json else None
         self.foodItem = FoodItem(json=foodItem) if foodItem is not None else FoodItem(json=json.get('foodItem')) if json and json.get('foodItem') is not None else None
-        self.presetName = ValueObject(json=presetName) if presetName is not None else ValueObject(json=json['presetName']) if json and 'presetName' in json else None
-        self.cookTime = CookTime(json=cookTime) if cookTime is not None else CookTime(json=json['cookTime']) if json and 'cookTime' in json else None
+        self.presetName = ValueObject(json=presetName).value if presetName is not None else ValueObject(json=json['presetName']).value if json and 'presetName' in json else None
+        self.cookTime = CookTime(json=cookTime).value if cookTime is not None else CookTime(json=json['cookTime']).value if json and 'cookTime' in json else None
+        self.cookingPowerLevel = PowerLevel(json=cookingPowerLevel) if cookingPowerLevel is not None else PowerLevel(json=json['cookingPowerLevel']) if json and 'cookingPowerLevel' in json else None
+        self.meeting = Meeting(json=meeting) if meeting is not None else Meeting(json=json['meeting']) if json and 'meeting' in json else None
+        self.targetSetpoint = Temperature(json=targetSetpoint) if targetSetpoint is not None else Temperature(json=json['targetSetpoint']) if json and 'targetSetpoint' in json else None
+        self.lowerSetpoint = Temperature(json=lowerSetpoint) if lowerSetpoint is not None else Temperature(json=json['lowerSetpoint']) if json and 'lowerSetpoint' in json else None
+        self.upperSetpoint = Temperature(json=upperSetpoint) if upperSetpoint is not None else Temperature(json=json['upperSetpoint']) if json and 'upperSetpoint' in json else None
+        self.targetSetpointDelta = Temperature(json=targetSetpointDelta) if targetSetpointDelta is not None else Temperature(json=json['targetSetpointDelta']) if json and 'targetSetpointDelta' in json else None
+        self.thermostatMode = ThermostatMode(json=thermostatMode) if thermostatMode is not None else ThermostatMode(json=json['thermostatMode']) if json and 'thermostatMode' in json else None
 
-        if payload:
-            if 'cookingPowerLevel' in request['directive']['payload']:
-                self.cookingPowerLevel = CookingPowerLevel(json=request['directive']['payload']['cookingPowerLevel'])
-            if 'meeting' in request['directive']['payload']:
-                self.meeting = Meeting(json=request['directive']['payload']['meeting'])
-            if 'targetSetpoint' in request['directive']['payload']:
-                self.targetSetpoint = TargetSetPoint(json=request['directive']['payload']['targetSetpoint'])
-            if 'targetSetpointDelta' in request['directive']['payload']:
-                self.targetSetpointDelta = TargetSetPoint(json=request['directive']['payload']['targetSetpointDelta'])
-            if 'lowerSetpoint' in request['directive']['payload']:
-                self.targetSetpoint = TargetSetPoint(json=request['directive']['payload']['lowerSetpoint'])
-            if 'upperSetpoint' in request['directive']['payload']:
-                self.targetSetpoint = TargetSetPoint(json=request['directive']['payload']['upperSetpoint'])
-            if 'thermostatMode' in request['directive']['payload']:
-                self.thermostatMode = ThermostatMode(json=request['directive']['payload']['thermostatMode'])
+class PowerLevel(ashobject):
+    def __init__(self, pvalue=None, json=None):
+        super(PowerLevel, self).__init__()
+
+        if json:
+            self.type = dict.get('@type')
+            self.pvalue = dict.get('value')
+
+        if type(pvalue) == int:
+            object = PowerLevel.IntegralPowerLevel(pvalue)
+        elif type(pvalue) == str:
+            object = PowerLevel.EnumeratedPowerLevel(pvalue)
+        else:
+            object = pvalue
+
+        if not isinstance(object, EnumeratedPowerLevel) and not isinstance(object, IntegralPowerLevel):
+            raise TypeError('Power level must be either a EnumeratedPowerLevel object or a IntegralPowerLevel object.  Received ' + str(type(object)))
+
+        self.value = pvalue
+        self.json = object.value
+
+    class EnumeratedPowerLevel():
+        def __init__(self, pvalue):
+            super(EnumeratedPowerLevel, self).__init__()
+            if type(pvalue) != str:
+                raise TypeError('EnumeratedPowerLevel must be a string value.  Received a '+str(type(pvalue)))
+            if pvalue.upper() not in VALID_ENUMERATEDPOWERLEVELS:
+                raise ValueError(value.upper() + ' is not a valid EnumeratedPowerLevel value')
+            self.name = 'EnumeratedPowerLevel'
+            self.value = { '@type': self.name, 'value': self.pvalue }
+
+    class IntegralPowerLevel():
+        def __init__(self, pvalue):
+            super(IntegralPowerLevel, self).__init__()
+            if type(pvalue) != int:
+                raise TypeError('IntegralPowerLevel must be an integer value.  Received a '+str(type(pvalue)))
+            self.name = 'IntegralPowerLevel'
+            self.value = { '@type': self.name, 'value': self.pvalue }
 
 class ValueObject(ashobject):
-    def __init__(self, value=None, json=None):
+    def __init__(self, value=None, enum=None, json=None):
         if value is None and json: value = json
         self.value = value if type(value) is not dict else value.get('value')
         self.json = self.value if type(value) is not dict else { 'value': self.value }

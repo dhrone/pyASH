@@ -35,7 +35,7 @@ def test_Endpoint():
 
 	a = Endpoint(endpointId = 'appliance-001', token='access-token-from-skill',cookie={})
 	assert a.json == json
-	
+
 
 def test_Header():
 	def cleanse(json):
@@ -55,3 +55,33 @@ def test_Header():
 
 	a = Header(namespace='Alexa.CameraStreamController', name='Response', correlationToken='dFMb0z+PgpgdDmluhJ1LddFvSqZ/jCc8ptlAKulUj90jSqg==')
 	assert cleanse(a.json) == cleanse(json)
+
+def test_Request_1():
+	json = {
+	    "directive": {
+	        "header": {
+	            "namespace": "Alexa.BrightnessController",
+	            "name": "AdjustBrightness",
+	            "payloadVersion": "3",
+	            "messageId": "1bd5d003-31b9-476f-ad03-71d471922820",
+	            "correlationToken": "dFMb0z+PgpgdDmluhJ1LddFvSqZ/jCc8ptlAKulUj90jSqg=="
+	        },
+	        "endpoint": {
+	            "scope": {
+	                "type": "BearerToken",
+	                "token": "access-token-from-skill"
+	            },
+	            "endpointId": "endpoint-001",
+	            "cookie": {}
+	        },
+	        "payload": {
+	            "brightnessDelta": -25
+	        }
+	    }
+	}
+	a = Request(json=json)
+	assert a.header.namespace == 'Alexa.BrightnessController'
+	assert a.header.name == 'AdjustBrightness'
+	assert a.endpoint.id == 'endpoint-001'
+	assert a.endpoint.token == 'access-token-from-skill'
+	assert a.payload.brightnessDelta == -25
