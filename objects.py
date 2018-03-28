@@ -378,14 +378,6 @@ class Header(ashobject):
         self.json = { 'namespace': self.namespace, 'name':self.name, 'messageId': self.messageId, 'payloadVersion': '3' }
         if self.correlationToken is not None: self.json['correlationToken'] = self.correlationToken
 
-{
-    "id": "1234567",
-    "pin": "7654321",
-    "endpoint": "54.19.29.39",
-    "protocol": "sip",
-    "provider": "chime"
-}
-
 class Meeting(ashobject):
     def __init__(self, id=None, pin=None, endpoint=None, protocol=None, provider=None,json=None):
         self.id = id if id is not None else json.get('id') if json else None
@@ -409,7 +401,7 @@ class PowerLevel(ashobject):
     @property
     def json(self):
         return { '@type': self.powerLevelType, 'value': self.value }
-
+'''
 class Request(ashobject):
     def __init__(self, request=None, json=None):
         if request is None and json: request = json
@@ -427,6 +419,8 @@ class Request(ashobject):
         self.header = Header(json=directive['header']) if 'header' in directive else None
         self.endpoint = Endpoint(json=directive['endpoint']) if 'endpoint' in directive else None
         self.payload = Payload(json=directive['payload']) if 'payload' in directive else None
+'''
+
 
 class Payload(ashobject):
     def __init__(self, scope=None, grant=None, grantee=None, brightnessDelta=None, brightness=None, cameraStreams=None, channel=None, channelMetadata=None, color=None, cookingMode=None, foodItem=None, presetName=None, cookTime=None, cookingPowerLevel=None, meeting=None, targetSetpoint=None, targetSetpointDelta=None, lowerSetpoint=None, upperSetpoint=None, thermostatMode=None, json=None):

@@ -330,9 +330,9 @@ class Endpoint(object):
     def getHandler(self, request):
         ret = self._directives
         for i in ret:
-            if i[0] == request.namespace and i[1] == request.directive:
+            if i[0] == request.namespace and i[1] == request.name:
                 return ret[i]
-        raise INVALID_DIRECTIVE('{0} has no method to handle {1}:{2}'.format(self.__class__.__name__,request.namespace,request.directive))
+        raise INVALID_DIRECTIVE('{0} has no method to handle {1}:{2}'.format(self.__class__.__name__,request.namespace,request.name))
 
     # See if an Iot class was included and return it if yes
     def _findIot(self):

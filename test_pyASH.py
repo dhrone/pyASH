@@ -4,6 +4,7 @@
 #
 import pytest
 import time
+from copy import deepcopy
 
 # Imports for v3 validation
 from validation import validate_message
@@ -17,7 +18,7 @@ from iot import Iot, IotTest
 from user import DemoUser
 from pyASH import pyASH
 from message import Request
-from objects import Header
+from objects import Header, Channel, CameraStream, Color
 
 from interface import *
 from utility import LOGLEVEL
@@ -98,9 +99,9 @@ class dhroneTV(Endpoint):
     def TurnOff(self, request):
         self.iot['powerState'] = 'OFF'
 
-    @Endpoint.addDirective(['AdjustVolume','SetVolume'])
+    @Endpoint.addDirective(['AdjustVolume','SetVolume'], interface='Alexa.Speaker')
     def Volume(self, request):
-        if request.directive == 'AdjustVolume':
+        if request.name == 'AdjustVolume':
             v = self.iot['volume'] + request.payload['volume']
             self.iot['volume'] = 0 if v < 0 else 100 if v > 100 else v
         else:
@@ -193,8 +194,12 @@ def cleanse(r):
                 if 'token' in r['event']['endpoint']['scope']: r['event']['endpoint']['scope']['token'] = 'TOKEN'
     return r
 
+def sk(v):
+    return v['name']
+
 def compareResults(r1, r2):
-    print (r2)
+    r1 = deepcopy(r1)
+    r2 = deepcopy(r2)
     validateFailed = False
     try:
         validate_message(request, response)
@@ -208,6 +213,16 @@ def compareResults(r1, r2):
     # Fix temporal values so that they do not get flagged as different
     r1 = cleanse(r1)
     r2 = cleanse(r2)
+
+    if 'context' in r1:
+        if 'properties' in r1['context']:
+            r1['context']['properties'] = sorted(r1['context']['properties'], key=sk)
+            r2['context']['properties'] = sorted(r2['context']['properties'], key=sk)
+
+    print ('**** R1 ****')
+    print(json.dumps(r1, indent=4))
+    print ('**** R2 ****')
+    print(json.dumps(r2, indent=4))
     assert r1 == r2
 
 @pytest.fixture

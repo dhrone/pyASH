@@ -6,6 +6,7 @@
 import pytest
 
 from objects import *
+from pyASH import Request
 
 def test_CameraStream_json():
 	json = {
@@ -79,9 +80,9 @@ def test_Request_1():
 	        }
 	    }
 	}
-	a = Request(json=json)
+	a = Request(json)
 	assert a.header.namespace == 'Alexa.BrightnessController'
 	assert a.header.name == 'AdjustBrightness'
-	assert a.endpoint.id == 'endpoint-001'
+	assert a.endpointId == 'endpoint-001'
 	assert a.endpoint.token == 'access-token-from-skill'
 	assert a.payload.brightnessDelta == -25

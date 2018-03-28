@@ -75,7 +75,7 @@ class dhroneTV(Endpoint):
 
     @Endpoint.addDirective(['AdjustVolume','SetVolume'])
     def Volume(self, request):
-        if request.directive == 'AdjustVolume':
+        if request.name == 'AdjustVolume':
             v = self.iot['volume'] + request.payload['volume']
             self.iot['volume'] = 0 if v < 0 else 100 if v > 100 else v
         else:

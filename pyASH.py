@@ -5,22 +5,88 @@
 
 import logging
 import time
-import json
-import uuid
-import os
-#from botocore.vendored import requests
-#import boto3
-import urllib
-from datetime import datetime
-from datetime import timedelta
 
 from utility import *
-from message import Request
+#from message import Request
 from objects import Header
 
 # Setup logger
 logger = logging.getLogger(__name__)
 logger.setLevel(LOGLEVEL)
+
+class Request(dict):
+    """Simplifies retrieval of values from a request.
+
+    Request takes a json object and exposes its contents as dynamically generated
+    attributes.  It will search, depth-first to find a key within the json object
+    that matches the requested attribute and will raise a KeyError if no key
+    within the json object matches the requested attribute.  If you need to ensure
+    that the key you are requesting comes from a specific path within the json
+    object, you can string together attributes to specify the path that you want
+    Request to follow to find the key.
+
+    Note:
+
+        Request will only return the first value that matches the requested attribute
+
+    Example:
+
+        json = {
+    	    "directive": {
+    	        "header": {
+    	            "namespace": "Alexa.BrightnessController",
+    	            "name": "AdjustBrightness",
+    	            "payloadVersion": "3",
+    	            "messageId": "1bd5d003-31b9-476f-ad03-71d471922820",
+    	            "correlationToken": "dFMb0z+PgpgdDmluhJ1LddFvSqZ/jCc8ptlAKulUj90jSqg=="
+    	        },
+    	        "endpoint": {
+    	            "scope": {
+    	                "type": "BearerToken",
+    	                "token": "access-token-from-skill"
+    	            },
+    	            "endpointId": "endpoint-001",
+    	            "cookie": {}
+    	        },
+    	        "payload": {
+    	            "brightnessDelta": -25
+    	        }
+    	    }
+    	}
+        request = Request(json)
+        >>> request.endpointId
+        "endpoint-001"
+        >>> request.endpoint.endpointId
+        "endpoint-001"
+        >>> request.payload
+        { 'brightnessDelta': -25 }
+        >>> request.brightnessDelta
+        -25
+        >>> request.payload.brightnessDelta
+        -25
+    """
+    def __init__(self, rawRequest):
+        super(Request, self).__init__(rawRequest)
+        self.raw = rawRequest
+
+    def __getattr__(self, name):
+        res = self.findkey(name, self.raw)
+        if isinstance(res, dict):
+            return Request(res)
+        if res:
+            return res
+        raise KeyError(name)
+
+    def findkey(self, key, dictionary):
+        for k,v in dictionary.items():
+            if k==key:
+                return v
+            elif isinstance(v, dict):
+                res = self.findkey(key,v)
+                if res: return res
+            else:
+                continue
+        return None
 
 class pyASH(object):
     def __init__(self, user, version='3'):
@@ -39,7 +105,7 @@ class pyASH(object):
         if hasattr(request, 'endpointId'):
             json['event']['endpoint'] = {'endpointId': request.endpointId }
             if hasattr(request, 'scope'):
-                json['event']['endpoint']['scope'] = request.scope.value
+                json['event']['endpoint']['scope'] = request.scope
 
         return json
 
@@ -112,14 +178,10 @@ class pyASH(object):
             things = self.user._retrieveThings(request.endpointId)
             method = handler.__get__(cls(iots=endpoint.iots), cls)
 
-            healthif = endpoint.generateInterfaces(endpoint.iots[0])['Alexa.EndpointHealth'] if 'Alexa.EndpointHealth' in endpoint._interfaces else None
-
             ret = method(request)
-            if ret:
-                if healthif:
-                    if 'context' not in ret: ret['context'] = {}
-                    if 'properties' not in ret['context']: ret['context']['properties'] = []
-            else:
+
+            # If the handler did not produce it's own response message then compute a default one
+            if not ret:
                 waitStarted = time.time()
                 waitFor = 5
                 while not endpoint.iots[0].updateFinished():
@@ -139,12 +201,15 @@ class pyASH(object):
                         'payload': {}
                     }
                 }
+
+            # Check if Endpoint Health is enabled and if yes, add the appropriate context information to the response
             healthif = endpoint.generateInterfaces(endpoint.iots[0])['Alexa.EndpointHealth'] if 'Alexa.EndpointHealth' in endpoint._interfaces else None
             if healthif:
                 if 'context' not in ret: ret['context'] = {}
                 if 'properties' not in ret['context'] or ret['context']['properties'] is None: ret['context']['properties'] = []
                 ret['context']['properties'] += healthif.jsonResponse
             if 'scope' in request.raw['directive']['endpoint']: ret['event']['endpoint']['scope'] = request.raw['directive']['endpoint']['scope']
+
             return ret
         except InterfaceException as e:
             return self._errorResponse(request, e)

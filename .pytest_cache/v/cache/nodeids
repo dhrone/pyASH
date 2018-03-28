@@ -1,0 +1,23 @@
+[
+  "test_objects.py::test_CameraStream_json",
+  "test_objects.py::test_Endpoint",
+  "test_objects.py::test_Header",
+  "test_objects.py::test_Request_1",
+  "test_pyASH.py::test_PowerController_TurnOff",
+  "test_pyASH.py::test_PowerController_TurnOn",
+  "test_pyASH.py::test_Speaker_AdjustVolume",
+  "test_pyASH.py::test_Speaker_SetVolume",
+  "test_pyASH.py::test_Speaker_SetMute",
+  "test_pyASH.py::test_BrightnessController_AdjustBrightness",
+  "test_pyASH.py::test_BrightnessController_SetBrightness",
+  "test_pyASH.py::test_ChannelController_ChangeChannel",
+  "test_pyASH.py::test_ColorController_SetColor",
+  "test_pyASH.py::test_ColorTemperatureController_SetColorTemperature",
+  "test_pyASH.py::test_ColorTemperatureController_Increase_DecreaseColorTemperature",
+  "test_pyASH.py::test_InputController_SelectInput",
+  "test_pyASH.py::test_LockController_LockUnlock",
+  "test_pyASH.py::test_PercentageController_SetAdjust",
+  "test_pyASH.py::test_PowerLevelController_SetAdjust",
+  "test_pyASH.py::test_StepSpeaker_SetAdjust",
+  "test_pyASH.py::test_CameraStreamController_InitializeCameraStreams"
+]

@@ -1,7 +1,6 @@
 import time
 
 from iot import Iot
-from objects import *
 from utility import get_utc_timestamp
 
 
