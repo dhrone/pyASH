@@ -13,56 +13,50 @@ def test_AffiliateCallSign():
 	expected = 'NBC'
 	a = ASHO.AffiliateCallSign('NBC')
 	a.validate()
-	a.as_dict() == expected
+	assert a.as_dict() == expected
 
 def test_AudioCodec():
 	expected = 'G711'
 	a = ASHO.AudioCodec('G711')
 	a.validate()
-	a.as_dict() == expected
+	assert a.as_dict() == expected
 
 def test_AuthorizationType():
 	expected = 'BASIC'
 	a = ASHO.AuthorizationType('BASIC')
 	a.validate()
-	a.as_dict() == expected
+	assert a.as_dict() == expected
+
+def test_BCbrightness():
+	expected = 45
+	a = ASHO.BCbrightness(45)
+	a.validate()
+	assert a.as_dict() == expected
 
 def test_Brightness():
 	# Name conflict between brightness controller and color(hue, saturation, brightness)
 	expected = .5
 	a = ASHO.Brightness(.5)
 	a.validate()
-	a.as_dict() == expected
+	assert a.as_dict() == expected
+
+def test_CCcolor():
+	expected = { 'hue': .5, 'saturation': .4, 'brightness': .3}
+	a = ASHO.CCcolor(hue=.5, saturation=.4, brightness=.3)
+	a.validate()
+	assert a.as_dict() == expected
+
+def test_CTCcolorTemperatureInKelvin():
+	expected = 2500
+	a = ASHO.CTCcolorTemperatureInKelvin(2500)
+	a.validate()
+	assert a.as_dict() == expected
 
 def test_CallSign():
 	expected = 'NBC4'
 	a = ASHO.CallSign('NBC4')
 	a.validate()
-	a.as_dict() == expected
-
-def test_Channel():
-	expected = { 'number': '504', 'CallSign': 'NBC4', 'AffiliateCallSign': 'NBC'}
-	a = ASHO.Channel(number='504', callSign='NBC4', affiliateCallSign='NBC')
-	a.validate()
-	a.as_dict() == expected
-
-def test_Color():
-	expected = { 'hue': .5, 'saturation': .4, 'brightness': .3}
-	a = ASHO.Color(hue=.5, saturation=.4, brightness=.3)
-	a.validate()
-	a.as_dict() == expected
-
-def test_ColorTemperatureInKelvin():
-	expected = 2500
-	a = ASHO.ColorTemperatureInKelvin(2500)
-	a.validate()
-	a.as_dict() == expected
-
-def test_Connectivity():
-	expected = 'OK'
-	a = ASHO.Connectivity('OK')
-	a.validate()
-	a.as_dict() == expected
+	assert a.as_dict() == expected
 
 def test_CameraStream():
 	expected = {
@@ -80,9 +74,25 @@ def test_CameraStream():
 
 	a = ASHO.CameraStream().from_json(json.dumps(expected))
 	a.validate()
-	a = ASHO.CameraStream().from_json(json.dumps(expected))
+	assert a.as_dict() == expected
 
+def test_Cause():
+	expected = {'type':'PHYSICAL_INTERACTION'}
+	a = ASHO.Cause(type='PHYSICAL_INTERACTION')
+	a.validate()
+	assert a.as_dict() == expected
 
+def test_Channel():
+	expected = { 'number': '504', 'callSign': 'NBC4', 'affiliateCallSign': 'NBC'}
+	a = ASHO.Channel(number='504', callSign='NBC4', affiliateCallSign='NBC')
+	a.validate()
+	assert a.as_dict() == expected
+
+def test_Connectivity():
+	expected = {'value':'OK'}
+	a = ASHO.EHconnectivity(value='OK')
+	a.validate()
+	assert a.as_dict() == expected
 
 def test_Endpoint():
 	expected =  {
