@@ -8,7 +8,7 @@ import time
 
 from utility import *
 #from message import Request
-from objects import Header
+from objects import ASHO
 
 # Setup logger
 logger = logging.getLogger(__name__)

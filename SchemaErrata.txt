@@ -1,0 +1,15 @@
+SCHEMA Errata
+
+The following interfaces are completely missing from the schema but show up in the documentation:
+
+Calendar
+Cooking
+Cooking.ErrorResponse
+Cooking.PresetController
+Cooking.TimeController
+MeetingClientController
+
+Other discrepancies
+
+ThermostatController
+The documentation shows support for a customName attribute as part of value but this is not supported in the schema.

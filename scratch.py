@@ -29,14 +29,15 @@ a.iot['volume']
 
 def addinterface(interface):
     def wrapper(*args, **kwargs):
+        func = ''
         for i in args:
             print('addinterface arg: {0}'.format(args))
         for k, v in kwargs.items():
             print('addinterface kwargs {0}:{1}'.format(k,v))
-        if hasattr(func, _secret):
-            func._secret.append(interface)
-        else:
-            func._secret = [ interface ]
+#        if hasattr(func, _secret):
+#            func._secret.append(interface)
+#        else:
+#            func._secret = [ interface ]
         return func
     if hasattr(addinterface, '_secret'):
         wrapper._secret = addinterface._secret

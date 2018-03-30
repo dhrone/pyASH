@@ -61,7 +61,7 @@ class User(ABC):
         return things
 
     def _retrieveClass(self, endpointId):
-        (cls, things) = endpointId.split('|')
+        cls = endpointId.split(':')[0]
         return self.endpointClasses[cls]
 
     def getTokens(self, request):
