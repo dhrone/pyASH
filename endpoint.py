@@ -38,9 +38,10 @@ class Endpoint(object):
     retrievable = None
     uncertaintyInMilliseconds = None
     supportsDeactivation = None
+    cameraStreamConfigurations = None
     cookie = None
 
-    def __init__(self, endpointId=None, things=None, friendlyName = None, description = None, manufacturerName=None, displayCategories=None, proactivelyReported=None, retrievable=None, uncertaintyInMilliseconds=None, supportsDeactivation=None, cookie=None, json=None, iots=None):
+    def __init__(self, endpointId=None, things=None, friendlyName = None, description = None, manufacturerName=None, displayCategories=None, proactivelyReported=None, retrievable=None, uncertaintyInMilliseconds=None, supportsDeactivation=None, cameraStreamConfigurations=None,cookie=None, json=None, iots=None):
         if json:
             self.endpointId = json.get('endpointId') if 'endpointId' in json else None
             self.things = json.get('things') if 'things' in json else None
@@ -53,6 +54,7 @@ class Endpoint(object):
             self.retrievable = json.get('retrievable') if 'retrievable' in json else None
             self.uncertaintyInMilliseconds = json.get('uncertaintyInMilliseconds') if 'uncertaintyInMilliseconds' in json else None
             self.supportsDeactivation = json.get('supportsDeactivation') if 'supportsDeactivation' in json else None
+            self.cameraStreamConfigurations = json.get('cameraStreamConfigurations') if 'cameraStreamConfigurations' in json else None
             self.cookie = json.get('cookie') if 'cookie' in json else None
             self.iots = iots if 'iots' in json else None
         else:
@@ -67,6 +69,7 @@ class Endpoint(object):
             self.retrievable = retrievable if retrievable is not None else self.retrievable
             self.uncertaintyInMilliseconds = uncertaintyInMilliseconds if uncertaintyInMilliseconds is not None else self.uncertaintyInMilliseconds
             self.supportsDeactivation = supportsDeactivation if supportsDeactivation is not None else self.supportsDeactivation
+            self.cameraStreamConfigurations = cameraStreamConfigurations if cameraStreamConfigurations is not None else self.cameraStreamConfigurations
             self.cookie = cookie if cookie is not None else self.cookie
             self.iots = iots
 
@@ -95,11 +98,12 @@ class Endpoint(object):
             'retrievable': self.retrievable,
             'uncertaintyInMilliseconds': self.uncertaintyInMilliseconds,
             'supportsDeactivation': self.supportsDeactivation,
+            'cameraStreamConfigurations': self.cameraStreamConfigurations,
             'cookie': self.cookie
         }.items() if v is not None}
 
     @staticmethod
-    def addInterface(interface, proactivelyReported=None, retrievable=None, uncertaintyInMilliseconds=None, supportsDeactivation = None):
+    def addInterface(interface, proactivelyReported=None, retrievable=None, uncertaintyInMilliseconds=None, supportsDeactivation = None, cameraStreamConfigurations = None):
         if type(interface) is str:
             interface = getInterfaceClass(interface)
         name = 'Alexa.'+ interface.__name__
@@ -108,9 +112,10 @@ class Endpoint(object):
         _retrievable = retrievable if retrievable is not None else None
         _uncertaintyInMilliseconds = uncertaintyInMilliseconds if uncertaintyInMilliseconds is not None else None
         _supportsDeactivation = supportsDeactivation if supportsDeactivation is not None else None
+        _cameraStreamConfigurations = cameraStreamConfigurations if cameraStreamConfigurations is not None else None
 
         def wrapper(func):
-            item = { 'interface': interface, 'proactivelyReported': _proactivelyReported, 'retrievable': _retrievable, 'uncertaintyInMilliseconds': _uncertaintyInMilliseconds, 'supportsDeactivation': _supportsDeactivation }
+            item = { 'interface': interface, 'proactivelyReported': _proactivelyReported, 'retrievable': _retrievable, 'uncertaintyInMilliseconds': _uncertaintyInMilliseconds, 'supportsDeactivation': _supportsDeactivation, 'cameraStreamConfigurations': _cameraStreamConfigurations }
             if hasattr(func, '__interfaces__'):
                 func.__interfaces__.append( item )
             else:
@@ -202,15 +207,16 @@ class Endpoint(object):
             interface['uncertaintyInMilliseconds'] = interface['uncertaintyInMilliseconds'] if interface['uncertaintyInMilliseconds'] is not None else self.uncertaintyInMilliseconds
 
             # For each interface, add capabilities
-            interface['supportsDeactivation'] = interface['supportsDeactivation'] if interface['supportsDeactivation'] else self.supportsDeactivation
-
+            interface['supportsDeactivation'] = interface['supportsDeactivation'] if interface['supportsDeactivation'] is not None else self.supportsDeactivation
+            interface['cameraStreamConfigurations'] = interface['cameraStreamConfigurations'] if interface['cameraStreamConfigurations'] is not None else self.cameraStreamConfigurations
             object = interface['interface'] \
                 ( \
                     iot=iot, \
                     proactivelyReported=interface['proactivelyReported'], \
                     retrievable = interface['retrievable'], \
                     uncertaintyInMilliseconds = interface['uncertaintyInMilliseconds'], \
-                    supportsDeactivation = interface['supportsDeactivation']
+                    supportsDeactivation = interface['supportsDeactivation'], \
+                    cameraStreamConfigurations= interface['cameraStreamConfigurations']
                 )
             ret[k]=object
         return ret
@@ -314,7 +320,8 @@ class Endpoint(object):
                             'proactivelyReported': None,
                             'retrievable': None,
                             'uncertaintyInMilliseconds': None,
-                            'supportsDeactivation': None
+                            'supportsDeactivation': None,
+                            'cameraStreamConfigurations': None
                         }
 
         return ret

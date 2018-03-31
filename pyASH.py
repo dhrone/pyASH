@@ -98,24 +98,24 @@ class pyASH(object):
     def _errorResponse(cls, request, e):
         json = {
             'event': {
-                'header': Header(namespace='Alexa', name='ErrorResponse', correlationToken=request.correlationToken).json,
+                'header': ASHO.Header(namespace='Alexa', name='ErrorResponse', correlationToken=request.correlationToken, messageId=get_uuid(), payloadVersion='3').as_dict(),
                 'payload': e.payload
             }
         }
         if hasattr(request, 'endpointId'):
             json['event']['endpoint'] = {'endpointId': request.endpointId }
             if hasattr(request, 'scope'):
-                json['event']['endpoint']['scope'] = request.scope
+                json['event']['endpoint']['scope'] = dict(request.scope)
 
         return json
 
     def handleAcceptGrant(self, request):
         # Provides tokens to user
         try:
-            user.getTokens(request)
+            self.user.getTokens(request)
             return {
                 'event': {
-                    'header': Header(namespace='Alexa.Authorization', name='AcceptGrant.Response').json,
+                    'header': ASHO.Header(namespace='Alexa.Authorization', name='AcceptGrant.Response', messageId=get_uuid(), payloadVersion='3').as_dict(),
                     'payload': {}
                 }
             }
@@ -133,7 +133,7 @@ class pyASH(object):
                 ret.append(ep.jsonDiscover)
             return {
                 'event': {
-                    'header': Header(namespace='Alexa.Discovery', name='Discover.Response').json,
+                    'header': ASHO.Header(namespace='Alexa.Discovery', name='Discover.Response',messageId=get_uuid(), payloadVersion='3').as_dict(),
                     'payload': {
                         'endpoints': ret
                     }
@@ -145,7 +145,8 @@ class pyASH(object):
             raise
 
 
-    def handleReportState(seld, request):
+    def handleReportState(self, request):
+        print ('HANDLING REPORTSTATE')        
         # Requires endpoints from user
         try:
             endpoint = self.user.getEndpoint(request)
@@ -154,7 +155,7 @@ class pyASH(object):
                     'properties': endpoint.jsonResponse
                 },
                 'event': {
-                    'header': Header(namespace='Alexa', name='StateReport', correlationToken=request.correlationToken).json,
+                    'header': ASHO.Header(namespace='Alexa', name='StateReport', correlationToken=request.correlationToken,messageId=get_uuid(), payloadVersion='3').as_dict(),
                     'endpoint': {
                         'scope': {
                             'type': 'BearerToken',
@@ -171,7 +172,7 @@ class pyASH(object):
             raise
 
     def handleDirective(self, request):
-
+        print ('HANDLING DIRECTIVE')
         try:
             endpoint = self.user.getEndpoint(request)
             cls, handler = endpoint.getHandler(request)
@@ -194,7 +195,7 @@ class pyASH(object):
                         'properties': interface.jsonResponse
                     },
                     'event': {
-                        'header': Header(namespace='Alexa', name='Response', correlationToken=request.correlationToken).json,
+                        'header': ASHO.Header(namespace='Alexa', name='Response', correlationToken=request.correlationToken,messageId=get_uuid(), payloadVersion='3').as_dict(),
                         'endpoint': {
                             'endpointId' : endpoint.endpointId
                         },

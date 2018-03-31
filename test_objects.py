@@ -6,6 +6,8 @@
 import pytest
 import json
 
+from python_jsonschema_objects import ValidationError
+
 from objects import ASHO
 from pyASH import Request
 
@@ -88,7 +90,19 @@ def test_Channel():
 	a.validate()
 	assert a.as_dict() == expected
 
-def test_Connectivity():
+def test_CorrelationToken():
+	expected = 'Correlation-Token'
+	a = ASHO.CorrelationToken('Correlation-Token')
+	a.validate()
+	assert a.as_dict() == expected
+
+def test_CurrentDeviceMode():
+	expected = 'ASLEEP'
+	a = ASHO.CurrentDeviceMode('ASLEEP')
+	a.validate()
+	assert a.as_dict() == expected
+
+def test_EHconnectivity():
 	expected = {'value':'OK'}
 	a = ASHO.EHconnectivity(value='OK')
 	a.validate()
@@ -107,6 +121,17 @@ def test_Endpoint():
 	a = ASHO.Endpoint(endpointId = 'appliance-001', scope=ASHO.Scope(type='BearerToken', token='access-token-from-skill'),cookie={})
 	assert a.as_dict() == expected
 
+def test_EndpointId():
+	expected = 'device-001'
+	a = ASHO.EndpointId('device-001')
+	a.validate()
+	assert a.as_dict() == expected
+
+def test_ExpirationTime():
+	expected = '2017-02-03T16:20:50.52Z'
+	a = ASHO.ExpirationTime('2017-02-03T16:20:50.52Z')
+	a.validate()
+	assert a.as_dict() == expected
 
 def test_Header():
 	def cleanse(json):
@@ -129,6 +154,272 @@ def test_Header():
 	a = ASHO.Header().from_json(json.dumps(expected))
 	a.validate()
 	assert a.as_dict() == expected
+
+def test_Height():
+	expected = 1920
+	a = ASHO.Height(1920)
+	a.validate()
+	assert a.as_dict() == expected
+
+	with pytest.raises(ValidationError) as e_info:
+		a = ASHO.Height('1920')
+
+def test_Hue():
+	expected = .5
+	a = ASHO.Hue(.5)
+	a.validate()
+	assert a.as_dict() == expected
+
+	with pytest.raises(ValidationError) as e_info:
+		a = ASHO.Hue(2000)
+
+def test_LClockstate():
+	expected = 'JAMMED'
+	a = ASHO.LClockState('JAMMED')
+	a.validate()
+	assert a.as_dict() == expected
+
+	with pytest.raises(ValidationError) as e_info:
+		a = ASHO.LClockState('OPEN')
+
+def test_IdleTimeoutSeconds():
+	expected = 60
+	a = ASHO.IdleTimeoutSeconds(60)
+	a.validate()
+	assert a.as_dict() == expected
+
+	with pytest.raises(ValidationError) as e_info:
+		a = ASHO.IdleTimeoutSeconds('60')
+
+def test_Input():
+	expected = 'CD'
+	a = ASHO.Input('CD')
+	a.validate()
+	assert a.as_dict() == expected
+
+	with pytest.raises(ValidationError) as e_info:
+		a = ASHO.Input(0)
+
+def test_Message():
+	expected = 'A message'
+	a = ASHO.Message('A message')
+	a.validate()
+	assert a.as_dict() == expected
+
+	with pytest.raises(ValidationError) as e_info:
+		a = ASHO.Message(0)
+
+def test_MessageId():
+	expected = '123-456'
+	a = ASHO.MessageId('123-456')
+	a.validate()
+	assert a.as_dict() == expected
+
+	with pytest.raises(ValidationError) as e_info:
+		a = ASHO.MessageId('123|456')
+
+def test_Muted():
+	expected = False
+	a = ASHO.Muted(False)
+	a.validate()
+	assert a.as_dict() == expected
+
+	with pytest.raises(ValidationError) as e_info:
+		a = ASHO.Muted('Off')
+
+def test_Name():
+	expected = 'Response'
+	a = ASHO.Name('Response')
+	a.validate()
+	assert a.as_dict() == expected
+
+	with pytest.raises(ValidationError) as e_info:
+		a = ASHO.Name('NotAResponse')
+
+def test_Namespace():
+	expected = 'Alexa.BrightnessController'
+	a = ASHO.Namespace('Alexa.BrightnessController')
+	a.validate()
+	assert a.as_dict() == expected
+
+	with pytest.raises(ValidationError) as e_info:
+		a = ASHO.Namespace('Alexa.NewController')
+
+def test_Number():
+	expected = '504'
+	a = ASHO.Number('504')
+	a.validate()
+	assert a.as_dict() == expected
+
+	with pytest.raises(ValidationError) as e_info:
+		a = ASHO.Number(504)
+
+def test_PCpercentage():
+	expected = 67
+	a = ASHO.PCpercentage(67)
+	a.validate()
+	assert a.as_dict() == expected
+
+	with pytest.raises(ValidationError) as e_info:
+		a = ASHO.PCpercentage(102)
+
+def test_PCpowerState():
+	expected = 'ON'
+	a = ASHO.PCpowerState('ON')
+	a.validate()
+	assert a.as_dict() == expected
+
+	with pytest.raises(ValidationError) as e_info:
+		a = ASHO.PCpowerState(True)
+
+def test_PLCpowerLevel():
+	expected = 50
+	a = ASHO.PLCpowerLevel(50)
+	a.validate()
+	assert a.as_dict() == expected
+
+	with pytest.raises(ValidationError) as e_info:
+		a = ASHO.PLCpowerLevel(102)
+
+def test_PayloadVersion():
+	expected = '3'
+	a = ASHO.PayloadVersion('3')
+	a.validate()
+	assert a.as_dict() == expected
+
+	with pytest.raises(ValidationError) as e_info:
+		a = ASHO.PayloadVersion('2')
+
+def test_Protocol():
+	expected = 'RTSP'
+	a = ASHO.Protocol('RTSP')
+	a.validate()
+	assert a.as_dict() == expected
+
+	with pytest.raises(ValidationError) as e_info:
+		a = ASHO.Protocol('MPEG2')
+
+def test_Resolution():
+	expected = { 'width': 1920, 'height': 1080 }
+	a = ASHO.Resolution(width=1920, height=1080)
+	a.validate()
+	assert a.as_dict() == expected
+
+	with pytest.raises(ValidationError) as e_info:
+		a = ASHO.Resolution(width='1920')
+
+def test_Saturation():
+	expected = 0.385
+	a = ASHO.Saturation(0.385)
+	a.validate()
+	assert a.as_dict() == expected
+
+	with pytest.raises(ValidationError) as e_info:
+		a = ASHO.Saturation(2)
+
+def test_Scale():
+	expected = 'KELVIN'
+	a = ASHO.Scale('KELVIN')
+	a.validate()
+	assert a.as_dict() == expected
+
+	with pytest.raises(ValidationError) as e_info:
+		a = ASHO.Scale('CHILLY')
+
+def test_Scope():
+	expected = { 'type': 'BearerToken', 'token': 'Atoken'}
+	a = ASHO.Scope(type='BearerToken', token='Atoken')
+	a.validate()
+	assert a.as_dict() == expected
+
+	with pytest.raises(ValidationError) as e_info:
+		a = ASHO.Scope(type='NotaBearerToken', token='Atoken')
+
+def test_TCsetpoint():
+	expected = { 'scale': 'CELSIUS', 'value': 25.3}
+	a = ASHO.TCsetpoint(scale='CELSIUS', value=25.3)
+	a.validate()
+	assert a.as_dict() == expected
+
+	with pytest.raises(ValidationError) as e_info:
+		a = ASHO.TCsetpoint(scale='Chilly', value=25.3)
+
+def test_TCthermostatMode():
+	expected = 'CUSTOM'
+	a = ASHO.TCthermostatMode('CUSTOM')
+	a.validate()
+	assert a.as_dict() == expected
+
+	with pytest.raises(ValidationError) as e_info:
+		a = ASHO.TCthermostatMode('HOT')
+
+def test_Temperature():
+	expected = { 'scale': 'CELSIUS', 'value': 25.3}
+	a = ASHO.Temperature(scale='CELSIUS', value=25.3)
+	a.validate()
+	assert a.as_dict() == expected
+
+	with pytest.raises(ValidationError) as e_info:
+		a = ASHO.Temperature(scale='Chilly', value=25.3)
+
+def test_Timestamp():
+	expected = '2017-02-03T16:20:50.52Z'
+	a = ASHO.Timestamp('2017-02-03T16:20:50.52Z')
+	a.validate()
+	assert a.as_dict() == expected
+
+def test_Token():
+	expected = 'a token'
+	a = ASHO.Token('a token')
+	a.validate()
+	assert a.as_dict() == expected
+
+def test_UncertaintyInMilliseconds():
+	expected = 1000
+	a = ASHO.UncertaintyInMilliseconds(1000)
+	a.validate()
+	assert a.as_dict() == expected
+
+def test_Uri():
+	expected = 'http://an.address.on.the.network/stuff'
+	a = ASHO.Uri('http://an.address.on.the.network/stuff')
+	a.validate()
+	assert a.as_dict() == expected
+
+def test_VideoCodec():
+	expected = 'MPEG2'
+	a = ASHO.VideoCodec('MPEG2')
+	a.validate()
+	assert a.as_dict() == expected
+
+	with pytest.raises(ValidationError) as e_info:
+		a = ASHO.VideoCodec('MPEG1000')
+
+def test_Volume():
+	expected = 100
+	a = ASHO.Volume(100)
+	a.validate()
+	assert a.as_dict() == expected
+
+	expected = 0
+	a = ASHO.Volume(0)
+	a.validate()
+	assert a.as_dict() == expected
+
+	with pytest.raises(ValidationError) as e_info:
+		a = ASHO.Volume(101)
+		a = ASHO.Volume(-1)
+
+
+def test_Width():
+	expected = 1080
+	a = ASHO.Height(1080)
+	a.validate()
+	assert a.as_dict() == expected
+
+	with pytest.raises(ValidationError) as e_info:
+		a = ASHO.Height('1080')
+
 
 def test_Request_1():
 	expected = {

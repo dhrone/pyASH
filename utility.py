@@ -99,6 +99,9 @@ VALID_DIRECTIVES = {
     'Alexa.StepSpeaker': ['AdjustVolume', 'SetMute'],
     'Alexa.TemperatureSensor': [],
     'Alexa.ThermostatController': ['SetTargetTemperature', 'AdjustTargetTemperature', 'SetThermostatMode'],
+    'Alexa.ThermostatControllerSingle': ['SetTargetTemperature', 'AdjustTargetTemperature', 'SetThermostatMode'],
+    'Alexa.ThermostatControllerDual': ['SetTargetTemperature', 'AdjustTargetTemperature', 'SetThermostatMode'],
+    'Alexa.ThermostatControllerTriple': ['SetTargetTemperature', 'AdjustTargetTemperature', 'SetThermostatMode'],
     'Alexa.TimeHoldController': ['Hold', 'Resume']
 }
 VALID_INTERFACES =[]

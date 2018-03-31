@@ -4,6 +4,7 @@
 #
 import pytest
 import time
+import os
 from copy import deepcopy
 
 # Imports for v3 validation
@@ -18,160 +19,22 @@ from iot import Iot, IotTest
 from user import DemoUser
 from pyASH import pyASH
 from message import Request
-from objects import Header, Channel, CameraStream, Color
+#from objects import Header, Channel, CameraStream, Color
+from objects import ASHO
 
 from interface import *
-from utility import LOGLEVEL
+from utility import LOGLEVEL, get_uuid
 
 # Setup logger
 import logging
 logger = logging.getLogger(__name__)
 logger.setLevel(LOGLEVEL)
 
-@IotTest.initial('apower', True)
-@IotTest.initial('asource', 'CD')
-@IotTest.initial('mute', False)
-@IotTest.initial('volume', 5)
-@IotTest.initial('brightness', 50)
-@IotTest.initial('channel', Channel(504, 'NBC4', 'NBC', 'someUrl').json)
-class iotTV(IotTest):
 
-    @Iot.transformFromProperty('powerState', 'apower')
-    def fromPowerState(self, value):
-        return { 'ON': True, 'OFF': False }.get(value, value)
 
-    @Iot.transformToProperty('powerState', 'apower')
-    def toPowerState(self, value):
-        return { True: 'ON', False: 'OFF'}.get(value, value)
 
-    @Iot.transformFromProperty('input', 'asource')
-    def fromInput(self, value):
-        return value
 
-    @Iot.transformToProperty('input', 'asource')
-    def toInput(self, value):
-        return value
 
-    @Iot.transformFromProperty('muted', 'mute')
-    def fromMuted(self, value):
-        return value
-
-    @Iot.transformToProperty('muted', 'mute')
-    def toMuted(self, value):
-        return value
-
-    @Iot.transformFromProperty('volume')
-    def fromVolume(self, value):
-        return int(value / 10)
-
-    @Iot.transformToProperty('volume')
-    def toVolume(self, value):
-        return value * 10
-
-@Endpoint.addInterface(PowerController, proactivelyReported=True, retrievable=True, uncertaintyInMilliseconds=0) ### Need to think through how to specify uncertainty for a property
-@Endpoint.addInterface(Speaker)
-@Endpoint.addInterface(BrightnessController)
-@Endpoint.addInterface(EndpointHealth)
-@Endpoint.addInterface(ColorController)
-@Endpoint.addInterface(ColorTemperatureController)
-@Endpoint.addInterface(InputController)
-@Endpoint.addInterface(LockController)
-@Endpoint.addInterface(PercentageController)
-@Endpoint.addInterface(PowerLevelController, uncertaintyInMilliseconds=200)
-@Endpoint.addInterface(StepSpeaker)
-@Endpoint.addIot(iotTV)
-class dhroneTV(Endpoint):
-    manufacturerName = 'dhrone'
-    description = 'iotTV controller by dhrone'
-    displayCategories = 'OTHER'
-    proactivelyReported = False
-    retrievable=False
-    uncertaintyInMilliseconds=0
-
-    class Iot(iotTV):
-        pass
-
-    @Endpoint.addDirective(['TurnOn'])
-    def OnWeGo(self, request):
-        self.iot['powerState'] = 'ON'
-
-    @Endpoint.addDirective
-    def TurnOff(self, request):
-        self.iot['powerState'] = 'OFF'
-
-    @Endpoint.addDirective(['AdjustVolume','SetVolume'], interface='Alexa.Speaker')
-    def Volume(self, request):
-        if request.name == 'AdjustVolume':
-            v = self.iot['volume'] + request.payload['volume']
-            self.iot['volume'] = 0 if v < 0 else 100 if v > 100 else v
-        else:
-            self.iot['volume'] = request.payload['volume']
-
-    @Endpoint.addDirective
-    def ChangeChannel(self, request):
-        self.iot['channel'] = request.payload['channel']
-
-    @Endpoint.addDirective
-    def SkipChannels(self, request):
-        count = request.payload['channelCount']
-        self.iot['channel'] = Channel(str(int(self.iot['channel']['number'])+count), 'NBC4', 'NBC', 'someUrl').json
-
-    @Endpoint.addDirective
-    def InitializeCameraStreams(self, request):
-        c = CameraStream()
-        c.protocol = 'RTSP'
-        c.uri = 'rtsp://username:password@link.to.video:443/feed1.mp4'
-        c.expirationTime ='2017-09-27T20:30:30.45Z'
-        c.idleTimeoutSeconds = 30
-        c.resolution = (1920,1080)
-        c.authorizationType = 'BASIC'
-        c.videoCodec = 'H264'
-        c.audioCodec = 'AAC'
-        cameraStreams = [c.jsonResponse]
-        c = CameraStream()
-        c.protocol = 'RTSP'
-        c.uri = 'rtsp://username:password@link.to.video:443/feed2.mp4'
-        c.expirationTime ='2017-09-27T20:30:30.45Z'
-        c.idleTimeoutSeconds = 60
-        c.resolution = (1280,720)
-        c.authorizationType = 'DIGEST'
-        c.videoCodec = 'MPEG2'
-        c.audioCodec = 'G711'
-        cameraStreams.append(c.jsonResponse)
-
-        payload = {'cameraStreams': cameraStreams, 'imageUri': 'https://username:password@link.to.image/image.jpg' }
-
-        return {
-            'context': {},
-            'event': {
-                'header': Header('Alexa.CameraStreamController', 'Response', request.correlationToken).json,
-                'endpoint': {
-                    'endpointId': request.endpointId
-                },
-                'payload': payload
-            }
-        }
-
-class dhroneTVScene(Endpoint):
-    manufacturerName = 'dhrone'
-    description = 'iotTV controller by dhrone'
-    displayCategories = 'SCENE_TRIGGER'
-
-    class Iot(iotTV):
-        def getThingName(self):
-            return self.endpointId.split(':')[0]
-
-    @Endpoint.addDirective
-    def Activate(self, request):
-        (endpointId, sceneId) = request.endpointId.split(':')
-        ds = { 'epower':True, 'esource': 'HDMI1', 'input': 'SAT', 'powerState':True }
-        self.iot.batchSet(ds)
-
-    @Endpoint.addDirective
-    def Deactivate(self, request):
-        (endpointId, sceneId) = request.endpointId.split(':')
-        ds = { 'epower': False, 'input': 'CD' }
-        self.iot.batchSet(ds)
 
 def validate_message(request, response):
     with open('alexa_smart_home_message_schema.json') as json_file:
@@ -197,6 +60,15 @@ def cleanse(r):
 def sk(v):
     return v['name']
 
+def pe(v):
+    return v['endpointId']
+
+def cp(v):
+    return v['interface']
+
+def nm(v):
+    return v['name']
+
 def compareResults(r1, r2):
     r1 = deepcopy(r1)
     r2 = deepcopy(r2)
@@ -218,6 +90,24 @@ def compareResults(r1, r2):
         if 'properties' in r1['context']:
             r1['context']['properties'] = sorted(r1['context']['properties'], key=sk)
             r2['context']['properties'] = sorted(r2['context']['properties'], key=sk)
+    if 'event' in r1:
+        if 'payload' in r1['event']:
+            if 'endpoints' in r1['event']['payload']:
+                r1['event']['payload']['endpoints'] = sorted(r1['event']['payload']['endpoints'], key=pe)
+                r2['event']['payload']['endpoints'] = sorted(r2['event']['payload']['endpoints'], key=pe)
+
+                for ep in r1['event']['payload']['endpoints']:
+                    ep['capabilities'] = sorted(ep['capabilities'], key=cp)
+                    for c in ep['capabilities']:
+                        if 'properties' in c:
+                            c['properties']['supported'] = sorted(c['properties']['supported'], key=nm)
+
+                for ep in r2['event']['payload']['endpoints']:
+                    ep['capabilities'] = sorted(ep['capabilities'], key=cp)
+                    for c in ep['capabilities']:
+                        if 'properties' in c:
+                            c['properties']['supported'] = sorted(c['properties']['supported'], key=nm)
+
 
     print ('**** R1 ****')
     print(json.dumps(r1, indent=4))
@@ -227,13 +117,306 @@ def compareResults(r1, r2):
 
 @pytest.fixture
 def setup():
+    try:
+        os.remove('IotTest.json')
+    except FileNotFoundError:
+        # ignore
+        pass
+
+    @IotTest.initial('apower', True)
+    @IotTest.initial('asource', 'CD')
+    @IotTest.initial('mute', False)
+    @IotTest.initial('volume', 5)
+    @IotTest.initial('brightness', 50)
+    @IotTest.initial('channel', ASHO.Channel(number='504', callSign='NBC4', affiliateCallSign='NBC').as_dict())
+    class iotTV(IotTest):
+
+        @Iot.transformFromProperty('powerState', 'apower')
+        def fromPowerState(self, value):
+            return { 'ON': True, 'OFF': False }.get(value, value)
+
+        @Iot.transformToProperty('powerState', 'apower')
+        def toPowerState(self, value):
+            return { True: 'ON', False: 'OFF'}.get(value, value)
+
+        @Iot.transformFromProperty('input', 'asource')
+        def fromInput(self, value):
+            return value
+
+        @Iot.transformToProperty('input', 'asource')
+        def toInput(self, value):
+            return value
+
+        @Iot.transformFromProperty('muted', 'mute')
+        def fromMuted(self, value):
+            return value
+
+        @Iot.transformToProperty('muted', 'mute')
+        def toMuted(self, value):
+            return value
+
+        @Iot.transformFromProperty('volume')
+        def fromVolume(self, value):
+            return int(value / 10)
+
+        @Iot.transformToProperty('volume')
+        def toVolume(self, value):
+            return value * 10
+
+    @Endpoint.addInterface(PowerController, proactivelyReported=True, retrievable=True, uncertaintyInMilliseconds=0) ### Need to think through how to specify uncertainty for a property
+    @Endpoint.addInterface(Speaker)
+    @Endpoint.addInterface(BrightnessController)
+    @Endpoint.addInterface(EndpointHealth)
+    @Endpoint.addInterface(ColorController)
+    @Endpoint.addInterface(ColorTemperatureController)
+    @Endpoint.addInterface(InputController)
+    @Endpoint.addInterface(LockController)
+    @Endpoint.addInterface(PercentageController)
+    @Endpoint.addInterface(PowerLevelController, uncertaintyInMilliseconds=200)
+    @Endpoint.addInterface(StepSpeaker)
+    @Endpoint.addIot(iotTV)
+    class dhroneTV(Endpoint):
+        manufacturerName = 'dhrone'
+        description = 'iotTV controller by dhrone'
+        displayCategories = 'OTHER'
+        proactivelyReported = False
+        retrievable=False
+        uncertaintyInMilliseconds=0
+
+        class Iot(iotTV):
+            pass
+
+        @Endpoint.addDirective(['TurnOn'])
+        def OnWeGo(self, request):
+            self.iot['powerState'] = 'ON'
+
+        @Endpoint.addDirective
+        def TurnOff(self, request):
+            self.iot['powerState'] = 'OFF'
+
+        @Endpoint.addDirective(['AdjustVolume','SetVolume'], interface='Alexa.Speaker')
+        def Volume(self, request):
+            if request.name == 'AdjustVolume':
+                v = self.iot['volume'] + request.payload['volume']
+                self.iot['volume'] = 0 if v < 0 else 100 if v > 100 else v
+            else:
+                self.iot['volume'] = request.payload['volume']
+
+        @Endpoint.addDirective
+        def ChangeChannel(self, request):
+            self.iot['channel'] = request.payload['channel']
+
+        @Endpoint.addDirective
+        def SkipChannels(self, request):
+            count = request.payload['channelCount']
+            self.iot['channel'] = ASHO.Channel(number=str(int(self.iot['channel']['number'])+count), callSign='NBC4', affiliateCallSign='NBC').as_dict()
+
+        @Endpoint.addDirective
+        def InitializeCameraStreams(self, request):
+            cameraStreams = []
+            c = ASHO.CameraStream(protocol='RTSP', uri='rtsp://username:password@link.to.video:443/feed1.mp4', expirationTime='2017-09-27T20:30:30.45Z', idleTimeoutSeconds=30, resolution=ASHO.Resolution(width=1920, height=1080), authorizationType='BASIC', videoCodec='H264', audioCodec='AAC')
+            cameraStreams = [c.as_dict()]
+
+            c = ASHO.CameraStream(protocol='RTSP', uri='rtsp://username:password@link.to.video:443/feed2.mp4', expirationTime='2017-09-27T20:30:30.45Z', idleTimeoutSeconds=60, resolution=ASHO.Resolution(width=1280, height=720), authorizationType='DIGEST', videoCodec='MPEG2', audioCodec='G711')
+            cameraStreams.append(c.as_dict())
+
+            payload = {'cameraStreams': cameraStreams, 'imageUri': 'https://username:password@link.to.image/image.jpg' }
+
+            return {
+                'context': {},
+                'event': {
+                    'header': ASHO.Header(namespace='Alexa.CameraStreamController', name='Response', correlationToken=request.correlationToken,payloadVersion='3', messageId=get_uuid()).as_dict(),
+                    'endpoint': {
+                        'endpointId': request.endpointId
+                    },
+                    'payload': payload
+                }
+            }
+
+    class dhroneTVScene(Endpoint):
+        manufacturerName = 'dhrone'
+        description = 'iotTV controller by dhrone'
+        displayCategories = 'SCENE_TRIGGER'
+
+        class Iot(iotTV):
+            def getThingName(self):
+                return self.endpointId.split(':')[0]
+
+        @Endpoint.addDirective
+        def Activate(self, request):
+            (endpointId, sceneId) = request.endpointId.split(':')
+            ds = { 'epower':True, 'esource': 'HDMI1', 'input': 'SAT', 'powerState':True }
+            self.iot.batchSet(ds)
+
+        @Endpoint.addDirective
+        def Deactivate(self, request):
+            (endpointId, sceneId) = request.endpointId.split(':')
+            ds = { 'epower': False, 'input': 'CD' }
+            self.iot.batchSet(ds)
+
     user = DemoUser()
     user.addEndpoint(endpointClass=dhroneTV, things='device_1', friendlyName='Sound', description='Sound by dhrone')
-    user.addEndpoint(endpointClass=dhroneTVScene, things='device_1', friendlyName='TV', description='TV by dhrone')
+    user.addEndpoint(endpointClass=dhroneTVScene, things='device_1', friendlyName='TV', proactivelyReported=True, supportsDeactivation=True, description='TV by dhrone')
     pyash = pyASH(user)
 
     return pyash
 
+
+@pytest.fixture
+def setupDiscover():
+    try:
+        os.remove('IotTest.json')
+    except FileNotFoundError:
+        # ignore
+        pass
+
+    user = DemoUser()
+
+    @Endpoint.addInterface(EndpointHealth)
+    @Endpoint.addInterface(PowerController)
+    class tSwitch(Endpoint):
+        manufacturerName = 'Sample Manufacturer'
+        displayCategories = 'SWITCH'
+        proactivelyReported = True
+        retrievable = True
+
+    @Endpoint.addInterface(EndpointHealth)
+    @Endpoint.addInterface(PowerController)
+    @Endpoint.addInterface(ColorController)
+    @Endpoint.addInterface(ColorTemperatureController)
+    @Endpoint.addInterface(BrightnessController)
+    @Endpoint.addInterface(PowerLevelController)
+    @Endpoint.addInterface(PercentageController)
+    class tLight(Endpoint):
+        manufacturerName = 'Sample Manufacturer'
+        displayCategories = 'LIGHT'
+        proactivelyReported = True
+        retrievable = True
+
+    @Endpoint.addInterface(EndpointHealth)
+    @Endpoint.addInterface(PowerController)
+    @Endpoint.addInterface(ColorTemperatureController)
+    @Endpoint.addInterface(BrightnessController)
+    @Endpoint.addInterface(PowerLevelController)
+    @Endpoint.addInterface(PercentageController)
+    class tLightWhite(Endpoint):
+        manufacturerName = 'Sample Manufacturer'
+        displayCategories = 'LIGHT'
+        proactivelyReported = True
+        retrievable = True
+
+    @Endpoint.addInterface(EndpointHealth)
+    @Endpoint.addInterface(ThermostatControllerSingle)
+    @Endpoint.addInterface(TemperatureSensor)
+    class tThermostat(Endpoint):
+        manufacturerName = 'Sample Manufacturer'
+        displayCategories = 'THERMOSTAT'
+        proactivelyReported = True
+        retrievable = True
+
+    @Endpoint.addInterface(EndpointHealth)
+    @Endpoint.addInterface(ThermostatControllerDual)
+    @Endpoint.addInterface(TemperatureSensor)
+    class tThermostatDual(Endpoint):
+        manufacturerName = 'Sample Manufacturer'
+        displayCategories = 'OTHER'
+        proactivelyReported = True
+        retrievable = True
+
+    @Endpoint.addInterface(EndpointHealth)
+    @Endpoint.addInterface(LockController)
+    class tLock(Endpoint):
+        manufacturerName = 'Sample Manufacturer'
+        displayCategories = 'SMARTLOCK'
+        proactivelyReported = True
+        retrievable = True
+
+    @Endpoint.addInterface(EndpointHealth)
+    @Endpoint.addInterface(SceneController, supportsDeactivation=False, proactivelyReported=True)
+    class tSceneOnonly(Endpoint):
+        manufacturerName = 'Sample Manufacturer'
+        displayCategories = 'SCENE_TRIGGER'
+        proactivelyReported = True
+        retrievable = True
+
+    @Endpoint.addInterface(EndpointHealth)
+    @Endpoint.addInterface(SceneController, supportsDeactivation=True, proactivelyReported=True)
+    class tSceneOnOff(Endpoint):
+        manufacturerName = 'Sample Manufacturer'
+        displayCategories = 'ACTIVITY_TRIGGER'
+        proactivelyReported = True
+        retrievable = True
+
+    @Endpoint.addInterface(EndpointHealth)
+    @Endpoint.addInterface(CameraStreamController)
+    class tCamera(Endpoint):
+        manufacturerName = 'Sample Manufacturer'
+        displayCategories = 'CAMERA'
+        cameraStreamConfigurations = [ {
+            'protocols': [ 'RTSP' ],
+            'resolutions': [{'width':1280, 'height':720}],
+            'authorizationTypes': ['NONE'],
+            'videoCodecs': ['H264'],
+            'audioCodecs': ['AAC']
+        } ]
+        proactivelyReported = True
+        retrievable = True
+
+    @Endpoint.addInterface(EndpointHealth)
+    @Endpoint.addInterface(ChannelController)
+    @Endpoint.addInterface(InputController)
+    @Endpoint.addInterface(Speaker)
+    class tTV(Endpoint):
+        manufacturerName = 'Sample Manufacturer'
+        displayCategories = 'OTHER'
+        proactivelyReported = True
+        retrievable = True
+
+
+    user.addEndpoint(endpointClass=tSwitch, things='endpoint-001', friendlyName='Switch', description='001 Switch that can only be turned on/off', cookie={ 'detail1': "For simplicity, this is the only appliance", 'detail2':"that has some values in the additionalApplianceDetails"})
+    user.addEndpoint(endpointClass=tLight, things='endpoint-002', friendlyName='Light', description='002 Light that is dimmable and can change color and color temperature')
+    user.addEndpoint(endpointClass=tLightWhite, things='endpoint-003', friendlyName='White Light', description='003 Light that is dimmable and can change color temperature only')
+    user.addEndpoint(endpointClass=tThermostat, things='endpoint-004', friendlyName='Thermostat', description='004 Thermostat that can change and query temperatures')
+    user.addEndpoint(endpointClass=tThermostatDual, things='endpoint-004-1', friendlyName='Living Room Thermostat', description='004-1 Thermostat that can change and query temperatures, supports dual setpoints')
+    user.addEndpoint(endpointClass=tLock, things='endpoint-005', friendlyName='Lock', description='005 Lock that can be locked and can query lock state')
+    user.addEndpoint(endpointClass=tSceneOnonly, things='endpoint-006', friendlyName='Goodnight', description='006 Scene that can only be turned on')
+    user.addEndpoint(endpointClass=tSceneOnOff, things='endpoint-007', friendlyName='Watch TV', description='007 Activity that runs sequentially that can be turned on and off')
+    user.addEndpoint(endpointClass=tCamera, things='endpoint-008', friendlyName='Baby Camera', description='008 Camera that streams from an RSTP source')
+    user.addEndpoint(endpointClass=tTV, things='endpoint-009', friendlyName='TV', description='009 TV that supports various entertainment controllers')
+
+    pyash = pyASH(user)
+
+    return pyash
+
+
+@pytest.fixture
+def setupReportState():
+    try:
+        os.remove('IotTest.json')
+    except FileNotFoundError:
+        # ignore
+        pass
+
+    user = DemoUser()
+
+#    @IotTest.initial('apower', True)
+    class iotReportState(IotTest):
+        pass
+
+    @Endpoint.addInterface(EndpointHealth)
+    @Endpoint.addInterface(ThermostatControllerSingle)
+    @Endpoint.addInterface(TemperatureSensor)
+    @Endpoint.addIot(iotReportState)
+    class tThermostat(Endpoint):
+        manufacturerName = 'Sample Manufacturer'
+        displayCategories = 'THERMOSTAT'
+        proactivelyReported = True
+        retrievable = True
+
+    user.addEndpoint(endpointClass=tThermostat, things='endpoint-001', friendlyName='Thermostat', description='001 Single mode thermostat')
+    pyash = pyASH(user)
+
+    return pyash
 
 
 def test_PowerController_TurnOff(setup):
@@ -746,7 +929,7 @@ def test_BrightnessController_SetBrightness(setup):
 
 def test_ChannelController_ChangeChannel(setup):
     pyash = setup
-    pyash.user.endpoints['dhroneTV:device_1'].iot['channel']= Channel(number='504', callSign='NBC4', affiliateCallSign='NBC', uri='someUrl').json
+    pyash.user.endpoints['dhroneTV:device_1'].iot['channel']= Channel(number='504', callSign='NBC4', affiliateCallSign='NBC').as_dict()
     request = {
         "directive": {
             "header": {
@@ -826,7 +1009,7 @@ def test_ChannelController_ChangeChannel(setup):
 
 def test_ChannelController_ChangeChannel(setup):
     pyash = setup
-    pyash.user.endpoints['dhroneTV:device_1'].iot['channel']= Channel(number='509', callSign='ABC9', affiliateCallSign='ABC', uri='someUrl').json
+    pyash.user.endpoints['dhroneTV:device_1'].iot['channel']= ASHO.Channel(number='509', callSign='ABC9', affiliateCallSign='ABC').as_dict()
     request = {
         "directive": {
             "header": {
@@ -897,7 +1080,7 @@ def test_ChannelController_ChangeChannel(setup):
 
 def test_ColorController_SetColor(setup):
     pyash = setup
-    pyash.user.endpoints['dhroneTV:device_1'].iot['color']= Color(hue=320.4, saturation=0.6138, brightness=0.7524).json
+    pyash.user.endpoints['dhroneTV:device_1'].iot['color']= ASHO.CCcolor(hue=320.4, saturation=0.6138, brightness=0.7524).as_dict()
     request = {
         "directive": {
             "header": {
@@ -1580,4 +1763,819 @@ def test_CameraStreamController_InitializeCameraStreams(setup):
     if validateFailed:
         raise Exception
 
+    compareResults(expected_response, response)
+
+def test_Discover(setupDiscover):
+    pyash = setupDiscover
+
+    true = True
+    false = False
+
+    request = {
+        "directive": {
+            "header": {
+                "namespace": "Alexa.Discovery",
+                    "name": "Discover",
+                    "payloadVersion": "3",
+                    "messageId": "1bd5d003-31b9-476f-ad03-71d471922820"
+            },
+            "payload": {
+                "scope": {
+                    "type": "BearerToken",
+                    "token": "access-token-from-skill"
+                }
+            }
+        }
+   }
+    expected_response = {
+        "event": {
+            "header": {
+                "namespace": "Alexa.Discovery",
+                "name": "Discover.Response",
+                "payloadVersion": "3",
+                "messageId": "0a58ace0-e6ab-47de-b6af-b600b5ab8a7a"
+            },
+            "payload": {
+                "endpoints": [
+                    {
+                        "endpointId": "tSwitch:endpoint-001",
+                        "manufacturerName": "Sample Manufacturer",
+                        "friendlyName": "Switch",
+                        "description": "001 Switch that can only be turned on/off",
+                        "displayCategories": [
+                            "SWITCH"
+                        ],
+                        "cookie": {
+                            "detail1": "For simplicity, this is the only appliance",
+                            "detail2": "that has some values in the additionalApplianceDetails"
+                        },
+                        "capabilities": [
+                            {
+                                "type": "AlexaInterface",
+                                "interface": "Alexa",
+                                "version": "3"
+                            },
+                            {
+                                "type": "AlexaInterface",
+                                "interface": "Alexa.PowerController",
+                                "version": "3",
+                                "properties": {
+                                    "supported": [
+                                        {
+                                            "name": "powerState"
+                                        }
+                                    ],
+                                    "proactivelyReported": true,
+                                    "retrievable": true
+                                }
+                            },
+                            {
+                                "type": "AlexaInterface",
+                                "interface": "Alexa.EndpointHealth",
+                                "version": "3",
+                                "properties": {
+                                    "supported": [
+                                        {
+                                            "name": "connectivity"
+                                        }
+                                    ],
+                                    "proactivelyReported": true,
+                                    "retrievable": true
+                                }
+                            }
+                        ]
+                    },
+                    {
+                        "endpointId": "tLight:endpoint-002",
+                        "manufacturerName": "Sample Manufacturer",
+                        "friendlyName": "Light",
+                        "description": "002 Light that is dimmable and can change color and color temperature",
+                        "displayCategories": [
+                            "LIGHT"
+                        ],
+                        "capabilities": [
+                            {
+                                "type": "AlexaInterface",
+                                "interface": "Alexa",
+                                "version": "3"
+                            },
+                            {
+                                "type": "AlexaInterface",
+                                "interface": "Alexa.PowerController",
+                                "version": "3",
+                                "properties": {
+                                    "supported": [
+                                        {
+                                            "name": "powerState"
+                                        }
+                                    ],
+                                    "proactivelyReported": true,
+                                    "retrievable": true
+                                }
+                            },
+                            {
+                                "type": "AlexaInterface",
+                                "interface": "Alexa.ColorController",
+                                "version": "3",
+                                "properties": {
+                                    "supported": [
+                                        {
+                                            "name": "color"
+                                        }
+                                    ],
+                                    "proactivelyReported": true,
+                                    "retrievable": true
+                                }
+                            },
+                            {
+                                "type": "AlexaInterface",
+                                "interface": "Alexa.ColorTemperatureController",
+                                "version": "3",
+                                "properties": {
+                                    "supported": [
+                                        {
+                                            "name": "colorTemperatureInKelvin"
+                                        }
+                                    ],
+                                    "proactivelyReported": true,
+                                    "retrievable": true
+                                }
+                            },
+                            {
+                                "type": "AlexaInterface",
+                                "interface": "Alexa.BrightnessController",
+                                "version": "3",
+                                "properties": {
+                                    "supported": [
+                                        {
+                                            "name": "brightness"
+                                        }
+                                    ],
+                                    "proactivelyReported": true,
+                                    "retrievable": true
+                                }
+                            },
+                            {
+                                "type": "AlexaInterface",
+                                "interface": "Alexa.PowerLevelController",
+                                "version": "3",
+                                "properties": {
+                                    "supported": [
+                                        {
+                                            "name": "powerLevel"
+                                        }
+                                    ],
+                                    "proactivelyReported": true,
+                                    "retrievable": true
+                                }
+                            },
+                            {
+                                "type": "AlexaInterface",
+                                "interface": "Alexa.PercentageController",
+                                "version": "3",
+                                "properties": {
+                                    "supported": [
+                                        {
+                                            "name": "percentage"
+                                        }
+                                    ],
+                                    "proactivelyReported": true,
+                                    "retrievable": true
+                                }
+                            },
+                            {
+                                "type": "AlexaInterface",
+                                "interface": "Alexa.EndpointHealth",
+                                "version": "3",
+                                "properties": {
+                                    "supported": [
+                                        {
+                                            "name": "connectivity"
+                                        }
+                                    ],
+                                    "proactivelyReported": true,
+                                    "retrievable": true
+                                }
+                            }
+                        ]
+                    },
+                    {
+                        "endpointId": "tLightWhite:endpoint-003",
+                        "manufacturerName": "Sample Manufacturer",
+                        "friendlyName": "White Light",
+                        "description": "003 Light that is dimmable and can change color temperature only",
+                        "displayCategories": [
+                            "LIGHT"
+                        ],
+                        "capabilities": [
+                            {
+                                "type": "AlexaInterface",
+                                "interface": "Alexa",
+                                "version": "3"
+                            },
+                            {
+                                "type": "AlexaInterface",
+                                "interface": "Alexa.PowerController",
+                                "version": "3",
+                                "properties": {
+                                    "supported": [
+                                        {
+                                            "name": "powerState"
+                                        }
+                                    ],
+                                    "proactivelyReported": true,
+                                    "retrievable": true
+                                }
+                            },
+                            {
+                                "type": "AlexaInterface",
+                                "interface": "Alexa.ColorTemperatureController",
+                                "version": "3",
+                                "properties": {
+                                    "supported": [
+                                        {
+                                            "name": "colorTemperatureInKelvin"
+                                        }
+                                    ],
+                                    "proactivelyReported": true,
+                                    "retrievable": true
+                                }
+                            },
+                            {
+                                "type": "AlexaInterface",
+                                "interface": "Alexa.BrightnessController",
+                                "version": "3",
+                                "properties": {
+                                    "supported": [
+                                        {
+                                            "name": "brightness"
+                                        }
+                                    ],
+                                    "proactivelyReported": true,
+                                    "retrievable": true
+                                }
+                            },
+                            {
+                                "type": "AlexaInterface",
+                                "interface": "Alexa.PowerLevelController",
+                                "version": "3",
+                                "properties": {
+                                    "supported": [
+                                        {
+                                            "name": "powerLevel"
+                                        }
+                                    ],
+                                    "proactivelyReported": true,
+                                    "retrievable": true
+                                }
+                            },
+                            {
+                                "type": "AlexaInterface",
+                                "interface": "Alexa.PercentageController",
+                                "version": "3",
+                                "properties": {
+                                    "supported": [
+                                        {
+                                            "name": "percentage"
+                                        }
+                                    ],
+                                    "proactivelyReported": true,
+                                    "retrievable": true
+                                }
+                            },
+                            {
+                                "type": "AlexaInterface",
+                                "interface": "Alexa.EndpointHealth",
+                                "version": "3",
+                                "properties": {
+                                    "supported": [
+                                        {
+                                            "name": "connectivity"
+                                        }
+                                    ],
+                                    "proactivelyReported": true,
+                                    "retrievable": true
+                                }
+                            }
+                        ]
+                    },
+                    {
+                        "endpointId": "tThermostat:endpoint-004",
+                        "manufacturerName": "Sample Manufacturer",
+                        "friendlyName": "Thermostat",
+                        "description": "004 Thermostat that can change and query temperatures",
+                        "displayCategories": [
+                            "THERMOSTAT"
+                        ],
+                        "capabilities": [
+                            {
+                                "type": "AlexaInterface",
+                                "interface": "Alexa",
+                                "version": "3"
+                            },
+                            {
+                                "type": "AlexaInterface",
+                                "interface": "Alexa.ThermostatController",
+                                "version": "3",
+                                "properties": {
+                                    "supported": [
+                                        {
+                                            "name": "targetSetpoint"
+                                        },
+                                        {
+                                            "name": "thermostatMode"
+                                        }
+                                    ],
+                                    "proactivelyReported": true,
+                                    "retrievable": true
+                                }
+                            },
+                            {
+                                "type": "AlexaInterface",
+                                "interface": "Alexa.TemperatureSensor",
+                                "version": "3",
+                                "properties": {
+                                    "supported": [
+                                        {
+                                            "name": "temperature"
+                                        }
+                                    ],
+                                    "proactivelyReported": true,
+                                    "retrievable": true
+                                }
+                            },
+                            {
+                                "type": "AlexaInterface",
+                                "interface": "Alexa.EndpointHealth",
+                                "version": "3",
+                                "properties": {
+                                    "supported": [
+                                        {
+                                            "name": "connectivity"
+                                        }
+                                    ],
+                                    "proactivelyReported": true,
+                                    "retrievable": true
+                                }
+                            }
+                        ]
+                    },
+                    {
+                        "endpointId": "tThermostatDual:endpoint-004-1",
+                        "manufacturerName": "Sample Manufacturer",
+                        "friendlyName": "Living Room Thermostat",
+                        "description": "004-1 Thermostat that can change and query temperatures, supports dual setpoints",
+                        "displayCategories": [
+                            "OTHER"
+                        ],
+                        "capabilities": [
+                            {
+                                "type": "AlexaInterface",
+                                "interface": "Alexa",
+                                "version": "3"
+                            },
+                            {
+                                "type": "AlexaInterface",
+                                "interface": "Alexa.ThermostatController",
+                                "version": "3",
+                                "properties": {
+                                    "supported": [
+                                        {
+                                            "name": "upperSetpoint"
+                                        },
+                                        {
+                                            "name": "lowerSetpoint"
+                                        },
+                                        {
+                                            "name": "thermostatMode"
+                                        }
+                                    ],
+                                    "proactivelyReported": true,
+                                    "retrievable": true
+                                }
+                            },
+                            {
+                                "type": "AlexaInterface",
+                                "interface": "Alexa.TemperatureSensor",
+                                "version": "3",
+                                "properties": {
+                                    "supported": [
+                                        {
+                                            "name": "temperature"
+                                        }
+                                    ],
+                                    "proactivelyReported": true,
+                                    "retrievable": true
+                                }
+                            },
+                            {
+                                "type": "AlexaInterface",
+                                "interface": "Alexa.EndpointHealth",
+                                "version": "3",
+                                "properties": {
+                                    "supported": [
+                                        {
+                                            "name": "connectivity"
+                                        }
+                                    ],
+                                    "proactivelyReported": true,
+                                    "retrievable": true
+                                }
+                            }
+                        ]
+                    },
+                    {
+                        "endpointId": "tLock:endpoint-005",
+                        "manufacturerName": "Sample Manufacturer",
+                        "friendlyName": "Lock",
+                        "description": "005 Lock that can be locked and can query lock state",
+                        "displayCategories": [
+                            "SMARTLOCK"
+                        ],
+                        "capabilities": [
+                            {
+                                "type": "AlexaInterface",
+                                "interface": "Alexa",
+                                "version": "3"
+                            },
+                            {
+                                "type": "AlexaInterface",
+                                "interface": "Alexa.LockController",
+                                "version": "3",
+                                "properties": {
+                                    "supported": [
+                                        {
+                                            "name": "lockState"
+                                        }
+                                    ],
+                                    "proactivelyReported": true,
+                                    "retrievable": true
+                                }
+                            },
+                            {
+                                "type": "AlexaInterface",
+                                "interface": "Alexa.EndpointHealth",
+                                "version": "3",
+                                "properties": {
+                                    "supported": [
+                                        {
+                                            "name": "connectivity"
+                                        }
+                                    ],
+                                    "proactivelyReported": true,
+                                    "retrievable": true
+                                }
+                            }
+                        ]
+                    },
+                    {
+                        "endpointId": "tSceneOnonly:endpoint-006",
+                        "manufacturerName": "Sample Manufacturer",
+                        "friendlyName": "Goodnight",
+                        "description": "006 Scene that can only be turned on",
+                        "displayCategories": [
+                            "SCENE_TRIGGER"
+                        ],
+                        "capabilities": [
+                            {
+                                "type": "AlexaInterface",
+                                "interface": "Alexa",
+                                "version": "3"
+                            },
+                            {
+                                "type": "AlexaInterface",
+                                "interface": "Alexa.SceneController",
+                                "version": "3",
+                                "supportsDeactivation": false,
+                                "proactivelyReported": true
+                            },
+                            {
+                                "type": "AlexaInterface",
+                                "interface": "Alexa.EndpointHealth",
+                                "version": "3",
+                                "properties": {
+                                    "supported": [
+                                        {
+                                            "name": "connectivity"
+                                        }
+                                    ],
+                                    "proactivelyReported": true,
+                                    "retrievable": true
+                                }
+                            }
+                        ]
+                    },
+                    {
+                        "endpointId": "tSceneOnOff:endpoint-007",
+                        "manufacturerName": "Sample Manufacturer",
+                        "friendlyName": "Watch TV",
+                        "description": "007 Activity that runs sequentially that can be turned on and off",
+                        "displayCategories": [
+                            "ACTIVITY_TRIGGER"
+                        ],
+                        "capabilities": [
+                            {
+                                "type": "AlexaInterface",
+                                "interface": "Alexa",
+                                "version": "3"
+                            },
+                            {
+                                "type": "AlexaInterface",
+                                "interface": "Alexa.SceneController",
+                                "version": "3",
+                                "supportsDeactivation": true,
+                                "proactivelyReported": true
+                            },
+                            {
+                                "type": "AlexaInterface",
+                                "interface": "Alexa.EndpointHealth",
+                                "version": "3",
+                                "properties": {
+                                    "supported": [
+                                        {
+                                            "name": "connectivity"
+                                        }
+                                    ],
+                                    "proactivelyReported": true,
+                                    "retrievable": true
+                                }
+                            }
+                        ]
+                    },
+                    {
+                        "endpointId": "tCamera:endpoint-008",
+                        "manufacturerName": "Sample Manufacturer",
+                        "friendlyName": "Baby Camera",
+                        "description": "008 Camera that streams from an RSTP source",
+                        "displayCategories": [
+                            "CAMERA"
+                        ],
+                        "capabilities": [
+                            {
+                                "type": "AlexaInterface",
+                                "interface": "Alexa",
+                                "version": "3"
+                            },
+                            {
+                                "type": "AlexaInterface",
+                                "interface": "Alexa.CameraStreamController",
+                                "version": "3",
+                                "cameraStreamConfigurations": [
+                                    {
+                                        "protocols": [
+                                            "RTSP"
+                                        ],
+                                        "resolutions": [
+                                            {
+                                                "width": 1280,
+                                                "height": 720
+                                            }
+                                        ],
+                                        "authorizationTypes": [
+                                            "NONE"
+                                        ],
+                                        "videoCodecs": [
+                                            "H264"
+                                        ],
+                                        "audioCodecs": [
+                                            "AAC"
+                                        ]
+                                    }
+                                ]
+                            },
+                            {
+                                "type": "AlexaInterface",
+                                "interface": "Alexa.EndpointHealth",
+                                "version": "3",
+                                "properties": {
+                                    "supported": [
+                                        {
+                                            "name": "connectivity"
+                                        }
+                                    ],
+                                    "proactivelyReported": true,
+                                    "retrievable": true
+                                }
+                            }
+                        ]
+                    },
+                    {
+                        "endpointId": "tTV:endpoint-009",
+                        "manufacturerName": "Sample Manufacturer",
+                        "friendlyName": "TV",
+                        "description": "009 TV that supports various entertainment controllers",
+                        "displayCategories": [
+                            "OTHER"
+                        ],
+                        "capabilities": [
+                            {
+                                "type": "AlexaInterface",
+                                "interface": "Alexa",
+                                "version": "3"
+                            },
+                            {
+                                "type": "AlexaInterface",
+                                "interface": "Alexa.ChannelController",
+                                "version": "3",
+                                "properties": {
+                                    "supported": [
+                                        {
+                                            "name": "channel"
+                                        }
+                                    ],
+                                    "proactivelyReported": true,
+                                    "retrievable": true
+                                }
+                            },
+                            {
+                                "type": "AlexaInterface",
+                                "interface": "Alexa.InputController",
+                                "version": "3",
+                                "properties": {
+                                    "supported": [
+                                        {
+                                            "name": "input"
+                                        }
+                                    ],
+                                    "proactivelyReported": true,
+                                    "retrievable": true
+                                }
+                            },
+                            {
+                                "type": "AlexaInterface",
+                                "interface": "Alexa.Speaker",
+                                "version": "3",
+                                "properties": {
+                                    "supported": [
+                                        {
+                                            "name": "volume"
+                                        },
+                                        {
+                                            "name": "muted"
+                                        }
+                                    ],
+                                    "proactivelyReported": true,
+                                    "retrievable": true
+                                }
+                            },
+                            {
+                                "type": "AlexaInterface",
+                                "interface": "Alexa.EndpointHealth",
+                                "version": "3",
+                                "properties": {
+                                    "supported": [
+                                        {
+                                            "name": "connectivity"
+                                        }
+                                    ],
+                                    "proactivelyReported": true,
+                                    "retrievable": true
+                                }
+                            }
+                        ]
+                    }
+                ]
+            }
+        }
+    }
+
+    response = pyash.lambda_handler(request)
+    print (response)
+    compareResults(expected_response, response)
+
+def test_AcceptGrant(setup):
+    pyash = setup
+
+    request = {
+        "directive": {
+            "header": {
+                "namespace": "Alexa.Authorization",
+                "name": "AcceptGrant",
+                "payloadVersion": "3",
+                "messageId": "1bd5d003-31b9-476f-ad03-71d471922820",
+                "correlationToken": "dFMb0z+PgpgdDmluhJ1LddFvSqZ/jCc8ptlAKulUj90jSqg=="
+            },
+            "payload": {
+                "grant": {
+                    "type": "OAuth2.AuthorizationCode",
+                    "code": "ANUbUKCJqlBOpMhwYWxU"
+                },
+                "grantee": {
+                    "type": "BearerToken",
+                    "token": "access-token-from-skill"
+                }
+            }
+        }
+    }
+    expected_response = {
+        "event": {
+            "header": {
+                "namespace": "Alexa.Authorization",
+                "name": "AcceptGrant.Response",
+                "payloadVersion": "3",
+                "messageId": "5f8a426e-01e4-4cc9-8b79-65f8bd0fd8a4"
+            },
+            "payload": {}
+        }
+    }
+
+    response = pyash.lambda_handler(request)
+    print (response)
+    compareResults(expected_response, response)
+
+    assert pyash.user.accessToken == '<access token>'
+    assert pyash.user.refreshToken == '<refresh token>'
+    assert pyash.user.accessTokenExpires == 3600
+
+def test_ReportState(setupReportState):
+    pyash = setupReportState
+
+    print (pyash.user.endpoints['tThermostat:endpoint-001'].iot)
+
+    pyash.user.endpoints['tThermostat:endpoint-001'].iot['targetSetpoint']={'scale':'CELSIUS', 'value':25}
+    pyash.user.endpoints['tThermostat:endpoint-001'].iot['thermostatMode']='AUTO'
+    pyash.user.endpoints['tThermostat:endpoint-001'].iot['temperature']={'scale':'CELSIUS', 'value':20}
+
+    request = {
+        "directive": {
+            "header": {
+                "namespace": "Alexa",
+                "name": "ReportState",
+                "payloadVersion": "3",
+                "messageId": "1bd5d003-31b9-476f-ad03-71d471922820",
+                "correlationToken": "dFMb0z+PgpgdDmluhJ1LddFvSqZ/jCc8ptlAKulUj90jSqg=="
+            },
+            "endpoint": {
+                "endpointId": "tThermostat:endpoint-001",
+                "cookie": {},
+                "scope": {
+                    "type": "BearerToken",
+                    "token": "access-token-from-skill"
+                }
+            },
+            "payload": {}
+        }
+    }
+    expected_response = {
+        "context": {
+            "properties": [
+                {
+                    "namespace": "Alexa.EndpointHealth",
+                    "name": "connectivity",
+                    "value": {
+                        "value": "OK"
+                    },
+                    "timeOfSample": "2017-09-27T18:30:30.45Z",
+                    "uncertaintyInMilliseconds": 200
+                },
+                {
+                    "name": "targetSetpoint",
+                    "namespace": "Alexa.ThermostatController",
+                    "value": {
+                        "scale": "CELSIUS",
+                        "value": 25
+                    },
+                    "timeOfSample": "2017-09-27T18:30:30.45Z",
+                    "uncertaintyInMilliseconds": 200
+                },
+                {
+                    "name": "thermostatMode",
+                    "namespace": "Alexa.ThermostatController",
+                    "value": "AUTO",
+                    "timeOfSample": "2017-09-27T18:30:30.45Z",
+                    "uncertaintyInMilliseconds": 200
+                },
+                {
+                    "name": "temperature",
+                    "namespace": "Alexa.TemperatureSensor",
+                    "value": {
+                        "scale": "CELSIUS",
+                        "value": 20
+                    },
+                    "timeOfSample": "2017-09-27T18:30:30.45Z",
+                    "uncertaintyInMilliseconds": 200
+                }
+            ]
+        },
+        "event": {
+            "header": {
+                "namespace": "Alexa",
+                "name": "StateReport",
+                "payloadVersion": "3",
+                "messageId": "5f8a426e-01e4-4cc9-8b79-65f8bd0fd8a4",
+                "correlationToken": "dFMb0z+PgpgdDmluhJ1LddFvSqZ/jCc8ptlAKulUj90jSqg=="
+            },
+            "endpoint": {
+                "scope": {
+                    "type": "BearerToken",
+                    "token": "access-token-from-Amazon"
+                },
+                "endpointId": "endpoint-001"
+            },
+            "payload": {}
+        }
+    }
+
+    response = pyash.lambda_handler(request)
+    print (response)
     compareResults(expected_response, response)

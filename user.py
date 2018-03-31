@@ -71,7 +71,7 @@ class User(ABC):
     def addEndpoint(self, endpointClass, things=None,   friendlyName=None, description=None, manufacturerName=None,displayCategories=None, proactivelyReported=None, retrievable=None, uncertaintyInMilliseconds=None, supportsDeactivation=None, cookie=None):
         self.endpointClasses[endpointClass.__name__] = endpointClass
         endpointId = self._getEndpointId(endpointClass, things)
-        self.endpoints[endpointId] = endpointClass(endpointId, things, friendlyName, description, manufacturerName,displayCategories, proactivelyReported, retrievable, uncertaintyInMilliseconds, supportsDeactivation, cookie)
+        self.endpoints[endpointId] = endpointClass(endpointId=endpointId, things=things, friendlyName=friendlyName, description=description, manufacturerName=manufacturerName,displayCategories=displayCategories, proactivelyReported=proactivelyReported, retrievable=retrievable, uncertaintyInMilliseconds=uncertaintyInMilliseconds, supportsDeactivation=supportsDeactivation, cookie=cookie)
 
 class StaticUser(User):
     def __init__(self):
@@ -96,7 +96,7 @@ class DemoUser(StaticUser):
             response = getAccessTokenFromCode(request['payload']['grant']['code'])
         except:
             # Return dummy values if unable to retrieve real user profile
-            request = { 'access_token': '<access token>', 'refresh_token':'<refresh token>', 'expires_in': 3600 }
+            response = { 'access_token': '<access token>', 'refresh_token':'<refresh token>', 'expires_in': 3600 }
         self.storeTokens(response['access_token'], response['refresh_token'], response['expires_in'])
 
 class DbUser(User):
