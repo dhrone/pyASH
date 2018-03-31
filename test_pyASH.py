@@ -118,7 +118,7 @@ def compareResults(r1, r2):
 @pytest.fixture
 def setup():
     try:
-        os.remove('IotTest.json')
+        os.remove('IotTV.json')
     except FileNotFoundError:
         # ignore
         pass
@@ -264,12 +264,6 @@ def setup():
 
 @pytest.fixture
 def setupDiscover():
-    try:
-        os.remove('IotTest.json')
-    except FileNotFoundError:
-        # ignore
-        pass
-
     user = DemoUser()
 
     @Endpoint.addInterface(EndpointHealth)
@@ -392,14 +386,13 @@ def setupDiscover():
 @pytest.fixture
 def setupReportState():
     try:
-        os.remove('IotTest.json')
+        os.remove('iotReportState.json')
     except FileNotFoundError:
         # ignore
         pass
 
     user = DemoUser()
 
-#    @IotTest.initial('apower', True)
     class iotReportState(IotTest):
         pass
 
@@ -412,6 +405,7 @@ def setupReportState():
         displayCategories = 'THERMOSTAT'
         proactivelyReported = True
         retrievable = True
+        uncertaintyInMilliseconds = 200
 
     user.addEndpoint(endpointClass=tThermostat, things='endpoint-001', friendlyName='Thermostat', description='001 Single mode thermostat')
     pyash = pyASH(user)
@@ -2570,7 +2564,7 @@ def test_ReportState(setupReportState):
                     "type": "BearerToken",
                     "token": "access-token-from-Amazon"
                 },
-                "endpointId": "endpoint-001"
+                "endpointId": "tThermostat:endpoint-001"
             },
             "payload": {}
         }

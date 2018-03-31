@@ -105,7 +105,7 @@ class pyASH(object):
         if hasattr(request, 'endpointId'):
             json['event']['endpoint'] = {'endpointId': request.endpointId }
             if hasattr(request, 'scope'):
-                json['event']['endpoint']['scope'] = dict(request.scope)
+                json['event']['endpoint']['scope'] = request.scope
 
         return json
 
@@ -146,7 +146,7 @@ class pyASH(object):
 
 
     def handleReportState(self, request):
-        print ('HANDLING REPORTSTATE')        
+        print ('handling ReportState')
         # Requires endpoints from user
         try:
             endpoint = self.user.getEndpoint(request)
@@ -172,7 +172,7 @@ class pyASH(object):
             raise
 
     def handleDirective(self, request):
-        print ('HANDLING DIRECTIVE')
+
         try:
             endpoint = self.user.getEndpoint(request)
             cls, handler = endpoint.getHandler(request)

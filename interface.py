@@ -106,7 +106,8 @@ class Interface(object):
         def jsonResponse(self):
             proplist = []
             for item, p in self.properties.items():
-                proplist.append({'namespace': self.interface, 'name':item, 'value': p.value, 'timeOfSample': get_utc_timestamp(p.timeOfSample), 'uncertaintyInMilliseconds': p.uncertaintyInMilliseconds})
+                ums = p.uncertaintyInMilliseconds if p.uncertaintyInMilliseconds is not None else 0
+                proplist.append({'namespace': self.interface, 'name':item, 'value': p.value, 'timeOfSample': get_utc_timestamp(p.timeOfSample), 'uncertaintyInMilliseconds': ums})
             return proplist
 
     class Property(object):

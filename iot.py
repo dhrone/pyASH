@@ -162,14 +162,7 @@ class IotTest(IotBase):
         super(IotTest, self).__init__('endpointId')
 
         currentTime = int(time.time())
-        # If no initial values provided then create dummy entries for all possible properties
-        if not hasattr(self, '__initials__'):
-            for k,v in VALID_PROPERTIES.items():
-                for p in v:
-                    self.reportedState[p] = None
-                    self.reportedStateTimeStamp[p] = {'timestamp': currentTime}
-        else:
-        # Else initialize with the provided initial values
+        if hasattr(self, '__initials__'):
             for k,v in self.__initials__.items():
                 self.reportedState[k] = v
                 self.reportedStateTimeStamp[k] = {'timestamp': currentTime}
@@ -177,7 +170,8 @@ class IotTest(IotBase):
 
     def get(self):
         try:
-            with open('IotTest.json') as json_file:
+            filename = self.__class__.__name__+'.json'
+            with open(filename) as json_file:
                 df = json.load(json_file)
                 self.reportedState = df['reportedState']
                 self.reportedStateTimeStamp = df['reportedStateTimeStamp']
@@ -191,7 +185,8 @@ class IotTest(IotBase):
             self.reportedState[item] = newState[item]
             self.reportedStateTimeStamp[item] = {'timestamp': currentTime }
         df = {'reportedState': self.reportedState, 'reportedStateTimeStamp': self.reportedStateTimeStamp }
-        with open('IotTest.json','w') as outfile:
+        filename = self.__class__.__name__+'.json'
+        with open(filename,'w') as outfile:
             json.dump(df, outfile)
 
     @property
