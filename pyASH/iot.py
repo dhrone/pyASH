@@ -10,7 +10,7 @@ import boto3
 from botocore.exceptions import ClientError
 
 # pyASH imports
-from utility import *
+from .utility import *
 
 # Setup logger
 import logging

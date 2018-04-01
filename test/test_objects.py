@@ -8,8 +8,8 @@ import json
 
 from python_jsonschema_objects import ValidationError
 
-from objects import ASHO
-from pyASH import Request
+from pyASH.objects import ASHO
+from pyASH.pyASH import Request
 
 def test_AffiliateCallSign():
 	expected = 'NBC'

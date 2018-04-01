@@ -6,10 +6,10 @@
 import json
 
 # pyASH imports
-from iot import Iot
-from exceptions import *
-from utility import *
-from interface import getInterfaceClass
+from .iot import Iot
+from .exceptions import INVALID_DIRECTIVE, OnlyOneIOTallowedPerEndpoint
+from .utility import LOGLEVEL, VALID_DIRECTIVES
+from .interface import getInterfaceClass
 
 # Setup logger
 import logging

@@ -5,7 +5,7 @@
 from botocore.exceptions import ClientError
 
 # pyASH imports
-from utility import *
+from .utility import LOGLEVEL, DEFAULT_SYSTEM_NAME, DEFAULT_REGION, DEFAULT_IOTREGION
 
 # Setup logger
 import logging

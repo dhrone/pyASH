@@ -20,7 +20,7 @@ logger = logging.getLogger(__name__)
 logger.setLevel(LOGLEVEL)
 
 # pyASH imports
-from exceptions import *
+from .exceptions import *
 
 DEFAULT_REGION = 'us-east-1'
 DEFAULT_IOTREGION = 'us-west-2'

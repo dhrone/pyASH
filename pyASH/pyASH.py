@@ -6,8 +6,10 @@
 import logging
 import time
 
-from utility import *
-from objects import ASHO
+#from .utility import *
+from .utility import LOGLEVEL, get_uuid, get_utc_timestamp
+from .exceptions import InterfaceException, OAUTH2_EXCEPTION, MISCELLANIOUS_EXCEPTION
+from .objects import ASHO
 
 # Setup logger
 logger = logging.getLogger(__name__)

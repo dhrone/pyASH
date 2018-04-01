@@ -8,37 +8,26 @@ import os
 from copy import deepcopy
 
 # Imports for v3 validation
-from validation import validate_message
 import jsonschema
 from jsonschema import validate
 import json
 
 # pyASH imports
-from endpoint import Endpoint
-from iot import Iot, IotTest
-from user import DemoUser
-from pyASH import pyASH
+from pyASH.validation import validate_message
+from pyASH.endpoint import Endpoint
+from pyASH.iot import Iot, IotTest
+from pyASH.user import DemoUser
+from pyASH.pyASH import pyASH
 #from objects import Header, Channel, CameraStream, Color
-from objects import ASHO
+from pyASH.objects import ASHO
 
-from interface import *
-from utility import LOGLEVEL, get_uuid
+from pyASH.interface import *
+from pyASH.utility import LOGLEVEL, get_uuid
 
 # Setup logger
 import logging
 logger = logging.getLogger(__name__)
 logger.setLevel(LOGLEVEL)
-
-
-
-
-
-
-
-def validate_message(request, response):
-    with open('alexa_smart_home_message_schema.json') as json_file:
-        schema = json.load(json_file)
-    validate(response, schema)
 
 def cleanse(r):
 

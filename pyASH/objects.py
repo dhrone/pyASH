@@ -1,10 +1,16 @@
+# -*- coding: utf-8 -*-
+
+# Copyright 2018 by dhrone. All Rights Reserved.
+#
+
 import json
+import os
 import python_jsonschema_objects as pjs
 
-from utility import VALID_DIRECTIVES
+from .utility import VALID_DIRECTIVES
 
 
-with open('alexa_smart_home_message_schema.json') as json_file:
+with open(os.path.dirname(__file__)+'/alexa_smart_home_message_schema.json') as json_file:
     schema = json.load(json_file)
 
 # Calculate all of the possible values for name in a header
