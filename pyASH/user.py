@@ -12,7 +12,6 @@ from decimal import Decimal
 
 # pyASH imports
 from db import Persist
-from message import Capability, Request, Response, defaultResponse
 from endpoint import Endpoint
 from exceptions import *
 from utility import *

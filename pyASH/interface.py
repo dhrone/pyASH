@@ -30,7 +30,7 @@ class Interface(object):
 
     @property
     def jsonResponse(self):
-        if not self.properties: return None
+        if not self.properties: return []
         if self.iot:
             timeStamps = self.iot.timeStamps
             for item, value in self.properties.properties.items():
@@ -165,9 +165,7 @@ class Calendar(Interface):
 class CameraStreamController(Interface):
     def __init__(self, cameraStreamConfigurations=None, *args, **kwargs):
         super(CameraStreamController, self).__init__()
-        print ('**********')
-        print (cameraStreamConfigurations)
-        print ('**********')
+
         self.cameraStreamConfigurations_value = cameraStreamConfigurations if type (cameraStreamConfigurations) is list else [ cameraStreamConfigurations ] if cameraStreamConfigurations is not None else None
 
     @property

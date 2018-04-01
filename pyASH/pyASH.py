@@ -7,7 +7,6 @@ import logging
 import time
 
 from utility import *
-#from message import Request
 from objects import ASHO
 
 # Setup logger
@@ -70,12 +69,13 @@ class Request(dict):
         self.raw = rawRequest
 
     def __getattr__(self, name):
+        if name == 'raw': raise AttributeError()
         res = self.findkey(name, self.raw)
         if isinstance(res, dict):
             return Request(res)
         if res:
             return res
-        raise KeyError(name)
+        raise AttributeError()
 
     def findkey(self, key, dictionary):
         for k,v in dictionary.items():
@@ -173,6 +173,36 @@ class pyASH(object):
 
     def handleDirective(self, request):
 
+        def _getResponseJson(request):
+            if request.namespace != 'Alexa.SceneController':
+                return {
+                    'context': {
+                         'properties': []
+                    },
+                     'event': {
+                        'header': ASHO.Header(namespace='Alexa', name='Response', correlationToken=request.correlationToken,messageId=get_uuid(), payloadVersion='3').as_dict(),
+                        'endpoint': ASHO.Endpoint(endpointId=endpoint.endpointId).as_dict(),
+                        'payload': {}
+                    }
+                }
+
+            scene_type = 'ActivationStarted' if request.name == 'Activate' else 'DeactivationStarted' if request.name == 'Deactivate' else None
+            return {
+                "context": {
+                    "properties": []
+                },
+                "event": {
+                    'header': ASHO.Header(namespace='Alexa.SceneController', name=scene_type, correlationToken=request.correlationToken,messageId=get_uuid(), payloadVersion='3').as_dict(),
+                    'endpoint': ASHO.Endpoint(endpointId=endpoint.endpointId, scope=ASHO.Scope(type='BearerToken', token=request.token)).as_dict(),
+                    "payload": {
+                        "cause": {
+                            "type": "VOICE_INTERACTION"
+                        },
+                        "timestamp": get_utc_timestamp()
+                    }
+                }
+            }
+
         try:
             endpoint = self.user.getEndpoint(request)
             cls, handler = endpoint.getHandler(request)
@@ -190,18 +220,10 @@ class pyASH(object):
                         raise ENDPOINT_UNREACHABLE('Timed out waiting for endpoint to update')
 
                 interface = endpoint.generateInterfaces(endpoint.iots[0])[request.namespace]
-                ret =  {
-                    'context': {
-                        'properties': interface.jsonResponse
-                    },
-                    'event': {
-                        'header': ASHO.Header(namespace='Alexa', name='Response', correlationToken=request.correlationToken,messageId=get_uuid(), payloadVersion='3').as_dict(),
-                        'endpoint': {
-                            'endpointId' : endpoint.endpointId
-                        },
-                        'payload': {}
-                    }
-                }
+                interfaceJsonResponse = interface.jsonResponse
+                ret = _getResponseJson(request)
+                if interfaceJsonResponse and type(interfaceJsonResponse) is list:
+                    ret['context']['properties'] += interfaceJsonResponse
 
             # Check if Endpoint Health is enabled and if yes, add the appropriate context information to the response
             healthif = endpoint.generateInterfaces(endpoint.iots[0])['Alexa.EndpointHealth'] if 'Alexa.EndpointHealth' in endpoint._interfaces else None

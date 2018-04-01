@@ -7,7 +7,6 @@
 # pyASH imports
 from endpoint import Endpoint
 from iot import Iot
-from message import Request
 
 from interface import PowerController, Speaker
 from utility import LOGLEVEL

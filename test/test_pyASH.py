@@ -18,7 +18,6 @@ from endpoint import Endpoint
 from iot import Iot, IotTest
 from user import DemoUser
 from pyASH import pyASH
-from message import Request
 #from objects import Header, Channel, CameraStream, Color
 from objects import ASHO
 
@@ -55,6 +54,8 @@ def cleanse(r):
         if 'endpoint' in r['event']:
             if 'scope' in r['event']['endpoint']:
                 if 'token' in r['event']['endpoint']['scope']: r['event']['endpoint']['scope']['token'] = 'TOKEN'
+        if 'payload' in r['event']:
+            if 'timestamp' in r['event']['payload']: r['event']['payload']['timestamp'] = 'TIMESTAMP'
     return r
 
 def sk(v):
@@ -183,9 +184,6 @@ def setup():
         retrievable=False
         uncertaintyInMilliseconds=0
 
-        class Iot(iotTV):
-            pass
-
         @Endpoint.addDirective(['TurnOn'])
         def OnWeGo(self, request):
             self.iot['powerState'] = 'ON'
@@ -233,14 +231,13 @@ def setup():
                 }
             }
 
+    @Endpoint.addInterface(EndpointHealth)
+    @Endpoint.addIot(iotTV)
     class dhroneTVScene(Endpoint):
         manufacturerName = 'dhrone'
         description = 'iotTV controller by dhrone'
         displayCategories = 'SCENE_TRIGGER'
-
-        class Iot(iotTV):
-            def getThingName(self):
-                return self.endpointId.split(':')[0]
+        uncertaintyInMilliseconds = 200
 
         @Endpoint.addDirective
         def Activate(self, request):
@@ -1636,6 +1633,77 @@ def test_StepSpeaker_SetAdjust(setup):
     request['directive']['payload']['mute']= True
     response = pyash.lambda_handler(request)
     compareResults(expected_response, response)
+
+def test_SceneController_Activate(setup):
+    pyash = setup
+
+    request = {
+        "directive": {
+            "header": {
+                "namespace": "Alexa.SceneController",
+                "name": "Activate",
+                "payloadVersion": "3",
+                "messageId": "1bd5d003-31b9-476f-ad03-71d471922820",
+                "correlationToken": "dFMb0z+PgpgdDmluhJ1LddFvSqZ/jCc8ptlAKulUj90jSqg=="
+            },
+            "endpoint": {
+                "scope": {
+                    "type": "BearerToken",
+                    "token": "access-token-from-skill"
+                },
+                "endpointId": "dhroneTVScene:device_1",
+                "cookie": {}
+            },
+            "payload": {}
+        }
+    }
+
+    expected_response = {
+        "context": {
+            "properties": [
+                {
+                    "namespace": "Alexa.EndpointHealth",
+                    "name": "connectivity",
+                    "value": {
+                        "value": "OK"
+                    },
+                    "timeOfSample": "2017-09-27T18:30:30.45Z",
+                    "uncertaintyInMilliseconds": 200
+                }
+            ]
+        },
+        "event": {
+            "header": {
+                "namespace": "Alexa.SceneController",
+                "name": "ActivationStarted",
+                "payloadVersion": "3",
+                "messageId": "5f8a426e-01e4-4cc9-8b79-65f8bd0fd8a4",
+                "correlationToken": "dFMb0z+PgpgdDmluhJ1LddFvSqZ/jCc8ptlAKulUj90jSqg=="
+            },
+            "endpoint": {
+                "scope": {
+                    "type": "BearerToken",
+                    "token": "access-token-from-Amazon"
+                },
+                "endpointId": "dhroneTVScene:device_1"
+            },
+            "payload": {
+                "cause": {
+                    "type": "VOICE_INTERACTION"
+                },
+                "timestamp": "2017-09-27T18:30:30.45Z"
+            }
+        }
+    }
+
+    response = pyash.lambda_handler(request)
+    compareResults(expected_response, response)
+
+    request['directive']['header']['name'] = 'Deactivate'
+    expected_response['event']['header']['name'] = 'DeactivationStarted'
+    response = pyash.lambda_handler(request)
+    compareResults(expected_response, response)
+
 
 def test_CameraStreamController_InitializeCameraStreams(setup):
     pyash = setup

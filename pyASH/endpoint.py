@@ -7,7 +7,6 @@ import json
 
 # pyASH imports
 from iot import Iot
-from message import EndpointResponse, Capability
 from exceptions import *
 from utility import *
 from interface import getInterfaceClass

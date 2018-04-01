@@ -93,7 +93,11 @@ class IotBase(ABC):
     def batchSet(self, propdict):
         vars = {}
         for property in propdict:
-            (method, variable) = self._getMethodVariable(property, 'to')
+            try:
+                (method, variable) = self._getMethodVariable(property, 'to')
+            except (KeyError, ValueError):
+                method = doNothing
+                variable = property
             vars[variable] = method(self, propdict[property])
         self.put(vars)
 
