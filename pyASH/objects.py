@@ -62,3 +62,78 @@ schema = {
 
 builder = pjs.ObjectBuilder(schema)
 ASHO = builder.build_classes()
+
+class Request(dict):
+    """Simplifies retrieval of values from a request.
+
+    Request takes a json object and exposes its contents as dynamically generated
+    attributes.  It will search, depth-first to find a key within the json object
+    that matches the requested attribute and will raise an AttributeError if no key
+    within the json object matches the requested attribute.  If you need to ensure
+    that the key you are requesting comes from a specific path within the json
+    object, you can string together attributes to specify the path that you want
+    Request to follow to find the key.
+
+    Note:
+
+        Request will only return the first value that matches the requested attribute
+
+    Example:
+
+        json = {
+    	    "directive": {
+    	        "header": {
+    	            "namespace": "Alexa.BrightnessController",
+    	            "name": "AdjustBrightness",
+    	            "payloadVersion": "3",
+    	            "messageId": "1bd5d003-31b9-476f-ad03-71d471922820",
+    	            "correlationToken": "dFMb0z+PgpgdDmluhJ1LddFvSqZ/jCc8ptlAKulUj90jSqg=="
+    	        },
+    	        "endpoint": {
+    	            "scope": {
+    	                "type": "BearerToken",
+    	                "token": "access-token-from-skill"
+    	            },
+    	            "endpointId": "endpoint-001",
+    	            "cookie": {}
+    	        },
+    	        "payload": {
+    	            "brightnessDelta": -25
+    	        }
+    	    }
+    	}
+        request = Request(json)
+        >>> request.endpointId
+        "endpoint-001"
+        >>> request.endpoint.endpointId
+        "endpoint-001"
+        >>> request.payload
+        { 'brightnessDelta': -25 }
+        >>> request.brightnessDelta
+        -25
+        >>> request.payload.brightnessDelta
+        -25
+    """
+    def __init__(self, rawRequest):
+        super(Request, self).__init__(rawRequest)
+        self.raw = rawRequest
+
+    def __getattr__(self, name):
+        if name == 'raw': raise AttributeError()
+        res = self.findkey(name, self.raw)
+        if isinstance(res, dict):
+            return Request(res)
+        if res:
+            return res
+        raise AttributeError()
+
+    def findkey(self, key, dictionary):
+        for k,v in dictionary.items():
+            if k==key:
+                return v
+            elif isinstance(v, dict):
+                res = self.findkey(key,v)
+                if res: return res
+            else:
+                continue
+        return None

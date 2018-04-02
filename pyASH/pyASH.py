@@ -9,89 +9,23 @@ import time
 #from .utility import *
 from .utility import LOGLEVEL, get_uuid, get_utc_timestamp
 from .exceptions import InterfaceException, OAUTH2_EXCEPTION, MISCELLANIOUS_EXCEPTION
-from .objects import ASHO
+from .objects import ASHO, Request
 
 # Setup logger
 logger = logging.getLogger(__name__)
 logger.setLevel(LOGLEVEL)
 
-class Request(dict):
-    """Simplifies retrieval of values from a request.
 
-    Request takes a json object and exposes its contents as dynamically generated
-    attributes.  It will search, depth-first to find a key within the json object
-    that matches the requested attribute and will raise a KeyError if no key
-    within the json object matches the requested attribute.  If you need to ensure
-    that the key you are requesting comes from a specific path within the json
-    object, you can string together attributes to specify the path that you want
-    Request to follow to find the key.
-
-    Note:
-
-        Request will only return the first value that matches the requested attribute
-
-    Example:
-
-        json = {
-    	    "directive": {
-    	        "header": {
-    	            "namespace": "Alexa.BrightnessController",
-    	            "name": "AdjustBrightness",
-    	            "payloadVersion": "3",
-    	            "messageId": "1bd5d003-31b9-476f-ad03-71d471922820",
-    	            "correlationToken": "dFMb0z+PgpgdDmluhJ1LddFvSqZ/jCc8ptlAKulUj90jSqg=="
-    	        },
-    	        "endpoint": {
-    	            "scope": {
-    	                "type": "BearerToken",
-    	                "token": "access-token-from-skill"
-    	            },
-    	            "endpointId": "endpoint-001",
-    	            "cookie": {}
-    	        },
-    	        "payload": {
-    	            "brightnessDelta": -25
-    	        }
-    	    }
-    	}
-        request = Request(json)
-        >>> request.endpointId
-        "endpoint-001"
-        >>> request.endpoint.endpointId
-        "endpoint-001"
-        >>> request.payload
-        { 'brightnessDelta': -25 }
-        >>> request.brightnessDelta
-        -25
-        >>> request.payload.brightnessDelta
-        -25
-    """
-    def __init__(self, rawRequest):
-        super(Request, self).__init__(rawRequest)
-        self.raw = rawRequest
-
-    def __getattr__(self, name):
-        if name == 'raw': raise AttributeError()
-        res = self.findkey(name, self.raw)
-        if isinstance(res, dict):
-            return Request(res)
-        if res:
-            return res
-        raise AttributeError()
-
-    def findkey(self, key, dictionary):
-        for k,v in dictionary.items():
-            if k==key:
-                return v
-            elif isinstance(v, dict):
-                res = self.findkey(key,v)
-                if res: return res
-            else:
-                continue
-        return None
 
 class pyASH(object):
+    """ pyASH is the message handler for the system processing all Alexa requests """
+
     def __init__(self, user, version='3'):
+        """
+        Args:
+            user (user object): The user object contains the list of endpoints that belong to a user
+            version (enum = ['3']): Currently pyASH only supports the version 3 Alexa Smart Home API.
+        """
         self.user = user
         self.version = version if type(version) is str else str(version)
         if not self.version == '3': raise ValueError('pyAsh currently only supports API version 3')
@@ -112,7 +46,12 @@ class pyASH(object):
         return json
 
     def handleAcceptGrant(self, request):
-        # Provides tokens to user
+        """ Handles the receipt of a user's OAUTH2 code.
+
+        When installing a new skill, during the enable process, the skill is linked to the customer's account through OAUTH2 authentication. If the user successfully authenticates, an AcceptGrant message is sent to your Lambda function.  This message includes a OAUTH2 Code which can be exchanged for an OAUTH2 refresh token and an OAUTH2 access token.
+
+        Note:  You only need to persist the refresh token if you need to initiate a message (e.g. async communications) with the Alexa Smart Home Service.  If you will only be synchronously replying, you can use the access token provided in the Alexa request and therefore do not need to manage requesting your own access token for the user.
+        """
         try:
             self.user.getTokens(request)
             return {
@@ -127,7 +66,11 @@ class pyASH(object):
             raise
 
     def handleDiscovery(self, request):
-        # Requires endpoints from user
+        """ Sends a list of all of the endpoints a user has installed and what they are capable of to Alexa Smart Home
+
+        Before Alexa Smart Home can control a device, it needs to be told about each endpoint that your skill will handle for a user and what interfaces that endpoint supports.
+        """
+
         try:
             ret = []
             endpoints = self.user.getEndpoints(request)
@@ -148,8 +91,7 @@ class pyASH(object):
 
 
     def handleReportState(self, request):
-        print ('handling ReportState')
-        # Requires endpoints from user
+        """ Sends the current property values for the requested endpoint to Alexa Smart Home """
         try:
             endpoint = self.user.getEndpoint(request)
             return {
@@ -174,6 +116,7 @@ class pyASH(object):
             raise
 
     def handleDirective(self, request):
+        """ Based upon the request from Alexa Smart Home, invokes the appropriate method to handle the request """
 
         def _getResponseJson(request):
             if request.namespace != 'Alexa.SceneController':
@@ -246,89 +189,13 @@ class pyASH(object):
             raise
 
     def lambda_handler(self, request, context=None):
+        """ Routes the Alexa Smart Home request to the appropriate handler
+
+        This is the method that you should point your Lambda function toself.
+        """
         request = Request(request)
         return {
             'Alexa' : self.handleReportState,
             'Alexa.Authorization' : self.handleAcceptGrant,
             'Alexa.Discovery' : self.handleDiscovery,
         }.get(request.namespace, self.handleDirective)(request)
-
-if __name__ == u'__main__':
-
-    ts = get_utc_timestamp()
-    u = 0
-
-    p = BrightnessProperty(45, ts, u)
-    print (p)
-
-    p = ChannelProperty('6','PBS','KBTC', ts, u)
-    print (p)
-
-    p = ColorProperty(350.5, 0.7138, 0.6524, ts, u)
-    print (p)
-
-    p = ColorTemperatureInKelvinProperty(7500, ts, u)
-    print (p)
-
-    p = CookingModeProperty('TIMECOOK', ts, u)
-    print (p)
-
-    p = CookingModeProperty('OFF', ts, u)
-    print (p)
-
-    p = EndpointHealthProperty('UNREACHABLE', ts, u)
-    print (p)
-
-    p = CookingTimeProperty(datetime(2017,8,30,1,18,21),'cookCompletionTime', ts, u)
-    print (p)
-
-    p = CookingTimeControllerTimeProperty(timedelta(minutes=3, seconds=15), ts, u)
-    print (p)
-
-    p = CookingTimeControllerPowerProperty('MEDIUM', ts, u)
-    print (p)
-
-    fq = WeightFoodQuantity(2.5, 'POUND')
-    p = CookingFoodItemProperty('Cooper river salmon', 'FISH', fq, ts, u)
-    print(p)
-
-    fq = FoodCountFoodQuantity(1, 'LARGE')
-    p = CookingFoodItemProperty('Cooper river salmon', 'FISH', fq, ts, u)
-    print (p)
-
-    fq = VolumeFoodQuantity(2, 'LITER')
-    p = CookingFoodItemProperty('Salmon Soup', 'FISH', fq, ts, u)
-    print (p)
-
-    p = InputProperty('HDMI1', ts, u)
-    print (p)
-
-    p = PowerLevelProperty(5, ts, u)
-    print (p)
-
-    p = LockProperty('LOCKED', ts, u)
-    print (p)
-
-    p = SpeakerMuteProperty(False, ts, u)
-    print (p)
-
-    p = PercentageProperty(74, ts, u)
-    print (p)
-
-    p = PowerStateProperty('OFF', ts, u)
-    print (p)
-
-    p = PowerLevelProperty('MEDIUM', ts, u)
-    print (p)
-
-    p = TemperatureProperty(68, 'FAHRENHEIT', ts, u)
-    print (p)
-
-    p = ThermostatModeProperty('AUTO','', ts, u)
-    print (p)
-
-    p = ThermostatModeProperty('AUTO', 'VENDOR_HEAT_COOL', ts, u)
-    print (p)
-
-    p = ThermostatModeProperty('CUSTOM', 'VENDOR_HEAT_COOL', ts, u)
-    print (p)
