@@ -8,7 +8,7 @@ import time
 
 #from .utility import *
 from .utility import LOGLEVEL, get_uuid, get_utc_timestamp
-from .exceptions import InterfaceException, OAUTH2_EXCEPTION, MISCELLANIOUS_EXCEPTION
+from .exceptions import pyASH_EXCEPTION, OAUTH2_EXCEPTION, MISCELLANIOUS_EXCEPTION
 from .objects import ASHO, Request
 
 # Setup logger
@@ -30,8 +30,8 @@ class pyASH(object):
         self.version = version if type(version) is str else str(version)
         if not self.version == '3': raise ValueError('pyAsh currently only supports API version 3')
 
-    @classmethod
-    def _errorResponse(cls, request, e):
+    @staticmethod
+    def _errorResponse(request, e):
         json = {
             'event': {
                 'header': ASHO.Header(namespace='Alexa', name='ErrorResponse', correlationToken=request.correlationToken, messageId=get_uuid(), payloadVersion='3').as_dict(),
@@ -60,7 +60,7 @@ class pyASH(object):
                     'payload': {}
                 }
             }
-        except InterfaceException as e:
+        except pyASH_EXCEPTION as e:
             return self._errorResponse(request, e)
         except:
             raise
@@ -84,7 +84,7 @@ class pyASH(object):
                     }
                 }
             }
-        except InterfaceException as e:
+        except pyASH_EXCEPTION as e:
             return self._errorResponse(request, e)
         except:
             raise
@@ -110,7 +110,7 @@ class pyASH(object):
                     'payload': {}
                 }
             }
-        except InterfaceException as e:
+        except pyASH_EXCEPTION as e:
             return self._errorResponse(request, e)
         except:
             raise
@@ -179,7 +179,7 @@ class pyASH(object):
             if 'scope' in request.raw['directive']['endpoint']: ret['event']['endpoint']['scope'] = request.raw['directive']['endpoint']['scope']
 
             return ret
-        except InterfaceException as e:
+        except pyASH_EXCEPTION as e:
             return self._errorResponse(request, e)
         except OAUTH2_EXCEPTION as e:
             raise

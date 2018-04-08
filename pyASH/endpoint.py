@@ -7,7 +7,7 @@ import json
 
 # pyASH imports
 from .iot import Iot
-from .exceptions import INVALID_DIRECTIVE, OnlyOneIOTallowedPerEndpoint
+from .exceptions import INVALID_DIRECTIVE, MISCELLANIOUS_EXCEPTION
 from .utility import LOGLEVEL, VALID_DIRECTIVES
 from .interface import getInterfaceClass
 
@@ -142,7 +142,7 @@ class Endpoint(object):
     def addIot(iotcls):
         def wrapper(func):
             if hasattr(func, '__iot__'):
-                raise OnlyOneIOTallowedPerEndpoint('You can only specify a single IOT for an endpoint')
+                raise MISCELLANIOUS_EXCEPTION('You can only specify a single IOT class for an endpoint')
             else:
                 func.__iot__ = iotcls
             return func

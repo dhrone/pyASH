@@ -233,7 +233,7 @@ def fix_property(interface, property):
             logger.warn('Adjusted property from {0} to {1}'.format(property, p))
             return p
     properties = properties[:len(properties)-2] if len(properties)>=2 else properties
-    raise ValueError('{0} is not a valid property for interface {1}.  Valid values are {2}'.format(property, interface, properties))
+    raise INVALID_DIRECTIVE('{0} is not a valid property for interface {1}.  Valid values are {2}'.format(property, interface, properties))
 
 def fix_term(term):
     for ti in VALID_TERMS:
@@ -242,7 +242,7 @@ def fix_term(term):
                 if term != i:
                     logger.warn('Adjusted term from {0} to {1}'.format(term, i))
                 return i
-    raise ValueError('{0} not a valid term'.format(term))
+    raise INVALID_DIRECTIVE('{0} not a valid term'.format(term))
 
 
 # Oauth2 utilities
@@ -250,19 +250,20 @@ def validateReturnCode(response):
     error = response.json().get('error')
     error_description = response.json().get('error_description')
 
-    if response.status_code in [401,403,405]:
-        raise OAUTH2_PermissionDenied(error, error_description)
-    elif response.status_code == 400:
-        raise EXPIRED_AUTHORIZATION_CREDENTIAL(error, error_description)
+    if response.status_code in [400,401,403,405]:
+        if error == 'invalid_grant':
+            EXPIRED_AUTHORIZATION_CREDENTIAL(error_description)
+        else:
+            raise OAUTH2_EXCEPTION(error_description)
     elif response.status_code != 200:
-        raise OAUTH2_IOError(error, error_description)
+        raise OAUTH2_EXCEPTION(error_description)
     return response.status_code
 
 def validateValue(value, validList, errmsg=None):
     if value.upper() in map(str.upper, validList):
         return list(filter(lambda x: x.upper() == value.upper(), validList))[0]
     errmsg = errmsg if type(errmsg) == str else '{0} is not a valid value'
-    raise ValueError(errmsg.format(value))
+    raise INVALID_DIRECTIVE(errmsg.format(value))
 
 def getUserProfile(accessToken):
     payload = { 'access_token': accessToken }
@@ -289,7 +290,7 @@ def _getOauth2Credentials():
         except:
             errmsg = 'Unable to retrieve oauth2 credentials.  Must set oauth2_client_id and oauth2_client_secret as environment variables or within the pyASH config file'
             logger.critical(errmsg)
-            raise OAUTH2_CredentialMissing(errmsg)
+            raise OAUTH2_EXCEPTION(errmsg)
     return (oauth2_client_id, oauth2_client_secret)
 
 def refreshAccessToken(refreshToken):
@@ -309,7 +310,7 @@ def refreshAccessToken(refreshToken):
     except KeyError:
         errmsg = 'Tokens not in response'
         logger.warn(errmsg)
-        raise TokenMissingException(errmsg)
+        raise OAUTH2_EXCEPTION(errmsg)
 
 def getAccessTokenFromCode(code):
     oauth2_client_id, oauth2_client_secret = _getOauth2Credentials()
@@ -322,6 +323,9 @@ def getAccessTokenFromCode(code):
     }
 
     r = requests.post("https://api.amazon.com/auth/o2/token", data=payload)
-    validateReturnCode(r)
+    try:
+        validateReturnCode(r)
+    except (EXPIRED_AUTHORIZATION_CREDENTIAL, OAUTH2_EXCEPTION) as e:
+        raise ACCEPT_GRANT_FAILED(e.args[0])
 
     return r.json()

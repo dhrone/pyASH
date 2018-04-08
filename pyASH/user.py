@@ -13,7 +13,7 @@ from decimal import Decimal
 # pyASH imports
 from .db import Persist
 from .endpoint import Endpoint
-from .exceptions import NO_SUCH_ENDPOINT, UserNotFoundException, UserNotInitialized, MissingRequiredValueException
+from .exceptions import NO_SUCH_ENDPOINT, USER_NOT_FOUND_EXCEPTION, MISCELLANIOUS_EXCEPTION
 from .utility import LOGLEVEL, DEFAULT_SYSTEM_NAME, DEFAULT_REGION, DEFAULT_IOTREGION
 
 # Setup logger
@@ -115,7 +115,7 @@ class DbUser(User):
             self._getUser(userId=userId, userEmail=userEmail)
             if not self.uuid:
                 un = userId if userId else userEmail
-                raise UserNotFoundException('Could not find {0}'.format(un))
+                raise USER_NOT_FOUND_EXCEPTION('Could not find {0}'.format(un))
 
     def getEndpoints(self, request):
         self._getUser(token=request.token)
@@ -157,7 +157,7 @@ class DbUser(User):
         if not token and not userId and not userEmail:
             errmsg = 'Cannot initialize a user without an access token, an email address or a userId'
             logger.critical(errmsg)
-            raise MissingRequiredValueException(errmsg)
+            raise MISCELLANIOUS_EXCEPTION(errmsg)
 
         if token:
             self._getUserProfileFromToken()
@@ -180,7 +180,7 @@ class DbUser(User):
             self.uuid = res
             return self.uuid
         msg = 'No user with UserId of {0}'.format(self.userId) if self.userId else 'No user with Email address of {0}'.format(self.userEmail) if self.userEmail else 'No ability to retrieve user.  Both userId and userEmail not provided'
-        raise UserNotFoundException(msg)
+        raise USER_NOT_FOUND_EXCEPTION(msg)
 
     def _getUserProfileFromToken(self):
         response = getUserProfile(self.accessToken)
@@ -268,7 +268,7 @@ class DbUser(User):
                 json_list.append(item.json)
             dbThings['endpoints'] = json_list
         else:
-            raise UserNotInitialized('UUID not set.  _persistEndpoints likely called prior to _getUser')
+            raise MISCELLANIOUS_EXCEPTION('UUID not set.  _persistEndpoints likely called prior to _getUser')
 
     def _retrieveEndpoints(self):
         self.endpoints = {}
