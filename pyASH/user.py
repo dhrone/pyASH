@@ -27,7 +27,6 @@ class User(ABC):
 
     def __init__(self):
         self.endpoints = {}
-        self.endpointClasses = {}
 
     @abstractmethod
     def getEndpoints(self, request):
@@ -47,27 +46,19 @@ class User(ABC):
         self.accessTokenExpires = expires_in
         self.accessTokenTimestamp = time.time()
 
-    @staticmethod
-    def getEndpointId(cls, things):
-        if ':' in things:
-            raise ValueError(': symbol not allowed in thing names')
-        things = things if type(things) is list else [things]
-        return cls.__name__ + ':' + ':'.join(things)
+    def _persistEndpoints(self):
+        pass
 
-    @staticmethod
-    def retrieveThings(endpointId):
-        things = endpointId.split(':')
-        cls = things[0]
-        things = things[1:]
-        return things
+    def _retrieveEndpoints(self):
+        pass
 
     def getTokens(self, request):
         response = getAccessTokenFromCode(request['payload']['grant']['code'])
         self.storeTokens(response['access_token'], response['refresh_token'], response['expires_in'])
 
     def addEndpoint(self, endpoint):
-        self.endpointClasses[endpoint.__class__.__name__] = endpoint.__class__
         self.endpoints[endpoint.EndpointId] = endpoint
+        self._persistEndpoints()
 
 class StaticUser(User):
     def __init__(self):
@@ -96,17 +87,12 @@ class DemoUser(StaticUser):
         self.storeTokens(response['access_token'], response['refresh_token'], response['expires_in'])
 
 class DbUser(User):
-    def __init__(self, endpointClasses=None, userEmail=None, userId=None, region='us-east-1', systemName = 'pyASH'):
+    def __init__(self, userEmail=None, userId=None, region='us-east-1', systemName = 'pyASH'):
         super(DbUser, self).__init__()
 
         self.region = region
         self.systemName = systemName
         self.uuid = None
-
-        if endpointClasses:
-            endpointClasses = endpointClasses if type(endpointClasses) is list else [ endpointClasses ]
-            for cls in endpointClasses:
-                self.endpointClasses[cls.__name__] = cls
 
         if userId or userEmail:
             self._getUser(userId=userId, userEmail=userEmail)
@@ -133,11 +119,6 @@ class DbUser(User):
         self._persistTokens()
         dbUUIDuserid = UUIDuserid(self.userId)
         dbUUIDuserid['uuid'] = self.uuid
-
-
-    def addEndpoint(self, endpointClass, things=None,   friendlyName=None, description=None, manufacturerName=None,displayCategories=None, proactivelyReported=None, retrievable=None, uncertaintyInMilliseconds=None, supportsDeactivation=None, cookie=None):
-        super(DbUser, self).addEndpoint(endpointClass, things,   friendlyName, description, manufacturerName,displayCategories, proactivelyReported, retrievable, uncertaintyInMilliseconds, supportsDeactivation, cookie)
-        self._persistEndpoints()
 
     def _getUser(self, token=None, userId=None, userEmail=None):
         self.userId = userId
@@ -272,7 +253,6 @@ class DbUser(User):
             for item in endpointList:
                 endpoint = pickle.loads(item)
                 self.endpoints[endpoint.EndpointId] = endpoint
-                cls = self.endpointClasses[endpoint.__class__]
 
 class DBEndpoints(Persist):
     def __init__(self, uuid='', systemName=DEFAULT_SYSTEM_NAME, region=DEFAULT_REGION):

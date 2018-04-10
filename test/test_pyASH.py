@@ -153,7 +153,7 @@ def setup():
         def toVolume(self, value):
             return value * 10
 
-    @Endpoint.addInterface(PowerController, proactivelyReported=True, retrievable=True, uncertaintyInMilliseconds=0) ### Need to think through how to specify uncertainty for a property
+    @Endpoint.addInterface(PowerController, proactivelyReported=True, retrievable=True, uncertaintyInMilliseconds=0)
     @Endpoint.addInterface(Speaker)
     @Endpoint.addInterface(BrightnessController)
     @Endpoint.addInterface(EndpointHealth)
@@ -168,10 +168,6 @@ def setup():
     class dhroneTV(Endpoint):
         manufacturerName = 'dhrone'
         description = 'iotTV controller by dhrone'
-        displayCategories = 'OTHER'
-        proactivelyReported = False
-        retrievable=False
-        uncertaintyInMilliseconds=0
 
         @Endpoint.addDirective(['TurnOn'])
         def OnWeGo(self, request):
@@ -270,8 +266,6 @@ def setupDiscover():
     class tLight(Endpoint):
         manufacturerName = 'Sample Manufacturer'
         displayCategories = 'LIGHT'
-        proactivelyReported = True
-        retrievable = True
 
     @Endpoint.addInterface(EndpointHealth)
     @Endpoint.addInterface(PowerController)
