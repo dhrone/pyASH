@@ -21,6 +21,11 @@ logger.setLevel(LOGLEVEL)
 def doNothing(obj, value):
     return value
 
+class Thing(object):
+	def __init__(self, name, iotcls):
+		self.name = name
+		self.iotcls = iotcls
+
 class IotBase(ABC):
     def __init__(self, endpointId, consideredStaleAfter=2):
         self.endpointId = endpointId

@@ -46,22 +46,18 @@ class User(ABC):
         self.accessTokenTimestamp = time.time()
 
     @staticmethod
-    def _getEndpointId(cls, things):
+    def getEndpointId(cls, things):
         if ':' in things:
             raise ValueError(': symbol not allowed in thing names')
         things = things if type(things) is list else [things]
         return cls.__name__ + ':' + ':'.join(things)
 
     @staticmethod
-    def _retrieveThings(endpointId):
+    def retrieveThings(endpointId):
         things = endpointId.split(':')
         cls = things[0]
         things = things[1:]
         return things
-
-    def _retrieveClass(self, endpointId):
-        cls = endpointId.split(':')[0]
-        return self.endpointClasses[cls]
 
     def getTokens(self, request):
         response = getAccessTokenFromCode(request['payload']['grant']['code'])
@@ -69,7 +65,7 @@ class User(ABC):
 
     def addEndpoint(self, endpointClass, things=None,   friendlyName=None, description=None, manufacturerName=None,displayCategories=None, proactivelyReported=None, retrievable=None, uncertaintyInMilliseconds=None, supportsDeactivation=None, cookie=None):
         self.endpointClasses[endpointClass.__name__] = endpointClass
-        endpointId = self._getEndpointId(endpointClass, things)
+        endpointId = self.getEndpointId(endpointClass, things)
         self.endpoints[endpointId] = endpointClass(endpointId=endpointId, things=things, friendlyName=friendlyName, description=description, manufacturerName=manufacturerName,displayCategories=displayCategories, proactivelyReported=proactivelyReported, retrievable=retrievable, uncertaintyInMilliseconds=uncertaintyInMilliseconds, supportsDeactivation=supportsDeactivation, cookie=cookie)
 
 class StaticUser(User):
@@ -190,7 +186,7 @@ class DbUser(User):
         self._getUserUUID()
 
     def _getUserProfileFromDb(self):
-        dbTokens = Tokens(self.userId)
+        dbTokens = DBTokens(self.userId)
 
         self.refreshToken = dbTokens['refreshToken']
         self.userName = dbTokens['userName']
@@ -220,8 +216,8 @@ class DbUser(User):
     def createTables():
     	dbUUIDemail = UUIDemail()
     	dbUUIDuserid = UUIDuserid()
-    	dbTokens = Tokens()
-    	dbThings = Things()
+    	dbTokens = DBTokens()
+    	dbThings = DBThings()
     	dbs = [ dbUUIDemail,dbUUIDuserid,dbTokens,dbThings ]
     	for item in dbs:
     		item.createTable()
@@ -250,7 +246,7 @@ class DbUser(User):
         self._persistTokens()
 
     def _persistTokens(self):
-        dbTokens = Tokens(self.userId)
+        dbTokens = DBTokens(self.userId)
         dbTokens['values'] = {
             'accessToken': self.accessToken,
             'accessTokenTimestamp': self.accessTokenTimestamp,
@@ -262,7 +258,7 @@ class DbUser(User):
 
     def _persistEndpoints(self):
         if self.uuid:
-            dbThings = Things(self.uuid)
+            dbThings = DBThings(self.uuid)
             json_list = []
             for item in self.endpoints.values():
                 json_list.append(item.json)
@@ -272,20 +268,20 @@ class DbUser(User):
 
     def _retrieveEndpoints(self):
         self.endpoints = {}
-        dbThings = Things(self.uuid)
+        dbThings = DBThings(self.uuid)
         json_list = dbThings['endpoints']
         if json_list:
             for item in json_list:
                 cls = self.endpointClasses[item['className']]
                 self.endpoints[item['endpointId']] = cls(json=item)
 
-class Things(Persist):
+class DBThings(Persist):
     def __init__(self, uuid='', systemName=DEFAULT_SYSTEM_NAME, region=DEFAULT_REGION):
-        super(Things, self).__init__(uuid, 'uuid', 'Things')
+        super(DBThings, self).__init__(uuid, 'uuid', 'Things')
 
-class Tokens(Persist):
+class DBTokens(Persist):
     def __init__(self, userId='', systemName=DEFAULT_SYSTEM_NAME, region=DEFAULT_REGION):
-        super(Tokens, self).__init__(userId, 'userId', 'Tokens')
+        super(DBTokens, self).__init__(userId, 'userId', 'Tokens')
 
 class UUIDemail(Persist):
     def __init__(self, email='', systemName=DEFAULT_SYSTEM_NAME, region=DEFAULT_REGION):

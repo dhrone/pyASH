@@ -18,7 +18,17 @@ logger.setLevel(LOGLEVEL)
 
 
 class pyASH(object):
-    """ pyASH is the message handler for the system processing all Alexa requests """
+    """ pyASH is the main class of the pyASH system.
+
+    pyASH manages all message handling between the Alexa Smart Home Skill API, the Endpoints that it controls, and the users who are associated (e.g. own) specific endpoint devices.
+
+    There are four major concepts that make up pyASH::
+        Endpoint: Is a service that you want the Alexa Smart Home Skill API to control.  Endpoints must implement a set of Alexa Smart Home Skill interfaces.
+        Interface: Is a collection of directives which are messages that Alexa sends to request your endpoint to do something.
+        Iot: Is a physical device that an endpoint controls.  Normally the relationship between an Iot thing and an endpoint is 1:1 but this is often not true for endpoints that implement the SceneController interface where several Iot things may need to be acted on as a group.
+        User:  A user possess a set of Endpoints that are uniquely theirs.
+
+      """
 
     def __init__(self, user, version='3'):
         """
@@ -150,11 +160,13 @@ class pyASH(object):
 
         try:
             endpoint = self.user.getEndpoint(request)
-            cls, handler = endpoint.getHandler(request)
-            things = self.user._retrieveThings(request.endpointId)
+            cls, handler = endpoint._getHandler(request)
+            things = self.user.retrieveThings(request.endpointId)
             method = handler.__get__(cls(iots=endpoint.iots), cls)
 
             ret = method(request)
+
+            interfaces = endpoint._generateInterfaces(endpoint.iots[0])
 
             # If the handler did not produce it's own response message then compute a default one
             if not ret:
@@ -164,14 +176,14 @@ class pyASH(object):
                     if time.time() > waitStarted+waitFor:
                         raise ENDPOINT_UNREACHABLE('Timed out waiting for endpoint to update')
 
-                interface = endpoint.generateInterfaces(endpoint.iots[0])[request.namespace]
+                interface = interfaces[request.namespace]
                 interfaceJsonResponse = interface.jsonResponse
                 ret = _getResponseJson(request)
                 if interfaceJsonResponse and type(interfaceJsonResponse) is list:
                     ret['context']['properties'] += interfaceJsonResponse
 
             # Check if Endpoint Health is enabled and if yes, add the appropriate context information to the response
-            healthif = endpoint.generateInterfaces(endpoint.iots[0])['Alexa.EndpointHealth'] if 'Alexa.EndpointHealth' in endpoint._interfaces else None
+            healthif = interfaces['Alexa.EndpointHealth'] if 'Alexa.EndpointHealth' in endpoint._interfaces else None
             if healthif:
                 if 'context' not in ret: ret['context'] = {}
                 if 'properties' not in ret['context'] or ret['context']['properties'] is None: ret['context']['properties'] = []
