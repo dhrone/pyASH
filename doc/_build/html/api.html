@@ -1,0 +1,448 @@
+
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
+  "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+
+<html xmlns="http://www.w3.org/1999/xhtml">
+  <head>
+    <meta http-equiv="X-UA-Compatible" content="IE=Edge" />
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+    <title>API Reference &#8212; pyASH 0.1-Alpha documentation</title>
+    <link rel="stylesheet" href="_static/alabaster.css" type="text/css" />
+    <link rel="stylesheet" href="_static/pygments.css" type="text/css" />
+    <script type="text/javascript" src="_static/documentation_options.js"></script>
+    <script type="text/javascript" src="_static/jquery.js"></script>
+    <script type="text/javascript" src="_static/underscore.js"></script>
+    <script type="text/javascript" src="_static/doctools.js"></script>
+    <link rel="index" title="Index" href="genindex.html" />
+    <link rel="search" title="Search" href="search.html" />
+    <link rel="prev" title="Welcome to pyASH’s documentation!" href="index.html" />
+   
+  <link rel="stylesheet" href="_static/custom.css" type="text/css" />
+  
+  
+  <meta name="viewport" content="width=device-width, initial-scale=0.9, maximum-scale=0.9" />
+
+  </head><body>
+  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          <div class="body" role="main">
+            
+  <div class="section" id="api-reference">
+<h1>API Reference<a class="headerlink" href="#api-reference" title="Permalink to this headline">¶</a></h1>
+<div class="section" id="module-pyASH.endpoint">
+<span id="endpoint-module"></span><h2>Endpoint Module<a class="headerlink" href="#module-pyASH.endpoint" title="Permalink to this headline">¶</a></h2>
+<dl class="class">
+<dt id="pyASH.endpoint.Endpoint">
+<em class="property">class </em><code class="descclassname">pyASH.endpoint.</code><code class="descname">Endpoint</code><span class="sig-paren">(</span><em>endpointId=None</em>, <em>things=None</em>, <em>friendlyName=None</em>, <em>description=None</em>, <em>manufacturerName=None</em>, <em>displayCategories=None</em>, <em>proactivelyReported=None</em>, <em>retrievable=None</em>, <em>uncertaintyInMilliseconds=None</em>, <em>supportsDeactivation=None</em>, <em>cameraStreamConfigurations=None</em>, <em>cookie=None</em>, <em>json=None</em>, <em>iots=None</em><span class="sig-paren">)</span><a class="headerlink" href="#pyASH.endpoint.Endpoint" title="Permalink to this definition">¶</a></dt>
+<dd><p>Inherit from Endpoint to define how your device should respond to Alexa Smart Home messages.</p>
+<p>In pyASH, Endpoints are responsible for responding to Alexa Smart Home directives which can include instructions to change the device’s state (e.g. TurnOn, SetVolume, AdjustBrightness), respond to discover requests about the endpoint, and report on the current state of the Endpoint.  pyASH handles discovery and state reporting automatically and includes default directive handling where possible.  If your device implements a directive that does not have a defined default method or you need to implement different behavior for a directive, you must implement a method for the directive within your Endpoint derived class.</p>
+<p>When specifying a directive method, you must decorate the method with <code class="docutils literal notranslate"><span class="pre">Endpoint.addDirective</span></code>.  If you name the method the same as the directive you are trying to handle, pyASH will automatically register that method as the handler for the directive.  If you name your method anything else, you must include a list of the directives your method will handle as a parameter to the <code class="docutils literal notranslate"><span class="pre">Endpoint.addDirective</span></code></p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="nd">@Endpoint.addDirective</span><span class="p">([</span><span class="s1">&#39;AdjustVolume&#39;</span><span class="p">,</span><span class="s1">&#39;SetVolume&#39;</span><span class="p">])</span>
+<span class="k">def</span> <span class="nf">Volume</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">request</span><span class="p">):</span>
+    <span class="k">if</span> <span class="n">request</span><span class="o">.</span><span class="n">name</span> <span class="o">==</span> <span class="s1">&#39;AdjustVolume&#39;</span><span class="p">:</span>
+        <span class="n">v</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">iot</span><span class="p">[</span><span class="s1">&#39;volume&#39;</span><span class="p">]</span> <span class="o">+</span> <span class="n">request</span><span class="o">.</span><span class="n">payload</span><span class="p">[</span><span class="s1">&#39;volume&#39;</span><span class="p">]</span>
+       <span class="bp">self</span><span class="o">.</span><span class="n">iot</span><span class="p">[</span><span class="s1">&#39;volume&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="mi">0</span> <span class="k">if</span> <span class="n">v</span> <span class="o">&lt;</span> <span class="mi">0</span> <span class="k">else</span> <span class="mi">100</span> <span class="k">if</span> <span class="n">v</span> <span class="o">&gt;</span> <span class="mi">100</span> <span class="k">else</span> <span class="n">v</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">iot</span><span class="p">[</span><span class="s1">&#39;volume&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">request</span><span class="o">.</span><span class="n">payload</span><span class="p">[</span><span class="s1">&#39;volume&#39;</span><span class="p">]</span>
+</pre></div>
+</div>
+<p>In the Alexa Smart Home service, directives belong to Interfaces.  When you add a directive to an Endpoint, pyASH will determine which Interface the directive is associated with and automatically add that Interface to your class.  This can occasionally be ambiguous (e.g. Speaker, StepSpeaker).  In those situations, you should declare which Interface you want as an additional parameter to Endpoint.addDirective:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="nd">@Endpoint</span><span class="o">.</span><span class="n">addDirective</span><span class="p">([</span><span class="s1">&#39;AdjustVolume&#39;</span><span class="p">,</span><span class="s1">&#39;SetVolume&#39;</span><span class="p">],</span> <span class="n">interface</span><span class="o">=</span><span class="s1">&#39;Alexa.Speaker&#39;</span><span class="p">)</span>
+</pre></div>
+</div>
+<p>It is also important that you make sure to implement a directive method for all of the directives contained within each Interface your device implements.  Note: most interfaces require you to handle multiple directives.  As example, if you implement SetBrightness, pyASH will add the BrightnessController interface to your class.  This interface also requires you to implement AdjustBrightness.  If you do not provide a directive for an included interface, a default method will be used if available.</p>
+<p>Endpoint classes can be decorated to specify which interfaces they support (<code class="docutils literal notranslate"><span class="pre">Endpoint.addInterface</span></code>).  This can be useful if you want to add an interface and are relying completely on the interfaces default methods or you need to specify specific configuration values for the interface.</p>
+<p>Endpoint classes should be decorated to add an Iot class (<code class="docutils literal notranslate"><span class="pre">Endpoint.addIot</span></code>) which is used to integrate the device with an Internet of Things service (see Iot for more information).</p>
+<dl class="docutils">
+<dt><strong>Attributes:</strong></dt>
+<dd><p class="first"><strong>endpointId</strong> (<em>str</em>): A unique identifier for Alexa Smart Home Kit API to reference a specific endpoint normally constructed as the name of the Endpoint class concatenated with a ‘:’ and the identified for the device within its Iot service.  To change this behavior, override the getEndpointId static method.</p>
+<p><strong>things</strong> (<strong>list</strong>): A list of identifiers for all of the Iot devices that make up this endpoint.  Can also specify a (str) if the endpoint only uses a single thing.</p>
+<dl class="docutils">
+<dt><strong>Interface Variables – set the default values on all interfaces for this endpoint.</strong></dt>
+<dd><p class="first"><strong>proactivelyReported</strong> (<em>bool</em>): True if Alexa should expect state updates from you asynchronously</p>
+<p><strong>retrievable</strong> (<em>bool</em>): True if Alexa can expect you to respond to a ReportState directive</p>
+<p><strong>uncertaintyInMilliseconds</strong> (<em>int</em>): Amount of time (in milliseconds) your reported state value could be out of date (e.g. stale)</p>
+<p><strong>supportsDeactivation</strong> (<em>bool</em>): True if the Endpoint implements the Deactivate directive (for devices supporting the SceneController interface only)</p>
+<p class="last"><strong>cameraStreamConfigurationas</strong> (<em>list</em>): A list of dictionaries describing the cameraStreamConfigurations supported by this endpoint (for devices supporting the CameraStreamController interface only)</p>
+</dd>
+<dt><strong>Discovery Variables – reported to Alexa in response to a discovery message for this endpoint.</strong></dt>
+<dd><p class="first"><strong>friendlyName</strong> (<em>str</em>): A name normally created by your end user to refer to this endpoint</p>
+<p><strong>description</strong> (<em>str</em>): A description of the endpoint</p>
+<p><strong>manufacturerName</strong> (<em>str</em>): The name of the manufacturer of the endpoint</p>
+<p><strong>displayCategories</strong> (<em>list</em>): A list of the display categories that are appropriate for this endpoint</p>
+<p class="last"><strong>cookie</strong> (<em>dict</em>): A dictionary of key, value pairs that you want Alexa to report back to you when processing messages for this endpoint.</p>
+</dd>
+</dl>
+<p class="last"><strong>json</strong> (<em>dict</em>): Endpoint can also be instantiated from a dictionary with a key entry for each attribute that you are passing in</p>
+</dd>
+<dt><strong>Defaults:</strong></dt>
+<dd><p class="first">If you want to establish default values for all of the endpoints that will be created from your class, you can add them as class variables</p>
+<div class="last highlight-python notranslate"><div class="highlight"><pre><span></span><span class="k">class</span> <span class="nc">myEndpoint</span><span class="p">(</span><span class="n">Endpoint</span><span class="p">):</span>
+    <span class="n">manufacturerName</span> <span class="o">=</span> <span class="s1">&#39;Me&#39;</span>
+    <span class="n">description</span> <span class="o">=</span> <span class="s1">&#39;FancyTV controller by Me&#39;</span>
+    <span class="n">displayCategories</span> <span class="o">=</span> <span class="s1">&#39;OTHER&#39;</span>
+    <span class="n">proactivelyReported</span> <span class="o">=</span> <span class="bp">False</span>
+    <span class="n">retrievable</span><span class="o">=</span><span class="bp">False</span>
+    <span class="n">uncertaintyInMilliseconds</span><span class="o">=</span><span class="mi">0</span>
+</pre></div>
+</div>
+</dd>
+</dl>
+<dl class="classmethod">
+<dt id="pyASH.endpoint.Endpoint.addDirective">
+<em class="property">classmethod </em><code class="descname">addDirective</code><span class="sig-paren">(</span><em>*args</em>, <em>**kwargs</em><span class="sig-paren">)</span><a class="headerlink" href="#pyASH.endpoint.Endpoint.addDirective" title="Permalink to this definition">¶</a></dt>
+<dd><p>Decorator to declare that a method is responsible for handling a directive or set of directives</p>
+<dl class="docutils">
+<dt>Parameters:</dt>
+<dd>args[0](str or list): A single name or list of names for the directives this method will handle
+interface(str): Name of the interface that the method is supporting</dd>
+</dl>
+<p>If interface name is not provided, an attempt will be made to look it up from the name of the directives that have been requested.</p>
+<p>If no argument is provided, the name of the decorated method will be used as the directive name.</p>
+</dd></dl>
+
+<dl class="staticmethod">
+<dt id="pyASH.endpoint.Endpoint.addInterface">
+<em class="property">static </em><code class="descname">addInterface</code><span class="sig-paren">(</span><em>proactivelyReported=None</em>, <em>retrievable=None</em>, <em>uncertaintyInMilliseconds=None</em>, <em>supportsDeactivation=None</em>, <em>cameraStreamConfigurations=None</em><span class="sig-paren">)</span><a class="headerlink" href="#pyASH.endpoint.Endpoint.addInterface" title="Permalink to this definition">¶</a></dt>
+<dd><p>Decorator to associates an interface with the Endpoint class and allows that interface’s attributes to be specified (if different from the endpoint itself).</p>
+<dl class="docutils">
+<dt>Parameters:</dt>
+<dd>interface(str or interface class): The name or the class of the interface to bind to this Endpoint.
+proactivelyReported(bool): See class attributes
+retrievable(bool): See class attributes
+uncertaintyInMilliseconds(bool): See class attributes
+supportsDeactivation(bool): See class attributes
+cameraStreamConfigurations(list): See class attributes</dd>
+</dl>
+</dd></dl>
+
+<dl class="staticmethod">
+<dt id="pyASH.endpoint.Endpoint.addIot">
+<em class="property">static </em><code class="descname">addIot</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#pyASH.endpoint.Endpoint.addIot" title="Permalink to this definition">¶</a></dt>
+<dd><p>Decorator to associates an Iot driver with the Endpoint class.</p>
+</dd></dl>
+
+<dl class="staticmethod">
+<dt id="pyASH.endpoint.Endpoint.getEndpointId">
+<em class="property">static </em><code class="descname">getEndpointId</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#pyASH.endpoint.Endpoint.getEndpointId" title="Permalink to this definition">¶</a></dt>
+<dd><p>Returns the endpointId of the Endpoint</p>
+<p>Default behavior is to concatenate the class name of the Endpoint with a ‘:’ and the thingName of this specific Endpoint object.  This method can be overridden if a different scheme for identifying the endpoint is desired.</p>
+<dl class="docutils">
+<dt>Note:</dt>
+<dd><p class="first">The default user class relies upon this encoding to instantiate endpoints.  If you change it you should override both getEndpointId and retrieveThings within the User class (or it’s children).</p>
+<p class="last">Currently the ‘:’ is not escaped so it should not be used within a thing name</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="attribute">
+<dt id="pyASH.endpoint.Endpoint.jsonDiscover">
+<code class="descname">jsonDiscover</code><a class="headerlink" href="#pyASH.endpoint.Endpoint.jsonDiscover" title="Permalink to this definition">¶</a></dt>
+<dd><p>Formats and returns a dictionary that contains a capability object appropriate to support discovery for the endpoint</p>
+</dd></dl>
+
+<dl class="attribute">
+<dt id="pyASH.endpoint.Endpoint.jsonResponse">
+<code class="descname">jsonResponse</code><a class="headerlink" href="#pyASH.endpoint.Endpoint.jsonResponse" title="Permalink to this definition">¶</a></dt>
+<dd><p>Formats and returns a list of property values (e.g. current state) for the endpoint</p>
+</dd></dl>
+
+</dd></dl>
+
+</div>
+<div class="section" id="module-pyASH.user">
+<span id="user-module"></span><h2>User Module<a class="headerlink" href="#module-pyASH.user" title="Permalink to this headline">¶</a></h2>
+<dl class="class">
+<dt id="pyASH.user.DbUser">
+<em class="property">class </em><code class="descclassname">pyASH.user.</code><code class="descname">DbUser</code><span class="sig-paren">(</span><em>endpointClasses=None</em>, <em>userEmail=None</em>, <em>userId=None</em>, <em>region='us-east-1'</em>, <em>systemName='pyASH'</em><span class="sig-paren">)</span><a class="headerlink" href="#pyASH.user.DbUser" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="class">
+<dt id="pyASH.user.DemoUser">
+<em class="property">class </em><code class="descclassname">pyASH.user.</code><code class="descname">DemoUser</code><a class="headerlink" href="#pyASH.user.DemoUser" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="class">
+<dt id="pyASH.user.StaticUser">
+<em class="property">class </em><code class="descclassname">pyASH.user.</code><code class="descname">StaticUser</code><a class="headerlink" href="#pyASH.user.StaticUser" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="class">
+<dt id="pyASH.user.User">
+<em class="property">class </em><code class="descclassname">pyASH.user.</code><code class="descname">User</code><a class="headerlink" href="#pyASH.user.User" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+</div>
+<div class="section" id="module-pyASH.pyASH">
+<span id="pyash-module"></span><h2>pyASH Module<a class="headerlink" href="#module-pyASH.pyASH" title="Permalink to this headline">¶</a></h2>
+<dl class="class">
+<dt id="pyASH.pyASH.pyASH">
+<em class="property">class </em><code class="descclassname">pyASH.pyASH.</code><code class="descname">pyASH</code><span class="sig-paren">(</span><em>user</em>, <em>version='3'</em><span class="sig-paren">)</span><a class="headerlink" href="#pyASH.pyASH.pyASH" title="Permalink to this definition">¶</a></dt>
+<dd><p>pyASH is the main class of the pyASH system.</p>
+<p>pyASH manages all message handling between the Alexa Smart Home Skill API, the Endpoints that it controls, and the users who are associated (e.g. own) specific endpoint devices.</p>
+<dl class="docutils">
+<dt>There are four major concepts that make up pyASH::</dt>
+<dd>Endpoint: Is a service that you want the Alexa Smart Home Skill API to control.  Endpoints must implement a set of Alexa Smart Home Skill interfaces.
+Interface: Is a collection of directives which are messages that Alexa sends to request your endpoint to do something.
+Iot: Is a physical device that an endpoint controls.  Normally the relationship between an Iot thing and an endpoint is 1:1 but this is often not true for endpoints that implement the SceneController interface where several Iot things may need to be acted on as a group.
+User:  A user possess a set of Endpoints that are uniquely theirs.</dd>
+</dl>
+<dl class="method">
+<dt id="pyASH.pyASH.pyASH.handleAcceptGrant">
+<code class="descname">handleAcceptGrant</code><span class="sig-paren">(</span><em>request</em><span class="sig-paren">)</span><a class="headerlink" href="#pyASH.pyASH.pyASH.handleAcceptGrant" title="Permalink to this definition">¶</a></dt>
+<dd><p>Handles the receipt of a user’s OAUTH2 code.</p>
+<p>When installing a new skill, during the enable process, the skill is linked to the customer’s account through OAUTH2 authentication. If the user successfully authenticates, an AcceptGrant message is sent to your Lambda function.  This message includes a OAUTH2 Code which can be exchanged for an OAUTH2 refresh token and an OAUTH2 access token.</p>
+<p>Note:  You only need to persist the refresh token if you need to initiate a message (e.g. async communications) with the Alexa Smart Home Service.  If you will only be synchronously replying, you can use the access token provided in the Alexa request and therefore do not need to manage requesting your own access token for the user.</p>
+</dd></dl>
+
+<dl class="method">
+<dt id="pyASH.pyASH.pyASH.handleDirective">
+<code class="descname">handleDirective</code><span class="sig-paren">(</span><em>request</em><span class="sig-paren">)</span><a class="headerlink" href="#pyASH.pyASH.pyASH.handleDirective" title="Permalink to this definition">¶</a></dt>
+<dd><p>Based upon the request from Alexa Smart Home, invokes the appropriate method to handle the request</p>
+</dd></dl>
+
+<dl class="method">
+<dt id="pyASH.pyASH.pyASH.handleDiscovery">
+<code class="descname">handleDiscovery</code><span class="sig-paren">(</span><em>request</em><span class="sig-paren">)</span><a class="headerlink" href="#pyASH.pyASH.pyASH.handleDiscovery" title="Permalink to this definition">¶</a></dt>
+<dd><p>Sends a list of all of the endpoints a user has installed and what they are capable of to Alexa Smart Home</p>
+<p>Before Alexa Smart Home can control a device, it needs to be told about each endpoint that your skill will handle for a user and what interfaces that endpoint supports.</p>
+</dd></dl>
+
+<dl class="method">
+<dt id="pyASH.pyASH.pyASH.handleReportState">
+<code class="descname">handleReportState</code><span class="sig-paren">(</span><em>request</em><span class="sig-paren">)</span><a class="headerlink" href="#pyASH.pyASH.pyASH.handleReportState" title="Permalink to this definition">¶</a></dt>
+<dd><p>Sends the current property values for the requested endpoint to Alexa Smart Home</p>
+</dd></dl>
+
+<dl class="method">
+<dt id="pyASH.pyASH.pyASH.lambda_handler">
+<code class="descname">lambda_handler</code><span class="sig-paren">(</span><em>request</em>, <em>context=None</em><span class="sig-paren">)</span><a class="headerlink" href="#pyASH.pyASH.pyASH.lambda_handler" title="Permalink to this definition">¶</a></dt>
+<dd><p>Routes the Alexa Smart Home request to the appropriate handler</p>
+<p>This is the method that you should point your Lambda function toself.</p>
+</dd></dl>
+
+</dd></dl>
+
+</div>
+<div class="section" id="module-pyASH.exceptions">
+<span id="exceptions"></span><h2>Exceptions<a class="headerlink" href="#module-pyASH.exceptions" title="Permalink to this headline">¶</a></h2>
+<dl class="exception">
+<dt id="pyASH.exceptions.ACCEPT_GRANT_FAILED">
+<em class="property">exception </em><code class="descclassname">pyASH.exceptions.</code><code class="descname">ACCEPT_GRANT_FAILED</code><span class="sig-paren">(</span><em>message</em>, <em>*args</em>, <em>**kwargs</em><span class="sig-paren">)</span><a class="headerlink" href="#pyASH.exceptions.ACCEPT_GRANT_FAILED" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="exception">
+<dt id="pyASH.exceptions.ALREADY_IN_OPERATION">
+<em class="property">exception </em><code class="descclassname">pyASH.exceptions.</code><code class="descname">ALREADY_IN_OPERATION</code><span class="sig-paren">(</span><em>message</em>, <em>*args</em>, <em>**kwargs</em><span class="sig-paren">)</span><a class="headerlink" href="#pyASH.exceptions.ALREADY_IN_OPERATION" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="exception">
+<dt id="pyASH.exceptions.BRIDGE_UNREACHABLE">
+<em class="property">exception </em><code class="descclassname">pyASH.exceptions.</code><code class="descname">BRIDGE_UNREACHABLE</code><span class="sig-paren">(</span><em>message</em>, <em>*args</em>, <em>**kwargs</em><span class="sig-paren">)</span><a class="headerlink" href="#pyASH.exceptions.BRIDGE_UNREACHABLE" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="exception">
+<dt id="pyASH.exceptions.COOK_DURATION_TOO_LONG">
+<em class="property">exception </em><code class="descclassname">pyASH.exceptions.</code><code class="descname">COOK_DURATION_TOO_LONG</code><span class="sig-paren">(</span><em>message</em>, <em>maxCookTime=None</em>, <em>*args</em>, <em>**kwargs</em><span class="sig-paren">)</span><a class="headerlink" href="#pyASH.exceptions.COOK_DURATION_TOO_LONG" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="exception">
+<dt id="pyASH.exceptions.DOOR_CLOSED_TOO_LONG">
+<em class="property">exception </em><code class="descclassname">pyASH.exceptions.</code><code class="descname">DOOR_CLOSED_TOO_LONG</code><span class="sig-paren">(</span><em>message</em>, <em>*args</em>, <em>**kwargs</em><span class="sig-paren">)</span><a class="headerlink" href="#pyASH.exceptions.DOOR_CLOSED_TOO_LONG" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="exception">
+<dt id="pyASH.exceptions.DOOR_OPEN">
+<em class="property">exception </em><code class="descclassname">pyASH.exceptions.</code><code class="descname">DOOR_OPEN</code><span class="sig-paren">(</span><em>message</em>, <em>*args</em>, <em>**kwargs</em><span class="sig-paren">)</span><a class="headerlink" href="#pyASH.exceptions.DOOR_OPEN" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="exception">
+<dt id="pyASH.exceptions.ENDPOINT_BUSY">
+<em class="property">exception </em><code class="descclassname">pyASH.exceptions.</code><code class="descname">ENDPOINT_BUSY</code><span class="sig-paren">(</span><em>message</em>, <em>*args</em>, <em>**kwargs</em><span class="sig-paren">)</span><a class="headerlink" href="#pyASH.exceptions.ENDPOINT_BUSY" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="exception">
+<dt id="pyASH.exceptions.ENDPOINT_LOW_POWER">
+<em class="property">exception </em><code class="descclassname">pyASH.exceptions.</code><code class="descname">ENDPOINT_LOW_POWER</code><span class="sig-paren">(</span><em>message</em>, <em>percentageState=None</em>, <em>*args</em>, <em>**kwargs</em><span class="sig-paren">)</span><a class="headerlink" href="#pyASH.exceptions.ENDPOINT_LOW_POWER" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="exception">
+<dt id="pyASH.exceptions.ENDPOINT_UNREACHABLE">
+<em class="property">exception </em><code class="descclassname">pyASH.exceptions.</code><code class="descname">ENDPOINT_UNREACHABLE</code><span class="sig-paren">(</span><em>message</em>, <em>*args</em>, <em>**kwargs</em><span class="sig-paren">)</span><a class="headerlink" href="#pyASH.exceptions.ENDPOINT_UNREACHABLE" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="exception">
+<dt id="pyASH.exceptions.EXPIRED_AUTHORIZATION_CREDENTIAL">
+<em class="property">exception </em><code class="descclassname">pyASH.exceptions.</code><code class="descname">EXPIRED_AUTHORIZATION_CREDENTIAL</code><span class="sig-paren">(</span><em>message</em>, <em>*args</em>, <em>**kwargs</em><span class="sig-paren">)</span><a class="headerlink" href="#pyASH.exceptions.EXPIRED_AUTHORIZATION_CREDENTIAL" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="exception">
+<dt id="pyASH.exceptions.FIRMWARE_OUT_OF_DATE">
+<em class="property">exception </em><code class="descclassname">pyASH.exceptions.</code><code class="descname">FIRMWARE_OUT_OF_DATE</code><span class="sig-paren">(</span><em>message</em>, <em>*args</em>, <em>**kwargs</em><span class="sig-paren">)</span><a class="headerlink" href="#pyASH.exceptions.FIRMWARE_OUT_OF_DATE" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="exception">
+<dt id="pyASH.exceptions.HARDWARE_MALFUNCTION">
+<em class="property">exception </em><code class="descclassname">pyASH.exceptions.</code><code class="descname">HARDWARE_MALFUNCTION</code><span class="sig-paren">(</span><em>message</em>, <em>*args</em>, <em>**kwargs</em><span class="sig-paren">)</span><a class="headerlink" href="#pyASH.exceptions.HARDWARE_MALFUNCTION" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="exception">
+<dt id="pyASH.exceptions.INTERNAL_ERROR">
+<em class="property">exception </em><code class="descclassname">pyASH.exceptions.</code><code class="descname">INTERNAL_ERROR</code><span class="sig-paren">(</span><em>message</em>, <em>*args</em>, <em>**kwargs</em><span class="sig-paren">)</span><a class="headerlink" href="#pyASH.exceptions.INTERNAL_ERROR" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="exception">
+<dt id="pyASH.exceptions.INVALID_AUTHORIZATION_CREDENTIAL">
+<em class="property">exception </em><code class="descclassname">pyASH.exceptions.</code><code class="descname">INVALID_AUTHORIZATION_CREDENTIAL</code><span class="sig-paren">(</span><em>message</em>, <em>*args</em>, <em>**kwargs</em><span class="sig-paren">)</span><a class="headerlink" href="#pyASH.exceptions.INVALID_AUTHORIZATION_CREDENTIAL" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="exception">
+<dt id="pyASH.exceptions.INVALID_DIRECTIVE">
+<em class="property">exception </em><code class="descclassname">pyASH.exceptions.</code><code class="descname">INVALID_DIRECTIVE</code><span class="sig-paren">(</span><em>message</em>, <em>*args</em>, <em>**kwargs</em><span class="sig-paren">)</span><a class="headerlink" href="#pyASH.exceptions.INVALID_DIRECTIVE" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="exception">
+<dt id="pyASH.exceptions.INVALID_VALUE">
+<em class="property">exception </em><code class="descclassname">pyASH.exceptions.</code><code class="descname">INVALID_VALUE</code><span class="sig-paren">(</span><em>message</em>, <em>*args</em>, <em>**kwargs</em><span class="sig-paren">)</span><a class="headerlink" href="#pyASH.exceptions.INVALID_VALUE" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="exception">
+<dt id="pyASH.exceptions.MISCELLANIOUS_EXCEPTION">
+<em class="property">exception </em><code class="descclassname">pyASH.exceptions.</code><code class="descname">MISCELLANIOUS_EXCEPTION</code><span class="sig-paren">(</span><em>message</em>, <em>*args</em>, <em>**kwargs</em><span class="sig-paren">)</span><a class="headerlink" href="#pyASH.exceptions.MISCELLANIOUS_EXCEPTION" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="exception">
+<dt id="pyASH.exceptions.NOT_IN_OPERATION">
+<em class="property">exception </em><code class="descclassname">pyASH.exceptions.</code><code class="descname">NOT_IN_OPERATION</code><span class="sig-paren">(</span><em>message</em>, <em>*args</em>, <em>**kwargs</em><span class="sig-paren">)</span><a class="headerlink" href="#pyASH.exceptions.NOT_IN_OPERATION" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="exception">
+<dt id="pyASH.exceptions.NOT_SUBSCRIBED">
+<em class="property">exception </em><code class="descclassname">pyASH.exceptions.</code><code class="descname">NOT_SUBSCRIBED</code><span class="sig-paren">(</span><em>message</em>, <em>*args</em>, <em>**kwargs</em><span class="sig-paren">)</span><a class="headerlink" href="#pyASH.exceptions.NOT_SUBSCRIBED" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="exception">
+<dt id="pyASH.exceptions.NOT_SUPPORTED_IN_CURRENT_MODE">
+<em class="property">exception </em><code class="descclassname">pyASH.exceptions.</code><code class="descname">NOT_SUPPORTED_IN_CURRENT_MODE</code><span class="sig-paren">(</span><em>message</em>, <em>mode</em>, <em>*args</em>, <em>**kwargs</em><span class="sig-paren">)</span><a class="headerlink" href="#pyASH.exceptions.NOT_SUPPORTED_IN_CURRENT_MODE" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="exception">
+<dt id="pyASH.exceptions.NO_SUCH_ENDPOINT">
+<em class="property">exception </em><code class="descclassname">pyASH.exceptions.</code><code class="descname">NO_SUCH_ENDPOINT</code><span class="sig-paren">(</span><em>message</em>, <em>*args</em>, <em>**kwargs</em><span class="sig-paren">)</span><a class="headerlink" href="#pyASH.exceptions.NO_SUCH_ENDPOINT" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="exception">
+<dt id="pyASH.exceptions.OAUTH2_EXCEPTION">
+<em class="property">exception </em><code class="descclassname">pyASH.exceptions.</code><code class="descname">OAUTH2_EXCEPTION</code><span class="sig-paren">(</span><em>message</em>, <em>*args</em>, <em>**kwargs</em><span class="sig-paren">)</span><a class="headerlink" href="#pyASH.exceptions.OAUTH2_EXCEPTION" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="exception">
+<dt id="pyASH.exceptions.POWER_LEVEL_NOT_SUPPORTED">
+<em class="property">exception </em><code class="descclassname">pyASH.exceptions.</code><code class="descname">POWER_LEVEL_NOT_SUPPORTED</code><span class="sig-paren">(</span><em>message</em>, <em>*args</em>, <em>**kwargs</em><span class="sig-paren">)</span><a class="headerlink" href="#pyASH.exceptions.POWER_LEVEL_NOT_SUPPORTED" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="exception">
+<dt id="pyASH.exceptions.RATE_LIMIT_EXCEEDED">
+<em class="property">exception </em><code class="descclassname">pyASH.exceptions.</code><code class="descname">RATE_LIMIT_EXCEEDED</code><span class="sig-paren">(</span><em>message</em>, <em>*args</em>, <em>**kwargs</em><span class="sig-paren">)</span><a class="headerlink" href="#pyASH.exceptions.RATE_LIMIT_EXCEEDED" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="exception">
+<dt id="pyASH.exceptions.REMOTE_START_DISABLED">
+<em class="property">exception </em><code class="descclassname">pyASH.exceptions.</code><code class="descname">REMOTE_START_DISABLED</code><span class="sig-paren">(</span><em>message</em>, <em>*args</em>, <em>**kwargs</em><span class="sig-paren">)</span><a class="headerlink" href="#pyASH.exceptions.REMOTE_START_DISABLED" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="exception">
+<dt id="pyASH.exceptions.REMOTE_START_NOT_SUPPORTED">
+<em class="property">exception </em><code class="descclassname">pyASH.exceptions.</code><code class="descname">REMOTE_START_NOT_SUPPORTED</code><span class="sig-paren">(</span><em>message</em>, <em>*args</em>, <em>**kwargs</em><span class="sig-paren">)</span><a class="headerlink" href="#pyASH.exceptions.REMOTE_START_NOT_SUPPORTED" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="exception">
+<dt id="pyASH.exceptions.TEMPERATURE_VALUE_OUT_OF_RANGE">
+<em class="property">exception </em><code class="descclassname">pyASH.exceptions.</code><code class="descname">TEMPERATURE_VALUE_OUT_OF_RANGE</code><span class="sig-paren">(</span><em>message</em>, <em>minv=None</em>, <em>maxv=None</em>, <em>scale='FAHRENHEIT'</em>, <em>*args</em>, <em>**kwargs</em><span class="sig-paren">)</span><a class="headerlink" href="#pyASH.exceptions.TEMPERATURE_VALUE_OUT_OF_RANGE" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="exception">
+<dt id="pyASH.exceptions.USER_NOT_FOUND_EXCEPTION">
+<em class="property">exception </em><code class="descclassname">pyASH.exceptions.</code><code class="descname">USER_NOT_FOUND_EXCEPTION</code><span class="sig-paren">(</span><em>message</em>, <em>*args</em>, <em>**kwargs</em><span class="sig-paren">)</span><a class="headerlink" href="#pyASH.exceptions.USER_NOT_FOUND_EXCEPTION" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="exception">
+<dt id="pyASH.exceptions.VALUE_OUT_OF_RANGE">
+<em class="property">exception </em><code class="descclassname">pyASH.exceptions.</code><code class="descname">VALUE_OUT_OF_RANGE</code><span class="sig-paren">(</span><em>message</em>, <em>minv=None</em>, <em>maxv=None</em>, <em>*args</em>, <em>**kwargs</em><span class="sig-paren">)</span><a class="headerlink" href="#pyASH.exceptions.VALUE_OUT_OF_RANGE" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="exception">
+<dt id="pyASH.exceptions.pyASH_EXCEPTION">
+<em class="property">exception </em><code class="descclassname">pyASH.exceptions.</code><code class="descname">pyASH_EXCEPTION</code><span class="sig-paren">(</span><em>message</em>, <em>*args</em>, <em>**kwargs</em><span class="sig-paren">)</span><a class="headerlink" href="#pyASH.exceptions.pyASH_EXCEPTION" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+</div>
+</div>
+
+
+          </div>
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="main navigation">
+        <div class="sphinxsidebarwrapper">
+  <h3><a href="index.html">Table Of Contents</a></h3>
+  <ul>
+<li><a class="reference internal" href="#">API Reference</a><ul>
+<li><a class="reference internal" href="#module-pyASH.endpoint">Endpoint Module</a></li>
+<li><a class="reference internal" href="#module-pyASH.user">User Module</a></li>
+<li><a class="reference internal" href="#module-pyASH.pyASH">pyASH Module</a></li>
+<li><a class="reference internal" href="#module-pyASH.exceptions">Exceptions</a></li>
+</ul>
+</li>
+</ul>
+<div class="relations">
+<h3>Related Topics</h3>
+<ul>
+  <li><a href="index.html">Documentation overview</a><ul>
+      <li>Previous: <a href="index.html" title="previous chapter">Welcome to pyASH’s documentation!</a></li>
+  </ul></li>
+</ul>
+</div>
+  <div role="note" aria-label="source link">
+    <h3>This Page</h3>
+    <ul class="this-page-menu">
+      <li><a href="_sources/api.rst.txt"
+            rel="nofollow">Show Source</a></li>
+    </ul>
+   </div>
+<div id="searchbox" style="display: none" role="search">
+  <h3>Quick search</h3>
+    <div class="searchformwrapper">
+    <form class="search" action="search.html" method="get">
+      <input type="text" name="q" />
+      <input type="submit" value="Go" />
+      <input type="hidden" name="check_keywords" value="yes" />
+      <input type="hidden" name="area" value="default" />
+    </form>
+    </div>
+</div>
+<script type="text/javascript">$('#searchbox').show(0);</script>
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="footer">
+      &copy;2018, Dhrone.
+      
+      |
+      Powered by <a href="http://sphinx-doc.org/">Sphinx 1.7.2</a>
+      &amp; <a href="https://github.com/bitprophet/alabaster">Alabaster 0.7.10</a>
+      
+      |
+      <a href="_sources/api.rst.txt"
+          rel="nofollow">Page source</a>
+    </div>
+
+    
+
+    
+  </body>
+</html>
