@@ -10,7 +10,7 @@ from .utility import get_utc_timestamp
 from .objects import ASHO
 
 class InterfaceMeta(object):
-	def __init__(self, proactivelyReported=None, retrievable=None, supportsDeactivation=None, uncertaintyInMilliseconds=None, cameraStreamConfigurations=None)
+	def __init__(self, proactivelyReported=None, retrievable=None, supportsDeactivation=None, uncertaintyInMilliseconds=None, cameraStreamConfigurations=None):
 		self.proactivelyReported = proactivelyReported
 		self.retrievable = retrievable
 		self.supportsDeactivation = supportsDeactivation

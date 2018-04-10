@@ -6,9 +6,11 @@ from abc import ABC, abstractmethod
 import json
 import time
 import re
+import pickle
 import boto3
 from botocore.vendored import requests
 from decimal import Decimal
+
 
 # pyASH imports
 from .db import Persist
@@ -63,10 +65,9 @@ class User(ABC):
         response = getAccessTokenFromCode(request['payload']['grant']['code'])
         self.storeTokens(response['access_token'], response['refresh_token'], response['expires_in'])
 
-    def addEndpoint(self, endpointClass, things=None,   friendlyName=None, description=None, manufacturerName=None,displayCategories=None, proactivelyReported=None, retrievable=None, uncertaintyInMilliseconds=None, supportsDeactivation=None, cookie=None):
-        self.endpointClasses[endpointClass.__name__] = endpointClass
-        endpointId = self.getEndpointId(endpointClass, things)
-        self.endpoints[endpointId] = endpointClass(endpointId=endpointId, things=things, friendlyName=friendlyName, description=description, manufacturerName=manufacturerName,displayCategories=displayCategories, proactivelyReported=proactivelyReported, retrievable=retrievable, uncertaintyInMilliseconds=uncertaintyInMilliseconds, supportsDeactivation=supportsDeactivation, cookie=cookie)
+    def addEndpoint(self, endpoint):
+        self.endpointClasses[endpoint.__class__.__name__] = endpoint.__class__
+        self.endpoints[endpoint.EndpointId] = endpoint
 
 class StaticUser(User):
     def __init__(self):
@@ -257,27 +258,25 @@ class DbUser(User):
         }
 
     def _persistEndpoints(self):
-        if self.uuid:
-            dbThings = DBThings(self.uuid)
-            json_list = []
-            for item in self.endpoints.values():
-                json_list.append(item.json)
-            dbThings['endpoints'] = json_list
-        else:
-            raise MISCELLANIOUS_EXCEPTION('UUID not set.  _persistEndpoints likely called prior to _getUser')
+        dbEndpoints = DBEndpoints(self.uuid)
+        endpointList = []
+        for item in self.endpoints.values():
+            endpointList.append(pickle.dumps(item))
+        dbEndpoints['endpoints'] = endpointList
 
     def _retrieveEndpoints(self):
         self.endpoints = {}
-        dbThings = DBThings(self.uuid)
-        json_list = dbThings['endpoints']
-        if json_list:
-            for item in json_list:
-                cls = self.endpointClasses[item['className']]
-                self.endpoints[item['endpointId']] = cls(json=item)
+        dbEndpoints = DBEndpoints(self.uuid)
+        endpointList = dbEndpoints['endpoints']
+        if endpointList:
+            for item in endpointList:
+                endpoint = pickle.loads(item)
+                self.endpoints[endpoint.EndpointId] = endpoint
+                cls = self.endpointClasses[endpoint.__class__]
 
-class DBThings(Persist):
+class DBEndpoints(Persist):
     def __init__(self, uuid='', systemName=DEFAULT_SYSTEM_NAME, region=DEFAULT_REGION):
-        super(DBThings, self).__init__(uuid, 'uuid', 'Things')
+        super(DBEndpoints, self).__init__(uuid, 'uuid', 'Endpoints')
 
 class DBTokens(Persist):
     def __init__(self, userId='', systemName=DEFAULT_SYSTEM_NAME, region=DEFAULT_REGION):

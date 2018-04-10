@@ -102,44 +102,22 @@ class Endpoint(object):
     friendlyName = 'pyASH device'
     manufacturerName = 'pyASH'
     description = 'Generic device by pyASH'
-    displayCategories = 'OTHER'
-    proactivelyReported = None
-    retrievable = None
-    uncertaintyInMilliseconds = None
-    supportsDeactivation = None
-    cameraStreamConfigurations = None
+    displayCategories = ['OTHER']
     cookie = None
 
-    def __init__(self, things=None, friendlyName = None, description = None, manufacturerName=None, displayCategories=None, cookie=None, interfaceDefaults=None, iots=None, json=None):
+    def __init__(self, things=None, friendlyName=None, description=None, manufacturerName=None, displayCategories=None, cookie=None):
 
-        self.things = json.get('things') if type(json) is dict and 'things' in json else things
-        self.friendlyName = json.get('friendlyName') if type(json) is dict and 'friendlyName' in json else friendlyName if friendlyName is not None else self.friendlyName
-        self.manufacturerName = json.get('manufacturerName') if type(json) is dict and 'manufacturerName' in json else manufacturerName if manufacturerName is not None else self.manufacturerName
-        self.description = json.get('description') if type(json) is dict and 'description' in json else description if description is not None else self.description
-        self.displayCategories = json.get('displayCategories') if type(json) is dict and 'displayCategories' in json else displayCategories if displayCategories is not None else self.displayCategories
+        self.things = things
+        self.friendlyName = friendlyName if friendlyName is not None else self.friendlyName
+        self.manufacturerName = manufacturerName if manufacturerName is not None else self.manufacturerName
+        self.description = description if description is not None else self.description
+        self.displayCategories = displayCategories if displayCategories is not None else self.displayCategories
         self.displayCategories = self.displayCategories if self.displayCategories is None or type(self.displayCategories) is list else [self.displayCategories]
-        self.proactivelyReported = json.get('proactivelyReported') if type(json) is dict and 'proactivelyReported' in json else proactivelyReported if proactivelyReported is not None else self.proactivelyReported
-        self.retrievable = json.get('retrievable') if type(json) is dict and 'retrievable' in json else retrievable if retrievable is not None else self.retrievable
-        self.uncertaintyInMilliseconds = json.get('uncertaintyInMilliseconds') if type(json) is dict and 'uncertaintyInMilliseconds' in json else uncertaintyInMilliseconds if uncertaintyInMilliseconds is not None else self.uncertaintyInMilliseconds
-        self.supportsDeactivation = json.get('supportsDeactivation') if type(json) is dict and 'supportsDeactivation' in json else supportsDeactivation if supportsDeactivation is not None else self.supportsDeactivation
-        self.cameraStreamConfigurations = json.get('cameraStreamConfigurations') if type(json) is dict and 'cameraStreamConfigurations' in json else cameraStreamConfigurations if cameraStreamConfigurations is not None else self.cameraStreamConfigurations
-        self.cookie = json.get('cookie') if type(json) is dict and 'cookie' in json else cookie if cookie is not None else self.cookie
-        self.iots = json.get('iots') if type(json) is dict and 'iots' in json else iots
-
+        self.cookie = cookie if cookie is not None else self.cookie
         self.things = self.things if type(self.things) is list else [self.things] if self.things is not None else None
 
-        # Find and instantiate an array of Iot objects if possible and needed
-        if not self.iots:
-            self.iots = []
-            if self.things:
-                self.iotClass = self._findIot()
-                if self.iotClass:
-                    for thing in self.things:
-                        self.iots.append( self.iotClass(thing) )
-        self.iot = self.iots[0] if self.iots else None
-
     @staticmethod
-    def addInterface(interface, proactivelyReported=None, retrievable=None, uncertaintyInMilliseconds=None, supportsDeactivation = None, cameraStreamConfigurations = None):
+    def addInterface(interface, proactivelyReported=False, retrievable=False, uncertaintyInMilliseconds=0, supportsDeactivation = False, cameraStreamConfigurations = None):
         '''Decorator to associates an interface with the Endpoint class and allows that interface's attributes to be specified (if different from the endpoint itself).
 
         Parameters:
@@ -155,31 +133,14 @@ class Endpoint(object):
             interface = getInterfaceClass(interface)
         name = 'Alexa.'+ interface.__name__
         Endpoint._lookupInterface(name)
-        _proactivelyReported = proactivelyReported if proactivelyReported is not None else None
-        _retrievable = retrievable if retrievable is not None else None
-        _uncertaintyInMilliseconds = uncertaintyInMilliseconds if uncertaintyInMilliseconds is not None else None
-        _supportsDeactivation = supportsDeactivation if supportsDeactivation is not None else None
-        _cameraStreamConfigurations = cameraStreamConfigurations if cameraStreamConfigurations is not None else None
+
 
         def wrapper(func):
-            item = { 'interface': interface, 'proactivelyReported': _proactivelyReported, 'retrievable': _retrievable, 'uncertaintyInMilliseconds': _uncertaintyInMilliseconds, 'supportsDeactivation': _supportsDeactivation, 'cameraStreamConfigurations': _cameraStreamConfigurations }
-            if hasattr(func, '__interfaces__'):
-                func.__interfaces__.append( item )
-            else:
-                func.__interfaces__ = [ item ]
+            item = { 'interface': interface, 'proactivelyReported': proactivelyReported, 'retrievable': retrievable, 'uncertaintyInMilliseconds': uncertaintyInMilliseconds, 'supportsDeactivation': supportsDeactivation, 'cameraStreamConfigurations': cameraStreamConfigurations }
+            func.__interfaces__ = getattr(func, '__interfaces__', {})
+            func.__interfaces__[name] = item if name not in func.__interfaces__
             return func
 
-        return wrapper
-
-    @staticmethod
-    def addIot(iotcls):
-        '''Decorator to associates an Iot driver with the Endpoint class.'''
-        def wrapper(func):
-            if hasattr(func, '__iot__'):
-                raise MISCELLANIOUS_EXCEPTION('You can only specify a single IOT class for an endpoint')
-            else:
-                func.__iot__ = iotcls
-            return func
         return wrapper
 
     @classmethod
@@ -198,17 +159,36 @@ class Endpoint(object):
         if _interface:
             Endpoint._lookupInterface(_interface)
 
+        # Set interface attributes if included
+        proactivelyReported = kwargs.get('proactivelyReported',False)
+        retrievable = kwargs.get('retrievable',False)
+        uncertaintyInMilliseconds = kwargs.get('uncertaintyInMilliseconds',0)
+        supportsDeactivation = kwargs.get('supportsDeactivation',False)
+        cameraStreamConfigurations = kwargs.get('cameraStreamConfigurations',None)
+
         def decoratelist(func):
             d = args[0] if type(args[0]) is list else [args[0]]
+
             for item in d:
                 directives = getattr(func, '__directives__', [])
                 interface = _interface if _interface else Endpoint._lookupInterfaceFromDirective(item)
                 func.__directives__ = directives + [(interface, Endpoint._lookupDirective(item,interface))]
+
+                # Add interface associated with directive if it has not already been added
+                intf = { 'interface': interface, 'proactivelyReported': proactivelyReported, 'retrievable': retrievable, 'uncertaintyInMilliseconds': uncertaintyInMilliseconds, 'supportsDeactivation': supportsDeactivation, 'cameraStreamConfigurations': cameraStreamConfigurations }
+                func.__interfaces__ = getattr(func, '__interfaces__', {})
+                func.__interfaces__[name] = intf if name not in func.__interfaces__
+
             return func
         def decorateinterface(func):
             directives = getattr(func, '__directives__', [])
             interface = _interface if _interface else Endpoint._lookupInterfaceFromDirective(func.__name__)
             func.__directives__ = directives + [(interface, Endpoint._lookupDirective(func.__name__, interface))]
+
+            # Add interface associated with directive if it has not already been added
+            item = { 'interface': interface, 'proactivelyReported': proactivelyReported, 'retrievable': retrievable, 'uncertaintyInMilliseconds': uncertaintyInMilliseconds, 'supportsDeactivation': supportsDeactivation, 'cameraStreamConfigurations': cameraStreamConfigurations }
+            func.__interfaces__ = getattr(func, '__interfaces__', {})
+            func.__interfaces__[name] = item if name not in func.__interfaces__
             return func
 
         if args:
@@ -216,6 +196,12 @@ class Endpoint(object):
                 directives = getattr(args[0], '__directives__', [])
                 interface = _interface if _interface else Endpoint._lookupInterfaceFromDirective(args[0].__name__)
                 args[0].__directives__ = directives + [(interface, Endpoint._lookupDirective(args[0].__name__,interface))]
+
+                # Add interface associated with directive if it has not already been added
+                item = { 'interface': interface, 'proactivelyReported': proactivelyReported, 'retrievable': retrievable, 'uncertaintyInMilliseconds': uncertaintyInMilliseconds, 'supportsDeactivation': supportsDeactivation, 'cameraStreamConfigurations': cameraStreamConfigurations }
+                args[0].__interfaces__ = getattr(func, '__interfaces__', {})
+                args[0].__interfaces__[name] = item if name not in func.__interfaces__
+
                 return args[0]
             else:
                 return decoratelist
@@ -243,15 +229,7 @@ class Endpoint(object):
 
     def _generateInterfaces(self,iot=None):
         ret = {}
-        # Fix interface defaults
-        for k, interface in self._interfaces.items():
-            interface['proactivelyReported'] = interface['proactivelyReported'] if interface['proactivelyReported'] is not None else self.proactivelyReported
-            interface['retrievable'] = interface['retrievable'] if interface['retrievable'] is not None else self.retrievable
-            interface['uncertaintyInMilliseconds'] = interface['uncertaintyInMilliseconds'] if interface['uncertaintyInMilliseconds'] is not None else self.uncertaintyInMilliseconds
-
-            # For each interface, add capabilities
-            interface['supportsDeactivation'] = interface['supportsDeactivation'] if interface['supportsDeactivation'] is not None else self.supportsDeactivation
-            interface['cameraStreamConfigurations'] = interface['cameraStreamConfigurations'] if interface['cameraStreamConfigurations'] is not None else self.cameraStreamConfigurations
+        for name, interface in self._interfaces.items():
             object = interface['interface'] \
                 ( \
                     iot=iot, \
@@ -261,23 +239,14 @@ class Endpoint(object):
                     supportsDeactivation = interface['supportsDeactivation'], \
                     cameraStreamConfigurations= interface['cameraStreamConfigurations']
                 )
-            ret[k]=object
+            ret[name]=object
         return ret
 
     @property
     def jsonDiscover(self):
-        ### Need to sort out how to deal with endpointId
-        ### Difference between thingName which is what IOT needs
-        ### and endpointId sent to AWS and what is provided when the endpoint object is created
-        ### Should I REQUIRE that the classname of the endpoint be prepended to the endpointId
-        ### Or should I leave this up to the user object
-
-        ### Decided that user's get to set the endpointId.  Also...
-        ### Endpoints should keep endpointId and thing names separate.  Also...
-        ### Endpoints can contain multiple things
         '''Formats and returns a dictionary that contains a capability object appropriate to support discovery for the endpoint'''
         return { k:v for k,v in {
-            'endpointId' : self._getEndpointId,
+            'endpointId' : self.EndpointId,
             'manufacturerName' : self.manufacturerName,
             'friendlyName' : self.friendlyName,
             'description' : self.description,
@@ -322,7 +291,7 @@ class Endpoint(object):
         raise INVALID_DIRECTIVE('{0} is not a valid directive'.format(directive))
 
     @property
-    def _getEndpointId(self):
+    def EndpointId(self):
         '''Returns the endpointId of the Endpoint
 
         Default behavior is to concatenate the class name of the Endpoint with a ':' and the thingName of this specific Endpoint object.  This method can be overridden if a different scheme for identifying the endpoint is desired.
@@ -332,18 +301,18 @@ class Endpoint(object):
 
             Currently the ':' is not escaped so it should not be used within a thing name
         '''
-
-        return self.__name__ + ':' + ':'.join(self.things)
+        thingNames = [ t.name for t in self.things ]
+        return self.__name__ + ':' + ':'.join(thingNames)
 
     @_classproperty
     def _directives(cls):
         ret = {}
         # Add in default handlers from interface
         for supercls in cls.__mro__:  # This makes inherited Appliances work
-            for interface in getattr(supercls, '__interfaces__', []):
-                for d in VALID_DIRECTIVES['Alexa.'+interface['interface'].__name__]:
+            for name, interface in getattr(supercls, '__interfaces__', {}).items():
+                for d in VALID_DIRECTIVES[name]:
                     if hasattr(interface['interface'], d):
-                        ret[('Alexa.'+interface['interface'].__name__, d)] = (interface['interface'], getattr(interface['interface'], d))
+                        ret[(name, d)] = (interface['interface'], getattr(interface['interface'], d))
 
         # Override those with any locally defined ones
         for supercls in cls.__mro__:
@@ -355,25 +324,10 @@ class Endpoint(object):
     @_classproperty
     def _interfaces(cls):
         ret = {}
-        # Start with the list of declared interfaces
-        for supercls in cls.__mro__:
-            for interface in getattr(supercls, '__interfaces__', []):
-                ret['Alexa.'+interface['interface'].__name__] = interface
 
-        # Add any inferred interfaces based upon any Directives implemented within the endpoint
         for supercls in cls.__mro__:
-            for method in supercls.__dict__.values():
-                for directive in getattr(method, '__directives__', []):
-                    interface, d = directive
-                    if interface not in ret:
-                        ret[interface] = {
-                            'interface': getInterfaceClass(interface),
-                            'proactivelyReported': None,
-                            'retrievable': None,
-                            'uncertaintyInMilliseconds': None,
-                            'supportsDeactivation': None,
-                            'cameraStreamConfigurations': None
-                        }
+            for name, interface in getattr(supercls, '__interfaces__', {}).items():
+                ret[name] = interface
 
         return ret
 
