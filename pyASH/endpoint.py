@@ -8,7 +8,7 @@ import json
 # pyASH imports
 from .iot import Iot, Thing
 from .exceptions import INVALID_DIRECTIVE, MISCELLANIOUS_EXCEPTION
-from .utility import LOGLEVEL, VALID_DIRECTIVES
+from .utility import LOGLEVEL, VALID_DIRECTIVES, makeList
 from .interface import getInterfaceClass
 
 # Setup logger
@@ -111,7 +111,8 @@ class Endpoint(object):
         self.friendlyName = friendlyName if friendlyName is not None else self.friendlyName
         self.manufacturerName = manufacturerName if manufacturerName is not None else self.manufacturerName
         self.description = description if description is not None else self.description
-        self.displayCategories = displayCategories if type(displayCategories) is list else [displayCategories] if displayCategories is not None else None
+        self.displayCategories = displayCategories if displayCategories is not None else self.displayCategories if self.displayCategories is not None else None
+        if self.displayCategories: self.displayCategories = makeList(self.displayCategories)
         self.cookie = cookie if cookie is not None else self.cookie
 
         self.iot = self.things[0].iotcls(self.things[0].name)

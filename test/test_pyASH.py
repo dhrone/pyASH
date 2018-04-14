@@ -251,13 +251,13 @@ def setupDiscover():
         manufacturerName = 'Sample Manufacturer'
         displayCategories = 'SWITCH'
 
-    @Endpoint.addInterface(EndpointHealth)
-    @Endpoint.addInterface(PowerController)
-    @Endpoint.addInterface(ColorController)
-    @Endpoint.addInterface(ColorTemperatureController)
-    @Endpoint.addInterface(BrightnessController)
-    @Endpoint.addInterface(PowerLevelController)
-    @Endpoint.addInterface(PercentageController)
+    @Endpoint.addInterface(EndpointHealth, proactivelyReported=True, retrievable=True)
+    @Endpoint.addInterface(PowerController, proactivelyReported=True, retrievable=True)
+    @Endpoint.addInterface(ColorController, proactivelyReported=True, retrievable=True)
+    @Endpoint.addInterface(ColorTemperatureController, proactivelyReported=True, retrievable=True)
+    @Endpoint.addInterface(BrightnessController, proactivelyReported=True, retrievable=True)
+    @Endpoint.addInterface(PowerLevelController, proactivelyReported=True, retrievable=True)
+    @Endpoint.addInterface(PercentageController, proactivelyReported=True, retrievable=True)
     class tLight(Endpoint):
         manufacturerName = 'Sample Manufacturer'
         displayCategories = 'LIGHT'

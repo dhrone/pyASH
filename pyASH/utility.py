@@ -265,6 +265,12 @@ def validateValue(value, validList, errmsg=None):
     errmsg = errmsg if type(errmsg) == str else '{0} is not a valid value'
     raise INVALID_DIRECTIVE(errmsg.format(value))
 
+def makeList(item):
+    ''' Turn item into a list if it is not already a list '''
+    if type(item) != list:
+        return [ item ]
+    return item
+    
 def getUserProfile(accessToken):
     payload = { 'access_token': accessToken }
     r = requests.get("https://api.amazon.com/user/profile", params=payload)
