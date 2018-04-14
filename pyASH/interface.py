@@ -9,15 +9,6 @@ from .iot import Iot
 from .utility import get_utc_timestamp
 from .objects import ASHO
 
-class InterfaceMeta(object):
-    def __init__(self, proactivelyReported=None, retrievable=None, supportsDeactivation=None, uncertaintyInMilliseconds=None, cameraStreamConfigurations=None):
-        self.proactivelyReported = proactivelyReported
-        self.retrievable = retrievable
-        self.supportsDeactivation = supportsDeactivation
-        self.uncertaintyInMilliseconds = uncertaintyInMilliseconds
-        self.cameraStreamConfigurations = cameraStreamConfigurations
-
-
 class Interface(object):
     interface = None
     version = None
@@ -28,7 +19,8 @@ class Interface(object):
         self.version='3'
         self.uncertaintyInMilliseconds = uncertaintyInMilliseconds
         self.thing = thing
-        self.iot = thing.iotcls(thing.name)
+        if self.thing:
+            self.iot = thing.iotcls(thing.name)
 
     @property
     def capability(self):
@@ -321,7 +313,7 @@ class PowerLevelController(Interface):
 
 class SceneController(Interface):
     def __init__(self, thing=None, proactivelyReported=False, supportsDeactivation=False, *args, **kwargs):
-        super(SceneController, self).__init__(iots=iots, iot=iot)
+        super(SceneController, self).__init__(thing=thing)
         self.proactivelyReported = proactivelyReported
         self.supportsDeactivation = supportsDeactivation
 

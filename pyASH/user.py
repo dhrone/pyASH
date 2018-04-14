@@ -57,7 +57,7 @@ class User(ABC):
         pass
 
     def addEndpoint(self, endpoint):
-        self.endpoints[endpoint.EndpointId] = endpoint
+        self.endpoints[endpoint.endpointId] = endpoint
         self._persistEndpoints()
 
 class StaticUser(User):

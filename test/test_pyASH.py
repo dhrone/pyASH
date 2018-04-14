@@ -15,7 +15,7 @@ import json
 # pyASH imports
 from pyASH.validation import validate_message
 from pyASH.endpoint import Endpoint
-from pyASH.iot import Iot, IotTest
+from pyASH.iot import Iot, IotTest, Thing
 from pyASH.user import DemoUser
 from pyASH.pyASH import pyASH
 #from objects import Header, Channel, CameraStream, Color
@@ -164,7 +164,6 @@ def setup():
     @Endpoint.addInterface(PercentageController)
     @Endpoint.addInterface(PowerLevelController, uncertaintyInMilliseconds=200)
     @Endpoint.addInterface(StepSpeaker)
-    @Endpoint.addIot(iotTV)
     class dhroneTV(Endpoint):
         manufacturerName = 'dhrone'
         description = 'iotTV controller by dhrone'
@@ -246,13 +245,11 @@ def setup():
 def setupDiscover():
     user = DemoUser()
 
-    @Endpoint.addInterface(EndpointHealth)
-    @Endpoint.addInterface(PowerController)
+    @Endpoint.addInterface(EndpointHealth, proactivelyReported=True, retrievable=True)
+    @Endpoint.addInterface(PowerController, proactivelyReported=True, retrievable=True)
     class tSwitch(Endpoint):
         manufacturerName = 'Sample Manufacturer'
         displayCategories = 'SWITCH'
-        proactivelyReported = True
-        retrievable = True
 
     @Endpoint.addInterface(EndpointHealth)
     @Endpoint.addInterface(PowerController)
@@ -265,65 +262,51 @@ def setupDiscover():
         manufacturerName = 'Sample Manufacturer'
         displayCategories = 'LIGHT'
 
-    @Endpoint.addInterface(EndpointHealth)
-    @Endpoint.addInterface(PowerController)
-    @Endpoint.addInterface(ColorTemperatureController)
-    @Endpoint.addInterface(BrightnessController)
-    @Endpoint.addInterface(PowerLevelController)
-    @Endpoint.addInterface(PercentageController)
+    @Endpoint.addInterface(EndpointHealth, proactivelyReported=True, retrievable=True)
+    @Endpoint.addInterface(PowerController, proactivelyReported=True, retrievable=True)
+    @Endpoint.addInterface(ColorTemperatureController, proactivelyReported=True, retrievable=True)
+    @Endpoint.addInterface(BrightnessController, proactivelyReported=True, retrievable=True)
+    @Endpoint.addInterface(PowerLevelController, proactivelyReported=True, retrievable=True)
+    @Endpoint.addInterface(PercentageController, proactivelyReported=True, retrievable=True)
     class tLightWhite(Endpoint):
         manufacturerName = 'Sample Manufacturer'
         displayCategories = 'LIGHT'
-        proactivelyReported = True
-        retrievable = True
 
-    @Endpoint.addInterface(EndpointHealth)
-    @Endpoint.addInterface(ThermostatControllerSingle)
-    @Endpoint.addInterface(TemperatureSensor)
+    @Endpoint.addInterface(EndpointHealth, proactivelyReported=True, retrievable=True)
+    @Endpoint.addInterface(ThermostatControllerSingle, proactivelyReported=True, retrievable=True)
+    @Endpoint.addInterface(TemperatureSensor, proactivelyReported=True, retrievable=True)
     class tThermostat(Endpoint):
         manufacturerName = 'Sample Manufacturer'
         displayCategories = 'THERMOSTAT'
-        proactivelyReported = True
-        retrievable = True
 
-    @Endpoint.addInterface(EndpointHealth)
-    @Endpoint.addInterface(ThermostatControllerDual)
-    @Endpoint.addInterface(TemperatureSensor)
+    @Endpoint.addInterface(EndpointHealth, proactivelyReported=True, retrievable=True)
+    @Endpoint.addInterface(ThermostatControllerDual, proactivelyReported=True, retrievable=True)
+    @Endpoint.addInterface(TemperatureSensor, proactivelyReported=True, retrievable=True)
     class tThermostatDual(Endpoint):
         manufacturerName = 'Sample Manufacturer'
         displayCategories = 'OTHER'
-        proactivelyReported = True
-        retrievable = True
 
-    @Endpoint.addInterface(EndpointHealth)
-    @Endpoint.addInterface(LockController)
+
+    @Endpoint.addInterface(EndpointHealth, proactivelyReported=True, retrievable=True)
+    @Endpoint.addInterface(LockController, proactivelyReported=True, retrievable=True)
     class tLock(Endpoint):
         manufacturerName = 'Sample Manufacturer'
         displayCategories = 'SMARTLOCK'
-        proactivelyReported = True
-        retrievable = True
 
-    @Endpoint.addInterface(EndpointHealth)
+    @Endpoint.addInterface(EndpointHealth, proactivelyReported=True, retrievable=True)
     @Endpoint.addInterface(SceneController, supportsDeactivation=False, proactivelyReported=True)
     class tSceneOnonly(Endpoint):
         manufacturerName = 'Sample Manufacturer'
         displayCategories = 'SCENE_TRIGGER'
-        proactivelyReported = True
-        retrievable = True
 
-    @Endpoint.addInterface(EndpointHealth)
+    @Endpoint.addInterface(EndpointHealth, proactivelyReported=True, retrievable=True)
     @Endpoint.addInterface(SceneController, supportsDeactivation=True, proactivelyReported=True)
     class tSceneOnOff(Endpoint):
         manufacturerName = 'Sample Manufacturer'
         displayCategories = 'ACTIVITY_TRIGGER'
-        proactivelyReported = True
-        retrievable = True
 
-    @Endpoint.addInterface(EndpointHealth)
-    @Endpoint.addInterface(CameraStreamController)
-    class tCamera(Endpoint):
-        manufacturerName = 'Sample Manufacturer'
-        displayCategories = 'CAMERA'
+    @Endpoint.addInterface(EndpointHealth, proactivelyReported=True, retrievable=True)
+    @Endpoint.addInterface(CameraStreamController, proactivelyReported=True, retrievable=True, \
         cameraStreamConfigurations = [ {
             'protocols': [ 'RTSP' ],
             'resolutions': [{'width':1280, 'height':720}],
@@ -331,30 +314,29 @@ def setupDiscover():
             'videoCodecs': ['H264'],
             'audioCodecs': ['AAC']
         } ]
-        proactivelyReported = True
-        retrievable = True
+    )
+    class tCamera(Endpoint):
+        manufacturerName = 'Sample Manufacturer'
+        displayCategories = 'CAMERA'
 
-    @Endpoint.addInterface(EndpointHealth)
-    @Endpoint.addInterface(ChannelController)
-    @Endpoint.addInterface(InputController)
-    @Endpoint.addInterface(Speaker)
+    @Endpoint.addInterface(EndpointHealth, proactivelyReported=True, retrievable=True)
+    @Endpoint.addInterface(ChannelController, proactivelyReported=True, retrievable=True)
+    @Endpoint.addInterface(InputController, proactivelyReported=True, retrievable=True)
+    @Endpoint.addInterface(Speaker, proactivelyReported=True, retrievable=True)
     class tTV(Endpoint):
         manufacturerName = 'Sample Manufacturer'
         displayCategories = 'OTHER'
-        proactivelyReported = True
-        retrievable = True
 
-
-    user.addEndpoint(endpointClass=tSwitch, things='endpoint-001', friendlyName='Switch', description='001 Switch that can only be turned on/off', cookie={ 'detail1': "For simplicity, this is the only appliance", 'detail2':"that has some values in the additionalApplianceDetails"})
-    user.addEndpoint(endpointClass=tLight, things='endpoint-002', friendlyName='Light', description='002 Light that is dimmable and can change color and color temperature')
-    user.addEndpoint(endpointClass=tLightWhite, things='endpoint-003', friendlyName='White Light', description='003 Light that is dimmable and can change color temperature only')
-    user.addEndpoint(endpointClass=tThermostat, things='endpoint-004', friendlyName='Thermostat', description='004 Thermostat that can change and query temperatures')
-    user.addEndpoint(endpointClass=tThermostatDual, things='endpoint-004-1', friendlyName='Living Room Thermostat', description='004-1 Thermostat that can change and query temperatures, supports dual setpoints')
-    user.addEndpoint(endpointClass=tLock, things='endpoint-005', friendlyName='Lock', description='005 Lock that can be locked and can query lock state')
-    user.addEndpoint(endpointClass=tSceneOnonly, things='endpoint-006', friendlyName='Goodnight', description='006 Scene that can only be turned on')
-    user.addEndpoint(endpointClass=tSceneOnOff, things='endpoint-007', friendlyName='Watch TV', description='007 Activity that runs sequentially that can be turned on and off')
-    user.addEndpoint(endpointClass=tCamera, things='endpoint-008', friendlyName='Baby Camera', description='008 Camera that streams from an RSTP source')
-    user.addEndpoint(endpointClass=tTV, things='endpoint-009', friendlyName='TV', description='009 TV that supports various entertainment controllers')
+    user.addEndpoint(tSwitch(things=Thing('endpoint-001', IotTest), friendlyName='Switch', description='001 Switch that can only be turned on/off', cookie={ 'detail1': "For simplicity, this is the only appliance", 'detail2':"that has some values in the additionalApplianceDetails"}))
+    user.addEndpoint(tLight(things=Thing('endpoint-002',IotTest), friendlyName='Light', description='002 Light that is dimmable and can change color and color temperature'))
+    user.addEndpoint(tLightWhite(things=Thing('endpoint-003',IotTest), friendlyName='White Light', description='003 Light that is dimmable and can change color temperature only'))
+    user.addEndpoint(tThermostat(things=Thing('endpoint-004',IotTest), friendlyName='Thermostat', description='004 Thermostat that can change and query temperatures'))
+    user.addEndpoint(tThermostatDual(things=Thing('endpoint-004-1',IotTest), friendlyName='Living Room Thermostat', description='004-1 Thermostat that can change and query temperatures, supports dual setpoints'))
+    user.addEndpoint(tLock(things=Thing('endpoint-005',IotTest), friendlyName='Lock', description='005 Lock that can be locked and can query lock state'))
+    user.addEndpoint(tSceneOnonly(things=Thing('endpoint-006',IotTest), friendlyName='Goodnight', description='006 Scene that can only be turned on'))
+    user.addEndpoint(tSceneOnOff(things=Thing('endpoint-007',IotTest), friendlyName='Watch TV', description='007 Activity that runs sequentially that can be turned on and off'))
+    user.addEndpoint(tCamera(things=Thing('endpoint-008',IotTest), friendlyName='Baby Camera', description='008 Camera that streams from an RSTP source'))
+    user.addEndpoint(tTV(things=Thing('endpoint-009',IotTest), friendlyName='TV', description='009 TV that supports various entertainment controllers'))
 
     pyash = pyASH(user)
 
@@ -374,18 +356,14 @@ def setupReportState():
     class iotReportState(IotTest):
         pass
 
-    @Endpoint.addInterface(EndpointHealth)
-    @Endpoint.addInterface(ThermostatControllerSingle)
-    @Endpoint.addInterface(TemperatureSensor)
-    @Endpoint.addIot(iotReportState)
+    @Endpoint.addInterface(EndpointHealth, proactivelyReported=True, retrievable=True, uncertaintyInMilliseconds = 200)
+    @Endpoint.addInterface(ThermostatControllerSingle, proactivelyReported=True, retrievable=True, uncertaintyInMilliseconds = 200)
+    @Endpoint.addInterface(TemperatureSensor, proactivelyReported=True, retrievable=True, uncertaintyInMilliseconds = 200)
     class tThermostat(Endpoint):
         manufacturerName = 'Sample Manufacturer'
         displayCategories = 'THERMOSTAT'
-        proactivelyReported = True
-        retrievable = True
-        uncertaintyInMilliseconds = 200
 
-    user.addEndpoint(endpointClass=tThermostat, things='endpoint-001', friendlyName='Thermostat', description='001 Single mode thermostat')
+    user.addEndpoint(tThermostat(things=Thing('endpoint-001',iotReportState), friendlyName='Thermostat', description='001 Single mode thermostat'))
     pyash = pyASH(user)
 
     return pyash

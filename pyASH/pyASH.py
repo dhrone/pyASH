@@ -161,7 +161,14 @@ class pyASH(object):
         try:
             endpoint = self.user.getEndpoint(request)
             cls, handler = endpoint._getHandler(request)
-            method = handler.__get__(endpoint, cls)
+            print ('instantiating method with class {0}'.format(cls.__name__))
+
+            # If the method to handle the directive comes from the endpoint bind the method to the endpoint
+            if cls.__name__ == endpoint.__class__.__name__:
+                method = handler.__get__(endpoint, cls)
+            else:
+                # else create an object of the handling interface class and bind the method to it
+                method = handler.__get__(cls(endpoint.things[0]), cls)
 
             ret = method(request)
 
@@ -171,7 +178,7 @@ class pyASH(object):
             if not ret:
                 waitStarted = time.time()
                 waitFor = 5
-                while not endpoint.iots[0].updateFinished():
+                while not endpoint.iot.updateFinished():
                     if time.time() > waitStarted+waitFor:
                         raise ENDPOINT_UNREACHABLE('Timed out waiting for endpoint to update')
 

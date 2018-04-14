@@ -9,7 +9,7 @@ import json
 from .iot import Iot, Thing
 from .exceptions import INVALID_DIRECTIVE, MISCELLANIOUS_EXCEPTION
 from .utility import LOGLEVEL, VALID_DIRECTIVES
-from .interface import getInterfaceClass, InterfaceMeta
+from .interface import getInterfaceClass
 
 # Setup logger
 import logging
@@ -172,10 +172,11 @@ class Endpoint(object):
             for item in d:
                 directives = getattr(func, '__directives__', [])
                 interface = _interface if _interface else Endpoint._lookupInterfaceFromDirective(item)
+                icls = getInterfaceClass(interface)
                 func.__directives__ = directives + [(interface, Endpoint._lookupDirective(item,interface))]
 
                 # Add interface associated with directive if it has not already been added
-                intf = { 'interface': interface, 'proactivelyReported': proactivelyReported, 'retrievable': retrievable, 'uncertaintyInMilliseconds': uncertaintyInMilliseconds, 'supportsDeactivation': supportsDeactivation, 'cameraStreamConfigurations': cameraStreamConfigurations }
+                intf = { 'interface': icls, 'proactivelyReported': proactivelyReported, 'retrievable': retrievable, 'uncertaintyInMilliseconds': uncertaintyInMilliseconds, 'supportsDeactivation': supportsDeactivation, 'cameraStreamConfigurations': cameraStreamConfigurations }
                 func.__interfaces__ = getattr(func, '__interfaces__', {})
                 if interface not in func.__interfaces__: func.__interfaces__[interface] = intf
 
@@ -183,10 +184,11 @@ class Endpoint(object):
         def decorateinterface(func):
             directives = getattr(func, '__directives__', [])
             interface = _interface if _interface else Endpoint._lookupInterfaceFromDirective(func.__name__)
+            icls = getInterfaceClass(interface)
             func.__directives__ = directives + [(interface, Endpoint._lookupDirective(func.__name__, interface))]
 
             # Add interface associated with directive if it has not already been added
-            item = { 'interface': interface, 'proactivelyReported': proactivelyReported, 'retrievable': retrievable, 'uncertaintyInMilliseconds': uncertaintyInMilliseconds, 'supportsDeactivation': supportsDeactivation, 'cameraStreamConfigurations': cameraStreamConfigurations }
+            item = { 'interface': icls, 'proactivelyReported': proactivelyReported, 'retrievable': retrievable, 'uncertaintyInMilliseconds': uncertaintyInMilliseconds, 'supportsDeactivation': supportsDeactivation, 'cameraStreamConfigurations': cameraStreamConfigurations }
             func.__interfaces__ = getattr(func, '__interfaces__', {})
             if interface not in func.__interfaces__: func.__interfaces__[interface] = item
             return func
@@ -195,10 +197,11 @@ class Endpoint(object):
             if callable(args[0]):
                 directives = getattr(args[0], '__directives__', [])
                 interface = _interface if _interface else Endpoint._lookupInterfaceFromDirective(args[0].__name__)
+                icls = getInterfaceClass(interface)
                 args[0].__directives__ = directives + [(interface, Endpoint._lookupDirective(args[0].__name__,interface))]
 
                 # Add interface associated with directive if it has not already been added
-                item = { 'interface': interface, 'proactivelyReported': proactivelyReported, 'retrievable': retrievable, 'uncertaintyInMilliseconds': uncertaintyInMilliseconds, 'supportsDeactivation': supportsDeactivation, 'cameraStreamConfigurations': cameraStreamConfigurations }
+                item = { 'interface': icls, 'proactivelyReported': proactivelyReported, 'retrievable': retrievable, 'uncertaintyInMilliseconds': uncertaintyInMilliseconds, 'supportsDeactivation': supportsDeactivation, 'cameraStreamConfigurations': cameraStreamConfigurations }
                 args[0].__interfaces__ = getattr(args[0], '__interfaces__', {})
                 if interface not in args[0].__interfaces__: args[0].__interfaces__[interface] = item
 
@@ -246,7 +249,7 @@ class Endpoint(object):
     def jsonDiscover(self):
         '''Formats and returns a dictionary that contains a capability object appropriate to support discovery for the endpoint'''
         return { k:v for k,v in {
-            'endpointId' : self.EndpointId,
+            'endpointId' : self.endpointId,
             'manufacturerName' : self.manufacturerName,
             'friendlyName' : self.friendlyName,
             'description' : self.description,
@@ -291,7 +294,7 @@ class Endpoint(object):
         raise INVALID_DIRECTIVE('{0} is not a valid directive'.format(directive))
 
     @property
-    def EndpointId(self):
+    def endpointId(self):
         '''Returns the endpointId of the Endpoint
 
         Default behavior is to concatenate the class name of the Endpoint with a ':' and the thingName of this specific Endpoint object.  This method can be overridden if a different scheme for identifying the endpoint is desired.
@@ -331,19 +334,18 @@ class Endpoint(object):
             for name, interface in getattr(supercls, '__interfaces__', {}).items():
                 ret[name] = interface
 
-        return ret
+        # Add interfaces from directives
+        for supercls in cls.__mro__:
+            for method in supercls.__dict__.values():
+                for name, interface in getattr(method, '__interfaces__', {}).items():
+                    if name not in ret: ret[name] = interface
 
-    @property
-    def _properties(self):
-        idp_list = self._directives.keys()
-        ret = {}
-        for i in idp_list:
-            ret[i[0]] = VALID_PROPERTIES[i[0]]
         return ret
 
     def _getHandler(self, request):
         ret = self._directives
-        for i in ret:
-            if i[0] == request.namespace and i[1] == request.name:
-                return ret[i]
+        if (request.namespace, request.name) in ret:
+            return ret[request.namespace, request.name]
+        if request.name in ret:
+            return ret[request.name]
         raise INVALID_DIRECTIVE('{0} has no method to handle {1}:{2}'.format(self.__class__.__name__,request.namespace,request.name))
