@@ -5,11 +5,11 @@
 
 
 # pyASH imports
-from endpoint import Endpoint
-from iot import Iot
+from pyASH.endpoint import Endpoint
+from pyASH.iot import Iot
 
-from interface import PowerController, Speaker
-from utility import LOGLEVEL
+from pyASH.interface import PowerController, Speaker
+from pyASH.utility import LOGLEVEL
 
 # Setup logger
 import logging
@@ -52,7 +52,6 @@ class iotTV(Iot):
 
 @Endpoint.addInterface(PowerController, proactivelyReported=True, retrievable=True, uncertaintyInMilliseconds=0) ### Need to think through how to specify uncertainty for a property
 @Endpoint.addInterface(Speaker)
-@Endpoint.addIot(iotTV)
 class dhroneTV(Endpoint):
     manufacturerName = 'dhrone'
     description = 'iotTV controller by dhrone'
@@ -60,9 +59,6 @@ class dhroneTV(Endpoint):
     proactivelyReported = False
     retrievable=False
     uncertaintyInMilliseconds=0
-
-    class Iot(iotTV):
-        pass
 
     @Endpoint.addDirective(['TurnOn'])
     def TurnOn(self, request):

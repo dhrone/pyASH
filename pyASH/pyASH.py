@@ -161,12 +161,11 @@ class pyASH(object):
         try:
             endpoint = self.user.getEndpoint(request)
             cls, handler = endpoint._getHandler(request)
-            things = self.user.retrieveThings(request.endpointId)
-            method = handler.__get__(cls(iots=endpoint.iots), cls)
+            method = handler.__get__(endpoint, cls)
 
             ret = method(request)
 
-            interfaces = endpoint._generateInterfaces(endpoint.iots[0])
+            interfaces = endpoint._generateInterfaces()
 
             # If the handler did not produce it's own response message then compute a default one
             if not ret:

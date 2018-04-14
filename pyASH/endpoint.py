@@ -138,7 +138,7 @@ class Endpoint(object):
         def wrapper(func):
             item = { 'interface': interface, 'proactivelyReported': proactivelyReported, 'retrievable': retrievable, 'uncertaintyInMilliseconds': uncertaintyInMilliseconds, 'supportsDeactivation': supportsDeactivation, 'cameraStreamConfigurations': cameraStreamConfigurations }
             func.__interfaces__ = getattr(func, '__interfaces__', {})
-            func.__interfaces__[name] = item if name not in func.__interfaces__
+            if name not in func.__interfaces__: func.__interfaces__[name] = item
             return func
 
         return wrapper
@@ -177,7 +177,7 @@ class Endpoint(object):
                 # Add interface associated with directive if it has not already been added
                 intf = { 'interface': interface, 'proactivelyReported': proactivelyReported, 'retrievable': retrievable, 'uncertaintyInMilliseconds': uncertaintyInMilliseconds, 'supportsDeactivation': supportsDeactivation, 'cameraStreamConfigurations': cameraStreamConfigurations }
                 func.__interfaces__ = getattr(func, '__interfaces__', {})
-                func.__interfaces__[name] = intf if name not in func.__interfaces__
+                if interface not in func.__interfaces__: func.__interfaces__[interface] = intf
 
             return func
         def decorateinterface(func):
@@ -188,7 +188,7 @@ class Endpoint(object):
             # Add interface associated with directive if it has not already been added
             item = { 'interface': interface, 'proactivelyReported': proactivelyReported, 'retrievable': retrievable, 'uncertaintyInMilliseconds': uncertaintyInMilliseconds, 'supportsDeactivation': supportsDeactivation, 'cameraStreamConfigurations': cameraStreamConfigurations }
             func.__interfaces__ = getattr(func, '__interfaces__', {})
-            func.__interfaces__[name] = item if name not in func.__interfaces__
+            if interface not in func.__interfaces__: func.__interfaces__[interface] = item
             return func
 
         if args:
@@ -199,8 +199,8 @@ class Endpoint(object):
 
                 # Add interface associated with directive if it has not already been added
                 item = { 'interface': interface, 'proactivelyReported': proactivelyReported, 'retrievable': retrievable, 'uncertaintyInMilliseconds': uncertaintyInMilliseconds, 'supportsDeactivation': supportsDeactivation, 'cameraStreamConfigurations': cameraStreamConfigurations }
-                args[0].__interfaces__ = getattr(func, '__interfaces__', {})
-                args[0].__interfaces__[name] = item if name not in func.__interfaces__
+                args[0].__interfaces__ = getattr(args[0], '__interfaces__', {})
+                if interface not in args[0].__interfaces__: args[0].__interfaces__[interface] = item
 
                 return args[0]
             else:
@@ -216,23 +216,23 @@ class Endpoint(object):
             "version": "3"
         }]
 
-        for object in self._generateInterfaces(iot=None).values():
+        for object in self._generateInterfaces().values():
             capabilities.append(object.jsonDiscover)
         return capabilities
 
     @property
     def _getProperties(self):
         properties = []
-        for object in self._generateInterfaces(iot=self.iot).values():
+        for object in self._generateInterfaces().values():
             if object.jsonResponse: properties += object.jsonResponse
         return properties
 
-    def _generateInterfaces(self,iot=None):
+    def _generateInterfaces(self):
         ret = {}
         for name, interface in self._interfaces.items():
             object = interface['interface'] \
                 ( \
-                    iot=iot, \
+                    thing=self.things[0], \
                     proactivelyReported=interface['proactivelyReported'], \
                     retrievable = interface['retrievable'], \
                     uncertaintyInMilliseconds = interface['uncertaintyInMilliseconds'], \
@@ -302,10 +302,11 @@ class Endpoint(object):
             Currently the ':' is not escaped so it should not be used within a thing name
         '''
         thingNames = [ t.name for t in self.things ]
-        return self.__name__ + ':' + ':'.join(thingNames)
+        return self.__class__.__name__ + ':' + ':'.join(thingNames)
 
-    @_classproperty
-    def _directives(cls):
+    @property
+    def _directives(self):
+        cls = self.__class__
         ret = {}
         # Add in default handlers from interface
         for supercls in cls.__mro__:  # This makes inherited Appliances work
@@ -321,8 +322,9 @@ class Endpoint(object):
                     ret[directive] = (supercls, method)
         return ret
 
-    @_classproperty
-    def _interfaces(cls):
+    @property
+    def _interfaces(self):
+        cls = self.__class__
         ret = {}
 
         for supercls in cls.__mro__:
