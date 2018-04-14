@@ -200,10 +200,7 @@ class pyASH(object):
             raise
 
     def lambda_handler(self, request, context=None):
-        """ Routes the Alexa Smart Home request to the appropriate handler
-
-        This is the method that you should point your Lambda function toself.
-        """
+        """ Routes the Alexa Smart Home request to the appropriate handler """
         request = Request(request)
         return {
             'Alexa' : self.handleReportState,

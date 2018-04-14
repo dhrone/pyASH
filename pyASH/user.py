@@ -36,6 +36,10 @@ class User(ABC):
     def getEndpoint(self, request):
         pass
 
+    def getTokens(self, request):
+        response = getAccessTokenFromCode(request['payload']['grant']['code'])
+        self.storeTokens(response['access_token'], response['refresh_token'], response['expires_in'])
+
     @abstractmethod
     def storeTokens(self, access, refresh, expires_in):
         pass
@@ -51,10 +55,6 @@ class User(ABC):
 
     def _retrieveEndpoints(self):
         pass
-
-    def getTokens(self, request):
-        response = getAccessTokenFromCode(request['payload']['grant']['code'])
-        self.storeTokens(response['access_token'], response['refresh_token'], response['expires_in'])
 
     def addEndpoint(self, endpoint):
         self.endpoints[endpoint.EndpointId] = endpoint
@@ -87,15 +87,15 @@ class DemoUser(StaticUser):
         self.storeTokens(response['access_token'], response['refresh_token'], response['expires_in'])
 
 class DbUser(User):
-    def __init__(self, userEmail=None, userId=None, region='us-east-1', systemName = 'pyASH'):
+    def __init__(self, userEmail=None, userId=None, token=None, region='us-east-1', systemName = 'pyASH'):
         super(DbUser, self).__init__()
 
         self.region = region
         self.systemName = systemName
         self.uuid = None
 
-        if userId or userEmail:
-            self._getUser(userId=userId, userEmail=userEmail)
+        if userId or userEmail or token:
+            self._getUser(userId=userId, userEmail=userEmail, token=token)
             if not self.uuid:
                 un = userId if userId else userEmail
                 raise USER_NOT_FOUND_EXCEPTION('Could not find {0}'.format(un))
@@ -157,7 +157,7 @@ class DbUser(User):
         if res:
             self.uuid = res
             return self.uuid
-        msg = 'No user with UserId of {0}'.format(self.userId) if self.userId else 'No user with Email address of {0}'.format(self.userEmail) if self.userEmail else 'No ability to retrieve user.  Both userId and userEmail not provided'
+        msg = 'No user with UserId of {0}'.format(self.userId) if self.userId else 'No user with Email address of {0}'.format(self.userEmail) if self.userEmail else 'No ability to retrieve user.  Neither userId nor userEmail provided'
         raise USER_NOT_FOUND_EXCEPTION(msg)
 
     def _getUserProfileFromToken(self):

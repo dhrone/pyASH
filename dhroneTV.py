@@ -104,11 +104,10 @@ class dhroneTVScene(Endpoint):
 #lambda_handler = ash.lambda_handler
 
 if __name__ == u'lambda_function':
-    user = StaticUser()
-    user.addEndpoint(endpointClass=dhroneTV, things='avmctrl_den', friendlyName='Sound', description='Sound by dhrone')
-    user.addEndpoint(endpointClass=dhroneTVScene, things='avmctrl_den', friendlyName='TV', description='TV by dhrone')
-
-    pyash = pyASH(user)
+    def lambda_handler(request, context):
+        token = Request(request).token
+        user = DbUser(token=token)
+        pyASH(user).lambda_handler(request)
 
 if __name__ == u'__main__':
     from user import DbUser

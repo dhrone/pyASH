@@ -216,13 +216,11 @@ def setup():
                 }
             }
 
-    @Endpoint.addInterface(EndpointHealth)
-    @Endpoint.addIot(iotTV)
+    @Endpoint.addInterface(EndpointHealth, proactivelyReported=True, retrievable=True, uncertaintyInMilliseconds=200)
     class dhroneTVScene(Endpoint):
         manufacturerName = 'dhrone'
         description = 'iotTV controller by dhrone'
         displayCategories = 'SCENE_TRIGGER'
-        uncertaintyInMilliseconds = 200
 
         @Endpoint.addDirective
         def Activate(self, request):
@@ -237,8 +235,8 @@ def setup():
             self.iot.batchSet(ds)
 
     user = DemoUser()
-    user.addEndpoint(endpointClass=dhroneTV, things='device_1', friendlyName='Sound', description='Sound by dhrone')
-    user.addEndpoint(endpointClass=dhroneTVScene, things='device_1', friendlyName='TV', proactivelyReported=True, supportsDeactivation=True, description='TV by dhrone')
+    user.addEndpoint(dhroneTV(things=Thing('device_1', iotTV), friendlyName='Sound', description='Sound by dhrone'))
+    user.addEndpoint(dhroneTVScene(things=Thing('device_1', iotTV), friendlyName='TV', description='TV by dhrone'))
     pyash = pyASH(user)
 
     return pyash

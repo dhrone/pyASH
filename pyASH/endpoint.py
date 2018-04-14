@@ -107,14 +107,14 @@ class Endpoint(object):
 
     def __init__(self, things=None, friendlyName=None, description=None, manufacturerName=None, displayCategories=None, cookie=None):
 
-        self.things = things
+        self.things = things if type(things) is list else [things] if things is not None else None
         self.friendlyName = friendlyName if friendlyName is not None else self.friendlyName
         self.manufacturerName = manufacturerName if manufacturerName is not None else self.manufacturerName
         self.description = description if description is not None else self.description
-        self.displayCategories = displayCategories if displayCategories is not None else self.displayCategories
-        self.displayCategories = self.displayCategories if self.displayCategories is None or type(self.displayCategories) is list else [self.displayCategories]
+        self.displayCategories = displayCategories if type(displayCategories) is list else [displayCategories] if displayCategories is not None else None
         self.cookie = cookie if cookie is not None else self.cookie
-        self.things = self.things if type(self.things) is list else [self.things] if self.things is not None else None
+
+        self.iot = self.things[0].iotcls(self.things[0].name)
 
     @staticmethod
     def addInterface(interface, proactivelyReported=False, retrievable=False, uncertaintyInMilliseconds=0, supportsDeactivation = False, cameraStreamConfigurations = None):
@@ -347,10 +347,3 @@ class Endpoint(object):
             if i[0] == request.namespace and i[1] == request.name:
                 return ret[i]
         raise INVALID_DIRECTIVE('{0} has no method to handle {1}:{2}'.format(self.__class__.__name__,request.namespace,request.name))
-
-    # See if an Iot class was included and return it if yes
-    def _findIot(self):
-        if hasattr(self, '__iot__'):
-            return self.__iot__
-        else:
-            return None
