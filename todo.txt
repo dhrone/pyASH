@@ -1,0 +1,18 @@
+To do
+
+Unit test User class
+Unit test DB class
+
+Clean up logging
+Move oauth2 functionality into separate class
+Allow for an alternative oauth2 provider
+
+Implement AVM20 specific driver (for condo)
+
+AWS configuration
+  Document set of configs Needed
+  Automate config setup (perhaps cloudformation)
+
+Document classes
+
+Post on py repository

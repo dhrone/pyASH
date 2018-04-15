@@ -106,7 +106,7 @@ class dhroneTVScene(Endpoint):
 if __name__ == u'lambda_function':
     def lambda_handler(request, context):
         token = Request(request).token
-        user = DbUser(token=token)
+        user = DbUser(token=Request(request).token)
         pyASH(user).lambda_handler(request)
 
 if __name__ == u'__main__':

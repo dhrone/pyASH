@@ -16,7 +16,7 @@ from decimal import Decimal
 from .db import Persist
 from .endpoint import Endpoint
 from .exceptions import NO_SUCH_ENDPOINT, USER_NOT_FOUND_EXCEPTION, MISCELLANIOUS_EXCEPTION
-from .utility import LOGLEVEL, DEFAULT_SYSTEM_NAME, DEFAULT_REGION, DEFAULT_IOTREGION
+from .utility import LOGLEVEL, DEFAULT_SYSTEM_NAME, DEFAULT_REGION, DEFAULT_IOTREGION, getAccessTokenFromCode
 
 # Setup logger
 import logging
@@ -191,16 +191,15 @@ class DbUser(User):
         print ('creating user {0} with uuid {1}'.format(email, uuid))
         self._getUser(userEmail=email)
 
+    def removeUser(self, user):
+
+
     def commit(self):
         self._persistEndpoints()
 
     @staticmethod
     def createTables():
-    	dbUUIDemail = UUIDemail()
-    	dbUUIDuserid = UUIDuserid()
-    	dbTokens = DBTokens()
-    	dbThings = DBThings()
-    	dbs = [ dbUUIDemail,dbUUIDuserid,dbTokens,dbThings ]
+    	dbs = [ UUIDemail(),UUIDuserid(),DBTokens(),DBThings() ]
     	for item in dbs:
     		item.createTable()
 
@@ -214,6 +213,13 @@ class DbUser(User):
     			print ('{0} seconds elapsed'.format(int(time.time() - starttime)))
     	print ('Finished')
 
+    @staticmethod
+    def delTables():
+    	dbs = [ UUIDemail(),UUIDuserid(),DBTokens(),DBThings() ]
+    	for item in dbs:
+    		item.delTable()
+
+
     def _getTokens(self, type):
         if type == 'CODE':
             response = getAccessTokenFromCode(self.accessGrantCode)
@@ -221,10 +227,7 @@ class DbUser(User):
             if not self.refreshToken:
                 self._getUserProfileFromDb()
             response = refreshAccessToken(self.refreshToken)
-        self.accessToken = response['access_token']
-        self.refreshToken = response['refresh_token']
-        self.accessTokenExpires = response['expires_in']
-        self.accessTokenTimestamp = time.time()
+        self._storeTokens(response['access_token'], response['refresh_token'], response['expires_in'])
         self._persistTokens()
 
     def _persistTokens(self):

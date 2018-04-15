@@ -161,7 +161,6 @@ class pyASH(object):
         try:
             endpoint = self.user.getEndpoint(request)
             cls, handler = endpoint._getHandler(request)
-            print ('instantiating method with class {0}'.format(cls.__name__))
 
             # If the method to handle the directive comes from the endpoint bind the method to the endpoint
             if cls.__name__ == endpoint.__class__.__name__:

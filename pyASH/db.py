@@ -75,6 +75,14 @@ class Persist(object):
         self.item[property] = value
         self._commit()
 
+    def __delitem__(self, key, secondaryKey=None):
+        if key not in item: raise KeyError
+        ddb = boto3.resource('dynamodb', self.region)
+        table = ddb.Table(self._tableName)
+        Key = { self.primaryKeyName: key }
+        if self.secondaryKeyName: Key[self.secondaryKeyName] = secondaryKey
+        table.delete_item(Key)
+
     def createTable(self):
         ddb = boto3.resource('dynamodb', self.region)
 
@@ -95,6 +103,12 @@ class Persist(object):
                 errmsg = 'Needed to create new {0} table but failed'.format(tn)
                 logger.critical(errmsg)
                 raise
+
+    def delTable(self):
+        ddb = boto3.resource('dynamodb', self.region)
+        table = ddb.Table(self._tableName)
+        table.delete()        
+
 
     def ready(self, timeout=5): # Called by user program to check if the table exists and is ready to be interacted with
         ddb = boto3.resource('dynamodb', self.region)
