@@ -192,7 +192,7 @@ class DbUser(User):
         self._getUser(userEmail=email)
 
     def removeUser(self, user):
-
+        pass
 
     def commit(self):
         self._persistEndpoints()
