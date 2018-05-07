@@ -16,3 +16,42 @@ AWS configuration
 Document classes
 
 Post on py repository
+
+LWA -- Manual config on the web site
+	Lambda application will need the endpoints for...
+		OAUTH2 CODE GRANT
+		OAUTH2 retrieve User
+		OAUTH2 retrieve tokens
+IOT -- Create things for each endpoint device
+	Generate Cert
+	Associate Policy with Cert
+	Create Thing
+	Associate Principal (cert) with Thing
+DynamoDB -- Create Tables
+	Create tables for
+		UUID Key email
+		UUID Key userId (from OAUTH2 provider)
+		Endpoints
+		Tokens (from OAUTH2 provider)
+Lambda service -- Create lambda function
+	Deploy application to lambda
+	Associate policy with lambda services to access...
+		DynamoDB tables
+		IOT devices
+ASDK -- Create Alexa smart home service
+	Associate Oauth2 endpoint and profile
+	Create Policy for access Lambda function
+	Associate Lambda function to service and policy
+
+
+IOT proposed registration process
+	from user.addEndpoint...
+
+	if thingname in iot add endpoint to user database
+	else
+	create certificate for thing
+	create thing in IOT service
+	bind certificate to thing
+	bind policy to certificate
+	add endpoint to user database
+	write certificate to disk
