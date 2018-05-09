@@ -1,0 +1,8 @@
+[Unit]
+Description=Alexa Smart Home demo
+
+[Service]
+ExecStart=python3 /usr/pi/pyASH/thing.py
+
+[Install]
+WantedBy=multi-user.target
