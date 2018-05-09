@@ -1,0 +1,11 @@
+[Unit]
+Description=thing
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+WorkingDirectory=/home/pi/pyASH
+ExecStart=/usr/bin/python3 /home/pi/pyASH/thing.py
+
+[Install]
+WantedBy=multi-user.target
