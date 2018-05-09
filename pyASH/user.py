@@ -87,12 +87,13 @@ class DemoUser(StaticUser):
         self.storeTokens(response['access_token'], response['refresh_token'], response['expires_in'])
 
 class DbUser(User):
-    def __init__(self, userEmail=None, userId=None, token=None, region='us-east-1', systemName = 'pyASH'):
+    def __init__(self, userEmail=None, userId=None, token=None, region='us-east-1', systemName = 'pyASH', classes=None):
         super(DbUser, self).__init__()
 
         self.region = region
         self.systemName = systemName
         self.uuid = None
+        self.classes = classes
 
         if userId or userEmail or token:
             self._getUser(userId=userId, userEmail=userEmail, token=token)
@@ -199,25 +200,25 @@ class DbUser(User):
 
     @staticmethod
     def createTables():
-    	dbs = [ UUIDemail(),UUIDuserid(),DBTokens(),DBEndpoints() ]
-    	for item in dbs:
-    		item.createTable()
+        dbs = [ UUIDemail(),UUIDuserid(),DBTokens(),DBEndpoints() ]
+        for item in dbs:
+            item.createTable()
 
-    	print ('Creating Tables.  This can take up to 60 seconds')
-    	starttime = time.time()
+        print ('Creating Tables.  This can take up to 60 seconds')
+        starttime = time.time()
 
-    	for item in dbs:
-    		while True:
-    			if item.ready():
-    				break
-    			print ('{0} seconds elapsed'.format(int(time.time() - starttime)))
-    	print ('Finished')
+        for item in dbs:
+            while True:
+                if item.ready():
+                    break
+                print ('{0} seconds elapsed'.format(int(time.time() - starttime)))
+        print ('Finished')
 
     @staticmethod
     def delTables():
-    	dbs = [ UUIDemail(),UUIDuserid(),DBTokens(),DBEndpoints() ]
-    	for item in dbs:
-    		item.delTable()
+        dbs = [ UUIDemail(),UUIDuserid(),DBTokens(),DBEndpoints() ]
+        for item in dbs:
+            item.delTable()
 
 
     def _getTokens(self, type):
@@ -245,7 +246,7 @@ class DbUser(User):
         dbEndpoints = DBEndpoints(self.uuid)
         endpointList = []
         for item in self.endpoints.values():
-            endpointList.append(pickle.dumps(item))
+            endpointList.append(item.json)
         dbEndpoints['endpoints'] = endpointList
 
     def _retrieveEndpoints(self):
@@ -254,7 +255,12 @@ class DbUser(User):
         endpointList = dbEndpoints['endpoints']
         if endpointList:
             for item in endpointList:
-                endpoint = pickle.loads(item)
+                for item in self.classes:
+                    if item.__classname__ == item.__name__:
+                        endpointClass = item
+                else:
+                    raise Exception('No endpoint class found to handle retrieved endpoint')
+                endpoint = endpointClass(json=item, iotClasses = self.classes)
                 self.endpoints[endpoint.EndpointId] = endpoint
 
 class DBEndpoints(Persist):

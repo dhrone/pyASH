@@ -105,17 +105,54 @@ class Endpoint(object):
     displayCategories = ['OTHER']
     cookie = None
 
-    def __init__(self, things=None, friendlyName=None, description=None, manufacturerName=None, displayCategories=None, cookie=None):
+    def __init__(self, things=None, friendlyName=None, description=None, manufacturerName=None, displayCategories=None, cookie=None, json=None, iotClasses=None):
 
-        self.things = things if type(things) is list else [things] if things is not None else None
-        self.friendlyName = friendlyName if friendlyName is not None else self.friendlyName
-        self.manufacturerName = manufacturerName if manufacturerName is not None else self.manufacturerName
-        self.description = description if description is not None else self.description
-        self.displayCategories = displayCategories if displayCategories is not None else self.displayCategories if self.displayCategories is not None else None
-        if self.displayCategories: self.displayCategories = makeList(self.displayCategories)
-        self.cookie = cookie if cookie is not None else self.cookie
+        if json:
+            self.friendlyName = json.get('friendlyName')
+            self.description = json.get('description')
+            self.manufacturerName = json.get('manufacturerName')
+            self.displayCategories = json.get('displayCategories')
+            self.cookie = json.get('cookie')
+
+            thingDict = json.get('things',{})
+            self.things=[]
+            for thing, iotClsName in thingDict.items():
+                if not iotClasses and not iotClasses is dict:
+                    raise Exception('Things provided without corresponding iot classes to instantiate them')
+                for item in iotClasses:
+                    if item.__name__ == iotClsName:
+                        iotcls = item
+                        break
+                else:
+                    raise Exception('Could not find IOT class to handle endpoint')
+                self.things.append(Thing(thing,iotcls))
+        else:
+            self.things = things if type(things) is list else [things] if things is not None else None
+            self.friendlyName = friendlyName if friendlyName is not None else self.friendlyName
+            self.manufacturerName = manufacturerName if manufacturerName is not None else self.manufacturerName
+            self.description = description if description is not None else self.description
+            self.displayCategories = displayCategories if displayCategories is not None else self.displayCategories if self.displayCategories is not None else None
+            if self.displayCategories: self.displayCategories = makeList(self.displayCategories)
+            self.cookie = cookie if cookie is not None else self.cookie
 
         self.iot = self.things[0].iotcls(self.things[0].name)
+
+    @property
+    def json(self):
+        thingDict = dict()
+        for thing in self.things:
+            thingDict[thing.name] = thing.iotcls.__name__
+
+        d = {
+            '__classname__': self.__class__.__name__,
+            'things' : thingDict,
+            'friendlyName': self.friendlyName,
+            'description': self.description,
+            'manufacturerName': self.manufacturerName,
+            'displayCategories': self.displayCategories,
+            'cookie': self.cookie,
+        }
+        return json.dumps(d)
 
     @staticmethod
     def addInterface(interface, proactivelyReported=False, retrievable=False, uncertaintyInMilliseconds=0, supportsDeactivation = False, cameraStreamConfigurations = None):

@@ -45,7 +45,7 @@ class cloudLight(Endpoint):
 if __name__ == u'lambda_function':
     def lambda_handler(request, context):
         token = Request(request).token
-        user = DbUser(token=Request(request).token)
+        user = DbUser(token=Request(request).token, classes=[cloudLight, Iot])
         pyASH(user).lambda_handler(request)
 
 
