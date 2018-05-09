@@ -1,8 +1,11 @@
 [Unit]
-Description=Alexa Smart Home demo
+Description=thing
+After=network-online.target
+Wants=network-online.target
 
 [Service]
-ExecStart=python3 /usr/pi/pyASH/thing.py
+WorkingDirectory=/home/pi/pyASH
+ExecStart=/usr/bin/python3 /home/pi/pyASH/thing.py
 
 [Install]
 WantedBy=multi-user.target
