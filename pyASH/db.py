@@ -2,7 +2,10 @@
 
 # Copyright 2018 dhrone. All Rights Reserved.
 #
+
+import time
 from botocore.exceptions import ClientError
+import boto3
 
 # pyASH imports
 from .utility import LOGLEVEL, DEFAULT_SYSTEM_NAME, DEFAULT_REGION, DEFAULT_IOTREGION
@@ -107,7 +110,7 @@ class Persist(object):
     def delTable(self):
         ddb = boto3.resource('dynamodb', self.region)
         table = ddb.Table(self._tableName)
-        table.delete()        
+        table.delete()
 
 
     def ready(self, timeout=5): # Called by user program to check if the table exists and is ready to be interacted with

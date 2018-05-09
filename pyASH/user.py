@@ -199,7 +199,7 @@ class DbUser(User):
 
     @staticmethod
     def createTables():
-    	dbs = [ UUIDemail(),UUIDuserid(),DBTokens(),DBThings() ]
+    	dbs = [ UUIDemail(),UUIDuserid(),DBTokens(),DBEndpoints() ]
     	for item in dbs:
     		item.createTable()
 
@@ -215,7 +215,7 @@ class DbUser(User):
 
     @staticmethod
     def delTables():
-    	dbs = [ UUIDemail(),UUIDuserid(),DBTokens(),DBThings() ]
+    	dbs = [ UUIDemail(),UUIDuserid(),DBTokens(),DBEndpoints() ]
     	for item in dbs:
     		item.delTable()
 

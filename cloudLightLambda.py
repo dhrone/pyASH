@@ -6,8 +6,8 @@
 
 # pyASH imports
 from pyASH.endpoint import Endpoint
-from pyASH.iot import Iot
-from pyASH.interface import PowerController
+from pyASH.iot import Iot, Thing
+from pyASH.interface import PowerController, EndpointHealth
 from pyASH.utility import LOGLEVEL
 from pyASH.user import DbUser
 
@@ -34,11 +34,9 @@ class cloudLight(Endpoint):
     manufacturerName = 'dhrone'
     description = 'Light controller demo'
     displayCategories = 'LIGHT'
-
     @Endpoint.addDirective(['TurnOn'])
     def TurnOn(self, request):
         self.iot['powerState'] = True
-
     @Endpoint.addDirective
     def TurnOff(self, request):
         self.iot['powerState'] = False
@@ -55,5 +53,5 @@ if __name__ == u'__main__':
     user = DbUser()
     user.createTables()
     user.createUser('ron@ritchey.org')
-    user.addEndpoint(endpointClass=cloudLight, things='cloudLightThing', friendlyName='Cloud')
+    user.addEndpoint(cloudLight(things=Thing('cloudLightThing', Iot), friendlyName='Cloud'))
     user.commit()

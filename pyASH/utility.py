@@ -23,7 +23,7 @@ logger.setLevel(LOGLEVEL)
 from .exceptions import *
 
 DEFAULT_REGION = 'us-east-1'
-DEFAULT_IOTREGION = 'us-west-2'
+DEFAULT_IOTREGION = 'us-east-1'
 DEFAULT_SYSTEM_NAME = 'pyASH'
 
 VALID_PROPERTIES = {
@@ -270,7 +270,7 @@ def makeList(item):
     if type(item) != list:
         return [ item ]
     return item
-    
+
 def getUserProfile(accessToken):
     payload = { 'access_token': accessToken }
     r = requests.get("https://api.amazon.com/user/profile", params=payload)

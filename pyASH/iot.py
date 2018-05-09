@@ -7,7 +7,6 @@ import json
 import time
 from abc import ABC, abstractmethod
 import boto3
-from botocore.exceptions import ClientError
 
 # pyASH imports
 from .utility import *
@@ -22,9 +21,9 @@ def doNothing(obj, value):
     return value
 
 class Thing(object):
-	def __init__(self, name, iotcls):
-		self.name = name
-		self.iotcls = iotcls
+    def __init__(self, name, iotcls):
+        self.name = name
+        self.iotcls = iotcls
 
 class IotBase(ABC):
     def __init__(self, endpointId, consideredStaleAfter=2):
@@ -230,49 +229,49 @@ class Iot(IotBase):
         self.region = region
         super(Iot, self).__init__(endpointId, consideredStaleAfter)
 
-	@staticmethod
-	def createIot(endpointId, region, profileName):
-		tp = {
-	        "Version": "2012-10-17",
-	        "Statement": [{
-	            "Effect": "Allow",
-	            "Action": [
-	                # "iot:*"
-	                "iot:Connect",
-	                "iot:Publish",
-	                "iot:Receive",
-	                "iot:Subscribe"
-	            ],
-	            "Resource": [
-	                "arn:aws:iot:{0}:*:*".format(region)
-	            ]
-	        }]
-	    }
-		iot = Session(region_name=region,
+    @staticmethod
+    def createIot(endpointId, region, profileName):
+        tp = {
+            "Version": "2012-10-17",
+            "Statement": [{
+                "Effect": "Allow",
+                "Action": [
+                    # "iot:*"
+                    "iot:Connect",
+                    "iot:Publish",
+                    "iot:Receive",
+                    "iot:Subscribe"
+                ],
+                "Resource": [
+                    "arn:aws:iot:{0}:*:*".format(region)
+                ]
+            }]
+        }
+        iot = Session(region_name=region,
         profile_name=profileName).client('iot')
 
-		cert = iot.create_keys_and_certificate(setAsActive=True)
-		iot.create_thing(thingName=endpointId)
-		iot.attach_thing_principal(
+        cert = iot.create_keys_and_certificate(setAsActive=True)
+        iot.create_thing(thingName=endpointId)
+        iot.attach_thing_principal(
             thingName=endpointId, principal=cert['certificateArn'])
 
-		### Check to see if a single policy can be reused across Iot instances
-		p = iot.create_policy(
-        	policyName=policy_name,
-	        policyDocument=policy
-    	)
-		iot.attach_principal_policy(
-        	policyName=policy_name, principal=thing_cert_arn)
+        ### Check to see if a single policy can be reused across Iot instances
+        p = iot.create_policy(
+            policyName=policy_name,
+            policyDocument=policy
+        )
+        iot.attach_principal_policy(
+            policyName=policy_name, principal=thing_cert_arn)
 
-		try:
-			with open(certName, 'w') as pf:
-				pf.write(cert['certificatePem'])
-			with open(pkName, 'w') as pf:
-				pf.write(cert['keyPair']['PublicKey'])
-			with open(prvkName) as pf:
-				pf.write(cert['keyPair']['PrivateKey'])
-		except OSError:
-			pass
+        try:
+            with open(certName, 'w') as pf:
+                pf.write(cert['certificatePem'])
+            with open(pkName, 'w') as pf:
+                pf.write(cert['keyPair']['PublicKey'])
+            with open(prvkName) as pf:
+                pf.write(cert['keyPair']['PrivateKey'])
+        except OSError:
+            pass
 
     def get(self):
         if not self.client:
