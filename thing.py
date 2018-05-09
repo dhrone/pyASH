@@ -11,7 +11,7 @@ import RPi.GPIO as GPIO
 
 from AWSIoTPythonSDK.MQTTLib import AWSIoTMQTTShadowClient
 
-class Thing(object):
+class PhysicalThing(object):
     _logger = logging.getLogger(__name__)
 
     def __init__(self, endpoint=None, thingName=None, rootCAPath=None, certificatePath=None, privateKeyPath=None, region=None, device=None, devices=None):
@@ -146,7 +146,7 @@ class Thing(object):
             if updateNeeded:
                 self._shadowHandler.shadowUpdate(json.dumps(payloadDict), self._updateCallback, 5)
 
-class Device(ABC):
+class PhysicalDevice(ABC):
     ''' Device that makes up part of an IOT thing '''
     _logger = logging.getLogger(__name__)
 
@@ -286,7 +286,7 @@ class Device(ABC):
         pass
 
 
-class cloudLight(Device):
+class cloudLight(PhysicalDevice):
 
     def __init__(self, gpio=14):
         self._gpio = gpio
@@ -318,7 +318,7 @@ class cloudLight(Device):
     def _close(self):
         GPIO.cleanup()
 
-    @Device.deviceToProperty('powerState', '^[01]$')
+    @PhysicalDevice.deviceToProperty('powerState', '^[01]$')
     def gpioToPowerState(self, value):
         if value == '1':
             return 'ON'
@@ -326,7 +326,7 @@ class cloudLight(Device):
             return 'OFF'
         raise ValueError('{0} is not a valid gpio value'.format(value))
 
-    @Device.propertyToDevice('powerState', '{0}')
+    @PhysicalDevice.propertyToDevice('powerState', '{0}')
     def powerStateToGPIO(self, value):
         if value == 'ON':
             return '1'
@@ -339,8 +339,6 @@ if __name__ == u'__main__':
     try:
         myCloudLightDevice = cloudLight()
 
-        cloudLightThing = Thing(endpoint='aamloz0nbas89.iot.us-east-1.amazonaws.com', thingName='cloudLightThing', rootCAPath='root-CA.pem', certificatePath='cloudLightThing.cert.pem', privateKeyPath='cloudLightThing.private.key', region='us-east-1', device=myCloudLightDevice)
+        cloudLightThing = PhysicalThing(endpoint='aamloz0nbas89.iot.us-east-1.amazonaws.com', thingName='cloudLightThing', rootCAPath='root-CA.pem', certificatePath='cloudLightThing.cert.pem', privateKeyPath='cloudLightThing.private.key', region='us-east-1', device=myCloudLightDevice)
     except KeyboardInterrupt:
         myCloudLightDevice.exit()
-
-
