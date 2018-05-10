@@ -16,7 +16,7 @@ from decimal import Decimal
 from .db import Persist
 from .endpoint import Endpoint
 from .exceptions import NO_SUCH_ENDPOINT, USER_NOT_FOUND_EXCEPTION, MISCELLANIOUS_EXCEPTION
-from .utility import LOGLEVEL, DEFAULT_SYSTEM_NAME, DEFAULT_REGION, DEFAULT_IOTREGION, getAccessTokenFromCode
+from .utility import LOGLEVEL, DEFAULT_SYSTEM_NAME, DEFAULT_REGION, DEFAULT_IOTREGION, getAccessTokenFromCode, getUserProfile
 
 # Setup logger
 import logging
@@ -254,14 +254,19 @@ class DbUser(User):
         dbEndpoints = DBEndpoints(self.uuid)
         endpointList = dbEndpoints['endpoints']
         if endpointList:
-            for item in endpointList:
-                for item in self.classes:
-                    if item.__classname__ == item.__name__:
-                        endpointClass = item
+            for epJson in endpointList:
+                item = json.loads(epJson)
+                print (item['__classname__'])
+                for clsinstance in self.classes:
+                    print ('Checking '+clsinstance.__name__)
+                    if item['__classname__'] == clsinstance.__name__:
+                        print ('Matched '+clsinstance.__name__)
+                        endpointClass = clsinstance
+                        break
                 else:
                     raise Exception('No endpoint class found to handle retrieved endpoint')
                 endpoint = endpointClass(json=item, iotClasses = self.classes)
-                self.endpoints[endpoint.EndpointId] = endpoint
+                self.endpoints[endpoint.endpointId] = endpoint
 
 class DBEndpoints(Persist):
     def __init__(self, uuid='', systemName=DEFAULT_SYSTEM_NAME, region=DEFAULT_REGION):

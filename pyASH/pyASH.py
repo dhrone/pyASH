@@ -6,6 +6,8 @@
 import logging
 import time
 
+import json
+
 #from .utility import *
 from .utility import LOGLEVEL, get_uuid, get_utc_timestamp
 from .exceptions import pyASH_EXCEPTION, OAUTH2_EXCEPTION, MISCELLANIOUS_EXCEPTION
@@ -81,10 +83,12 @@ class pyASH(object):
         Before Alexa Smart Home can control a device, it needs to be told about each endpoint that your skill will handle for a user and what interfaces that endpoint supports.
         """
 
+        print ('Entering handleDiscovery')
         try:
             ret = []
             endpoints = self.user.getEndpoints(request)
             for ep in endpoints:
+                print ('Processing discovery for endpoint '+ep.endpointId)
                 ret.append(ep.jsonDiscover)
             return {
                 'event': {
@@ -95,8 +99,10 @@ class pyASH(object):
                 }
             }
         except pyASH_EXCEPTION as e:
+            print(e)
             return self._errorResponse(request, e)
-        except:
+        except Exception as e:
+            print(e)
             raise
 
 
@@ -207,9 +213,14 @@ class pyASH(object):
 
     def lambda_handler(self, request, context=None):
         """ Routes the Alexa Smart Home request to the appropriate handler """
+        print ('Entering Lambda Function')
+
         request = Request(request)
-        return {
+        response = {
             'Alexa' : self.handleReportState,
             'Alexa.Authorization' : self.handleAcceptGrant,
             'Alexa.Discovery' : self.handleDiscovery,
         }.get(request.namespace, self.handleDirective)(request)
+
+        print ('lambda_handler response is '+json.dumps(response))
+        return response

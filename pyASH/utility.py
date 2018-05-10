@@ -8,7 +8,7 @@ import time
 import uuid
 import os
 import configparser
-import requests
+from botocore.vendored import requests
 import boto3
 from boto3.dynamodb.conditions import Key, Attr
 from botocore.exceptions import ClientError

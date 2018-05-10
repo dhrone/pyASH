@@ -3,6 +3,7 @@
 # Copyright 2018 dhrone. All Rights Reserved.
 #
 
+import json
 
 # pyASH imports
 from pyASH.endpoint import Endpoint
@@ -10,6 +11,8 @@ from pyASH.iot import Iot, Thing
 from pyASH.interface import PowerController, EndpointHealth
 from pyASH.utility import LOGLEVEL
 from pyASH.user import DbUser
+from pyASH.objects import Request
+from pyASH.pyASH import pyASH
 
 # Setup logger
 import logging
@@ -42,11 +45,16 @@ class cloudLight(Endpoint):
         self.iot['powerState'] = False
 
 
-if __name__ == u'lambda_function':
-    def lambda_handler(request, context):
-        token = Request(request).token
-        user = DbUser(token=Request(request).token, classes=[cloudLight, Iot])
-        pyASH(user).lambda_handler(request)
+
+def lambda_handler(request, context):
+    token = Request(request).token
+    user = DbUser(token=Request(request).token, classes=[cloudLight, Iot])
+    print ('Received '+ json.dumps(request))
+    pyASHinstance = pyASH(user)
+    print ('Processing message')
+    response = pyASHinstance.lambda_handler(request)
+    print ('Returning '+json.dumps(response))
+    return response
 
 
 if __name__ == u'__main__':
