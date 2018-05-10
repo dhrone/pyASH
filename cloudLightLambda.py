@@ -39,10 +39,10 @@ class cloudLight(Endpoint):
     displayCategories = 'LIGHT'
     @Endpoint.addDirective(['TurnOn'])
     def TurnOn(self, request):
-        self.iot['powerState'] = True
+        self.iot['powerState'] = 'ON'
     @Endpoint.addDirective
     def TurnOff(self, request):
-        self.iot['powerState'] = False
+        self.iot['powerState'] = 'OFF'
 
 
 
