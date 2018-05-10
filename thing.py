@@ -332,7 +332,7 @@ class cloudLight(PhysicalDevice):
             return '1'
         elif value == 'OFF':
             return '0'
-        raise ValueError('{0} is not a valid powerState'.formt(value))
+        raise ValueError('{0} is not a valid powerState'.format(value))
 
 if __name__ == u'__main__':
 #    import RPi.GPIO as GPIO
