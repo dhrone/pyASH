@@ -181,10 +181,8 @@ class IotTest(IotBase):
             filename = self.__class__.__name__+'.json'
             with open(filename) as json_file:
                 df = json.load(json_file)
-                connectivity = self.reportedState['connectivity'] # Save connectivity value
-                self.reportedState = df['reportedState']
-                self.reportedState['connectivity'] = connectivity # Restore connectivity value
-                self.reportedStateTimeStamp = df['reportedStateTimeStamp']
+                self.reportedState = { **self.reportedState, **df['reportedState'] }
+                self.reportedStateTimeStamp = { **self.reportedStateTimeStamp, **df['reportedStateTimeStamp'] }
         except FileNotFoundError:
             pass
 
@@ -279,10 +277,8 @@ class Iot(IotBase):
         if not self.client:
             self.client = boto3.client('iot-data', region_name=self.region)
         thingData = json.loads(self.client.get_thing_shadow(thingName=self.getThingName())['payload'].read().decode('utf-8'))
-        connectivity = self.reportedState['connectivity'] # Save connectivity state
-        self.reportedState = thingData['state']['reported']
-        self.reportedState['connectivity'] = connectivity # Restore connectivity state
-        self.reportedStateTimeStamp = thingData['metadata']['reported']
+        self.reportedState = { **self.reportedState, **thingData['state']['reported'] }
+        self.reportedStateTimeStamp = { **self.reportedStateTimeStamp, **thingData['metadata']['reported'] }
         self.lastGet = time.time()
         return thingData
 

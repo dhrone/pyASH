@@ -210,8 +210,9 @@ class PhysicalDevice(ABC):
             for method in supercls.__dict__.values():
                 d2pList = getattr(method, '__deviceToProperty__', {})
                 for cre, (property, method) in d2pList.items():
-                    if cre.match(value):
-                        return (property, method)
+                    match = cre.match(value)
+                    if match:
+                        return (property, method, match)
         return None
 
     @classmethod
@@ -231,11 +232,17 @@ class PhysicalDevice(ABC):
                 print ('Received {0} from device'.format(val))
                 ret = self._deviceToProperty(val) # Retrieve appropriate handler to translate device value into property value
                 if ret:
-                    print ('Sending {0} to event queue'.format(ret))
-                    (property, method) = ret
+                    (property, method, match) = ret
+                    if type(property) is not list: property = [ property ]
 
-                    # Send updated property to Thing
-                    self._eventQueue.put({'source': self.__name__, 'action': 'UPDATE', 'property': property, 'value': method(self,val) })
+                    for i in range(len(property)):
+                        # Extract out each match group and send to method to get it translated from the value from the device to the property value
+                        mval = match(i+1)
+                        xval = method(self, property[i], mval)
+                        print ('Sending {0}:{1} to event queue'.format(property[i], xval))
+
+                        # Send updated property to Thing
+                        self._eventQueue.put({'source': self.__name__, 'action': 'UPDATE', 'property': property[i], 'value': xval })
                 else:
                     self._logger.warn('No method matches {0}'.format(val))
 
@@ -289,7 +296,7 @@ class AVM20(PhysicalDevice):
         self._timeout=timeout
         if not self._ser:
             raise IOError('Unable to open serial connection on power {0}'.format(port))
-        super(AVM20, self).__init__(name = 'AVM20', properties = { 'powerState': 'UNKNOWN', 'input':'UNKNOWN', 'volume': -12.5, 'muted': False })
+        super(AVM20, self).__init__(name = 'AVM20', properties = { 'powerState': 'UNKNOWN', 'input':'UNKNOWN', 'volume': 0, 'muted': False })
 
     def _read(self):
 
@@ -302,10 +309,10 @@ class AVM20(PhysicalDevice):
             if c:
                 last_activity = time.time()
             if c == delimiter:
-                return buffer
+                return buffer.decode()
             buffer += c
             if time.time() - last_activity > timeout:
-                return buffer
+                return buffer.decode()
 
     def _write(self, value):
         if type(value) == str:
@@ -316,21 +323,67 @@ class AVM20(PhysicalDevice):
     def _close(self):
         self._ser.close()
 
-    @PhysicalDevice.deviceToProperty('powerState', '^[01]$')
-    def gpioToPowerState(self, value):
-        if value == '1':
-            return 'ON'
-        elif value == '0':
-            return 'OFF'
-        raise ValueError('{0} is not a valid gpio value'.format(value))
+    @PhysicalDevice.deviceToProperty('powerState', '^P1P([0-1])$')
+    def avm20ToPowerState(self, property, value):
+        assert (property == 'powerState'), 'Wrong property received: ' + property
+        val = { '1': 'ON', '0': 'OFF' }.get(value)
+        if val:
+            return val
+        raise ValueError('{0} is not a valid value for property {1}'.format(value, property))
+
+    @PhysicalDevice.deviceToProperty('input', '^P1S([0-9])$')
+    def avm20ToInput(self, property, value):
+        assert (property == 'input'), 'Wrong property received: ' + property
+        val = { '1': 'ON', '0': 'OFF' }.get(value)
+        if val:
+            return val
+        raise ValueError('{0} is not a valid value for property {1}'.format(value, property))
+
+    @PhysicalDevice.deviceToProperty('input', '^P1S([0-9])$')
+    def avm20ToMuted(self, property, value):
+        assert (property == 'muted'), 'Wrong property received: ' + property
+        val = { '1': True, '0': False }.get(value)
+        if val:
+            return val
+        raise ValueError('{0} is not a valid value for property {1}'.format(value, property))
+
+    @PhysicalDevice.deviceToProperty('volume', '^P1VM([+-][0-9]{1,2}(?:[\\.][0-9]{1,2})?)$')
+    def avm20ToVolume(self, property, value):
+        assert (property == 'volume'), 'Wrong property received: ' + property
+        volarray = [-50, -35, -25, -21, -18, -12, -8, -4, 0, 5, 10 ]
+        try:
+            rawvol = float(value)
+        except:
+            raise ValueError('{0} is not a valid value for property {1}'.format(value, property))
+        for i in range(len(self.volarray)):
+            if rawvol <= self.volarray[i]:
+                return i*10
+        else:
+            # volume greater than max array value
+            return len(volstr)*10
+
+    @PhysicalDevice.deviceToProperty(['input', 'volume', 'muted'], '^P1S([0-9])V([+-][0-9]{2}[\\.][0-9])M([0-1])D[0-9]E[0-9]$')
+    def avm20combinedResponse(self, property, value):
+        assert (property in ['input','volume', 'muted']), 'Wrong property received: {0}'.format(property)
+        return { 'input': self.avm20ToInput, 'volume': self.avm20ToVolume, 'muted': self.avm20ToMuted }.get(property)(property, value)
+
 
     @PhysicalDevice.propertyToDevice('powerState', '{0}')
-    def powerStateToGPIO(self, value):
-        if value == 'ON':
-            return '1'
-        elif value == 'OFF':
-            return '0'
+    def powerStateToAVM20(self, value):
+        val = { 'ON': 'P1P1', 'OFF': 'P1P0' }.get(value)
+        if val:
+            return val
         raise ValueError('{0} is not a valid powerState'.format(value))
+
+    @PhysicalDevice.propertyToDevice('input', '{0}')
+    def inputToAVM20(self, value):
+        val = { 'CD': 'P1S0', 'TAPE': 'P1P3', 'DVD': 'P1S5', 'TV': 'P1S6', 'SAT': 'P1S7', 'VCR': 'P1S8', 'AUX': 'P1S9' }.get(value)
+        if val:
+            return val
+        raise ValueError('{0} is not a valid input'.format(value))
+
+
+
 
 if __name__ == u'__main__':
 #    import RPi.GPIO as GPIO
