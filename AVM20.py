@@ -2,6 +2,7 @@
 
 from abc import ABC, abstractmethod
 from threading import Timer, Lock, Thread
+import io
 import logging
 import json
 import re
@@ -150,9 +151,12 @@ class PhysicalDevice(ABC):
     ''' Device that makes up part of an IOT thing '''
     _logger = logging.getLogger(__name__)
 
-    def __init__(self, name = None, properties = None):
+    def __init__(self, name = None, stream = None, properties = None, eol='\n', timeout=5):
         ''' Initialize device driver and set it to receive updates from the eventQueue '''
 
+        self._stream = stream
+        self._eol = eol
+        self._timeout = timeout
         self.properties = properties # dictionary of the properties and starting values for device
         self.__name__ = name if name is not None else self.__class__.__name__
         self._deviceQueue = queue.Queue()
@@ -160,7 +164,6 @@ class PhysicalDevice(ABC):
         self._waitFor = None # Are we waiting for a specific value from the device
         self._exit = False # Set when a request has been made to exit the device driver
 
-        self._initialize()
 
     def start(self, eventQueue):
         self._eventQueue = eventQueue
@@ -173,7 +176,10 @@ class PhysicalDevice(ABC):
 
     def update(self, property, value):
         ''' Change the physical state of the device by updating property to value '''
-        self._deviceQueue.put({'action': 'UPDATE', 'property': property, 'value': value })
+        self._deviceQueue.put({'source': self.__name__, 'action': 'UPDATE', 'property': property, 'value': value })
+
+        # update local property value
+        self.properties[property] = value
 
     def exit(self):
         ''' Shut down device driver '''
@@ -227,7 +233,7 @@ class PhysicalDevice(ABC):
         ''' Main event loop for reading from device '''
         print ('Starting {0} readLoop'.format(self.__name__))
         while not self._exit:
-            val = self._read(5) # Read input.  Timeout after 5 seconds to make sure we are checking that an exit hasn't been commanded.
+            val = self.read(self._eol, self._timeout) # Read input.  Timeout periodically to make sure we are checking that an exit hasn't been commanded.
             if val:
                 print ('Received {0} from device'.format(val))
                 ret = self._deviceToProperty(val) # Retrieve appropriate handler to translate device value into property value
@@ -239,10 +245,22 @@ class PhysicalDevice(ABC):
                         # Extract out each match group and send to method to get it translated from the value from the device to the property value
                         mval = match(i+1)
                         xval = method(self, property[i], mval)
-                        print ('Sending {0}:{1} to event queue'.format(property[i], xval))
 
-                        # Send updated property to Thing
-                        self._eventQueue.put({'source': self.__name__, 'action': 'UPDATE', 'property': property[i], 'value': xval })
+                        if self.properties[property[i]] != xval:
+                            print ('Sending {0}:{1} to event queue'.format(property[i], xval))
+
+                            # Send updated property to Thing
+                            self.update(property[i], xval)
+
+                            # Take any actions required due to new property state
+                            changedProperties = self.onStateChange(property[i], xval)
+
+                            # If _onStateChange called for additional property updates...
+                            for prop in changedProperties:
+                                # Send updated property to Thing
+                                self.update(prop, self.properties[prop])
+                        else:
+                            print ('Received {0}:{1}.  Property unchanged'.format(property[i], xval))
                 else:
                     self._logger.warn('No method matches {0}'.format(val))
 
@@ -264,7 +282,7 @@ class PhysicalDevice(ABC):
                         (cmd, method) = ret
 
                         # Send updated property to device
-                        self._write(cmd.format(method(self,message['value'])))
+                        self.write(cmd.format(method(self,message['value'])), self._eol, self._timeout)
                     else:
                         self._logger.warn('No property matches {0}'.format(message['property']))
 
@@ -273,20 +291,61 @@ class PhysicalDevice(ABC):
             except queue.Empty:
                 continue
 
+    def onStateChange(self, property, value):
+        return []
 
+    def _read(self, eol=b'\n', timeout=5):
+        eol = eol.encode() if type(eol) is str else eol
 
-    ''' User Defined Methods '''
-    @abstractmethod
-    def _read(self,timeout=0):
-        pass
+        with self.readlock:
+            last_activity = time.time()
+            buffer = b''
+            while True:
+                c = self._stream.read()
+                if c:
+                    buffer += c
+                    last_activity = time.time()
+                    if buffer.find(eol)>=0:
+                        return buffer[:buffer.find(eol)]
+                elif time.time() - last_activity > timeout:
+                    return buffer
 
-    @abstractmethod
-    def _write(self,value):
-        pass
+    def _write(self, value, eol=b'\n', timeout=5, synchronous=False):
+        value = value.encode() if type(value) is str else value
+        eol = eol.encode() if type(eol) is str else eol
 
-    @abstractmethod
+        # If device communicates synchronously, after sending request, wait for response
+        # reading input until receiving the eol value indicating that it is done responding
+        if synchronous:
+            with self.readlock:
+                self._stream.write(value)
+                last_activity = time.time()
+                buffer = b''
+                while True:
+                    c = self._stream.read()
+                    if c:
+                        buffer += c
+                        last_activity = time.time()
+                        if buffer.find(eol)>=0:
+                            return buffer[:buffer.find(eol)]
+                    elif time.time() - last_activity > timeout:
+                        return buffer
+        else:
+            self._stream.write(value)
+            return b''
+
     def _close(self):
-        pass
+        self._stream.close()
+
+    ''' Methods for User to override if their device is not operate as a stream '''
+    def read(self,eol=b'\n', timeout=5):
+        _read(eol, timeout)
+
+    def write(self,value, eol=b'\n', timeout=5, synchronous=False):
+        _write(value, eol, timeout, synchronous)
+
+    def close(self):
+        _close()
 
 
 class AVM20(PhysicalDevice):
@@ -296,32 +355,24 @@ class AVM20(PhysicalDevice):
         self._timeout=timeout
         if not self._ser:
             raise IOError('Unable to open serial connection on power {0}'.format(port))
-        super(AVM20, self).__init__(name = 'AVM20', properties = { 'powerState': 'UNKNOWN', 'input':'UNKNOWN', 'volume': 0, 'muted': False })
+        super(AVM20, self).__init__(name = 'AVM20', stream = self._ser, properties = { 'powerState': 'UNKNOWN', 'input':'UNKNOWN', 'volume': 'UNKNOWN', 'muted': 'UNKNOWN' })
 
-    def _read(self):
+        self.write('P1P?')
 
-        delimiter = b'\n'
-        buffer = b''
-        last_activity = time.time()
 
-        while True:
-            c = self._ser.read()
-            if c:
-                last_activity = time.time()
-            if c == delimiter:
-                return buffer.decode()
-            buffer += c
-            if time.time() - last_activity > timeout:
-                return buffer.decode()
-
-    def _write(self, value):
-        if type(value) == str:
-            value = value.encode()
-        self._ser.write(value)
-        self.logger.info ('From {0}, Sending  [{1}]'.format(self.name,value))
-
-    def _close(self):
+    def close(self):
         self._ser.close()
+
+    def onStateChange(self, property, value):
+        if property == 'powerState':
+            if value == 'ON':
+                self.write('P1P?')
+            else:
+                self.properties['input'] = 'UNKNOWN'
+                self.properties['volume'] = 'UNKNOWN'
+                self.properties['muted'] = 'UNKNOWN'
+                return ['input', 'volume', 'muted']
+        return []
 
     @PhysicalDevice.deviceToProperty('powerState', '^P1P([0-1])$')
     def avm20ToPowerState(self, property, value):
@@ -335,14 +386,6 @@ class AVM20(PhysicalDevice):
     def avm20ToInput(self, property, value):
         assert (property == 'input'), 'Wrong property received: ' + property
         val = { '1': 'ON', '0': 'OFF' }.get(value)
-        if val:
-            return val
-        raise ValueError('{0} is not a valid value for property {1}'.format(value, property))
-
-    @PhysicalDevice.deviceToProperty('input', '^P1S([0-9])$')
-    def avm20ToMuted(self, property, value):
-        assert (property == 'muted'), 'Wrong property received: ' + property
-        val = { '1': True, '0': False }.get(value)
         if val:
             return val
         raise ValueError('{0} is not a valid value for property {1}'.format(value, property))
@@ -362,34 +405,73 @@ class AVM20(PhysicalDevice):
             # volume greater than max array value
             return len(volstr)*10
 
+    @PhysicalDevice.deviceToProperty('muted', '^P1M([0-9])$')
+    def avm20ToMuted(self, property, value):
+        assert (property == 'muted'), 'Wrong property received: ' + property
+        val = { '1': True, '0': False }.get(value)
+        if val:
+            return val
+        raise ValueError('{0} is not a valid value for property {1}'.format(value, property))
+
     @PhysicalDevice.deviceToProperty(['input', 'volume', 'muted'], '^P1S([0-9])V([+-][0-9]{2}[\\.][0-9])M([0-1])D[0-9]E[0-9]$')
     def avm20combinedResponse(self, property, value):
         assert (property in ['input','volume', 'muted']), 'Wrong property received: {0}'.format(property)
         return { 'input': self.avm20ToInput, 'volume': self.avm20ToVolume, 'muted': self.avm20ToMuted }.get(property)(property, value)
 
-
-    @PhysicalDevice.propertyToDevice('powerState', '{0}')
+    @PhysicalDevice.propertyToDevice('powerState', 'P1P{0}')
     def powerStateToAVM20(self, value):
-        val = { 'ON': 'P1P1', 'OFF': 'P1P0' }.get(value)
+        val = { 'ON': '1', 'OFF': '0' }.get(value)
         if val:
             return val
         raise ValueError('{0} is not a valid powerState'.format(value))
 
-    @PhysicalDevice.propertyToDevice('input', '{0}')
+    @PhysicalDevice.propertyToDevice('input', 'P1S{0}')
     def inputToAVM20(self, value):
-        val = { 'CD': 'P1S0', 'TAPE': 'P1P3', 'DVD': 'P1S5', 'TV': 'P1S6', 'SAT': 'P1S7', 'VCR': 'P1S8', 'AUX': 'P1S9' }.get(value)
+        val = { 'CD': '0', 'TAPE': '3', 'DVD': '5', 'TV': '6', 'SAT': '7', 'VCR': '8', 'AUX': '9' }.get(value)
         if val:
             return val
         raise ValueError('{0} is not a valid input'.format(value))
 
+    @PhysicalDevice.propertyToDevice('volume', 'P1VM{0}')
+    def inputToAVM20(self, value):
+        if type(value) is int:
+            value = int(value)/10
+            value = 0 if value < 0 else 10 if value > 10 else value
+            return self.volarray[value]
+        raise ValueError('{0} is not a valid volume'.format(value))
 
+    @PhysicalDevice.propertyToDevice('muted', 'P1M{0}')
+    def powerStateToAVM20(self, value):
+        val = { True: '1', False: '0' }.get(value)
+        if val:
+            return val
+        raise ValueError('{0} is not a valid muted value'.format(value))
 
 
 if __name__ == u'__main__':
-#    import RPi.GPIO as GPIO
-    try:
-        myCloudLightDevice = cloudLight()
+    import getopt, sys
 
-        cloudLightThing = PhysicalThing(endpoint='aamloz0nbas89.iot.us-east-1.amazonaws.com', thingName='cloudLightThing', rootCAPath='root-CA.pem', certificatePath='cloudLightThing.cert.pem', privateKeyPath='cloudLightThing.private.key', region='us-east-1', device=myCloudLightDevice)
+    try:
+        opts, args = getopt.getopt(sys.argv[1:], u'p:b:', [u'baud=',u'port='])
+    except getopt.GetoptError:
+        print (u'avm20 -b <baud> --baud <baud> -p <port> --port <port>')
+        sys.exit(2)
+
+    port = None
+    baud = None
+    for opt, arg in opts:
+        if opt in (u'-b',u'--baud'):
+            baud = int(arg)
+        elif opt in (u'-p', u'--port'):
+            port = arg
+
+    if not port or not baud:
+        print ('You must provide the port the device is attached to and what baud rate to communicate with it on')
+        sys.exit(2)
+
+    try:
+        condoAVM30 = AVM20(port, baud)
+
+        condoAVM20Thing = PhysicalThing(endpoint='aamloz0nbas89.iot.us-east-1.amazonaws.com', thingName='condoAVM', rootCAPath='root-CA.crt', certificatePath='condoAVM.pem.crt', privateKeyPath='condoAVM.private.key', region='us-east-1', device=condoAVM30)
     except KeyboardInterrupt:
-        myCloudLightDevice.exit()
+        condoAVM30.exit()
