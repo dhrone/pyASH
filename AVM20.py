@@ -160,12 +160,13 @@ class PhysicalDevice(ABC):
     ''' Device that makes up part of an IOT thing '''
     _logger = logging.getLogger(__name__)
 
-    def __init__(self, name = None, stream = None, properties = None, eol='\n', timeout=5):
+    def __init__(self, name = None, stream = None, properties = None, eol='\n', timeout=5, synchronous=False):
         ''' Initialize device driver and set it to receive updates from the eventQueue '''
 
         self._stream = stream
         self._eol = eol
         self._timeout = timeout
+        self._synchronous = synchronous
         self.properties = properties # dictionary of the properties and starting values for device
         self.__name__ = name if name is not None else self.__class__.__name__
         self._deviceQueue = queue.Queue()
@@ -182,10 +183,13 @@ class PhysicalDevice(ABC):
         self._eventQueue = eventQueue
 
         # Starting event loops
-        _threadRead = Thread(target=self._readLoop)
-        _threadRead.start()
         _threadWrite = Thread(target=self._writeLoop)
         _threadWrite.start()
+
+        # If device is asynchronous, start an independent read thread
+        if not self._synchronous:
+            _threadRead = Thread(target=self._readLoop)
+            _threadRead.start()
 
     def updateDevice(self, property, value):
         ''' Send message to device to tell it to update one of its property values '''
@@ -249,53 +253,88 @@ class PhysicalDevice(ABC):
         ''' Main event loop for reading from device '''
         print ('Starting {0} readLoop'.format(self.__name__))
         while not self._exit:
-            val = self.read(self._eol, self._timeout) # Read input.  Timeout periodically to make sure we are checking that an exit hasn't been commanded.
+            val = self.read()
             if val:
-                ret = self._deviceToProperty(val) # Retrieve appropriate handler to translate device value into property value
-                if ret:
-                    print ('{0}:[{1}]'.format(self.__name__, val.replace('\r','\\r')))
-                    (property, method, match) = ret
-                    if type(property) is not list: property = [ property ]
+                print ('{0}:[{1}]'.format(self.__name__, val.replace('\r','\\r')))
+                self._processDeviceResponse(val)
 
-                    for i in range(len(property)):
-                        # Extract out each match group and send to method to get it translated from the value from the device to the property value
-                        mval = match.group(i+1)
-                        xval = method(self, property[i], mval)
+    def _processDeviceResponse(val):
+        ret = self._deviceToProperty(val) # Retrieve appropriate handler to translate device value into property value
+        if ret:
+            (property, method, match) = ret
+            if type(property) is not list: property = [ property ]
 
-                        if self.properties[property[i]] != xval:
-                            # Send updated property to Thing
-                            self.updateThing(property[i], xval)
-                        else:
-                            print ('Thing: {0}:{1} Unchanged'.format(property[i], xval))
-                else:
-                    print ('{0}:[{1}] Ignored'.format(self.__name__, val.replace('\r','\\r')))
+            for i in range(len(property)):
+                # Extract out each match group and send to method to get it translated from the value from the device to the property value
+                mval = match.group(i+1)
+                xval = method(self, property[i], mval)
+
+                if self.properties[property[i]] != xval:
+                    # Send updated property to Thing
+                    self.updateThing(property[i], xval)
+#        else:
+#            print ('{0}:[{1}] Ignored'.format(self.__name__, val.replace('\r','\\r')))
+
 
     def _writeLoop(self):
         ''' Main event loop for writing to device '''
         print ('Starting {0} writeLoop'.format(self.__name__))
 
         while not self._exit:
+            # Wait for ready state to be reached
+            now = time.time()
+            while not self.ready():
+                sleep(1)
+                if time.time() > now + 10:
+                    # Hmmm.  Device sure has been busy a long time...
+                    print ('Device busy\n  Device state is {0}')
+                    continue
             try:
                 message = self._deviceQueue.get(5)
                 self._deviceQueue.task_done()
 
-                print ('Received request to update device: {0}'.format(message))
                 if message['action'].upper() == 'EXIT':
                     return
                 elif message['action'].upper() == 'UPDATE':
+                    print ('THING [{0}:{1}]'.format(message['property'], message['value']))
                     ret = self._propertyToDevice(message['property'])
                     if ret:
                         (cmd, method) = ret
 
                         # Send updated property to device
-                        self.write(cmd.format(method(self,message['value'])), self._eol, self._timeout)
+                        val = self.write(cmd.format(method(self,message['value'])))
+
+                        # If device is synchronous, it likely returned a response from the command we just sent
+                        if val:
+                            # If so, process it
+                            self._processDeviceResponse(val)
                     else:
                         self._logger.warn('No property matches {0}'.format(message['property']))
 
-
-
             except queue.Empty:
+                # If nothing waiting to be written, send a query to get current device status
+                qs = self.queryStatus()
+                if qs:
+                    # Get the query to send.  If the query is a list, process each query individually
+                    qs = qs if type(qs) is list else [ qs ]
+                    for q in qs:
+                        val = self.write(q)
+                        if val:
+                            self._processDeviceResponse(val)
+
                 continue
+
+    def _queryStatus(self):
+        return None
+
+    def queryStatus(self):
+        return self._queryStatus()
+
+    def _ready(self):
+        return True
+
+    def ready(self):
+        return self._ready()
 
     def _read(self, eol=b'\n', timeout=5):
         eol = eol.encode() if type(eol) is str else eol
@@ -347,11 +386,11 @@ class PhysicalDevice(ABC):
         self._stream.close()
 
     ''' Methods for User to override if their device is not operate as a stream '''
-    def read(self,eol='\n', timeout=5):
-        return self._read(eol, timeout)
+    def read(self):
+        return self._read(self._eol, self._timeout)
 
-    def write(self,value, eol='\n', timeout=5, synchronous=False):
-        self._write(value, eol, timeout, synchronous)
+    def write(self,value):
+        return self._write(value, self._eol, self._timeout, self._synchronous)
 
     def close(self):
         self._close()
@@ -455,22 +494,29 @@ class Epson1080UB(PhysicalDevice):
         self._timeout=0.25
         if not self._ser:
             raise IOError('Unable to open serial connection on power {0}'.format(port))
-        super(Epson1080UB, self).__init__(name = 'Epson1080UB', eol='\r', stream = self._ser, properties = { 'projPowerState': 'UNKNOWN', 'projInput':'UNKNOWN'  })
+        super(Epson1080UB, self).__init__(name = 'Epson1080UB', eol='\r', stream = self._ser, properties = { 'projPowerState': 'UNKNOWN', 'projInput':'UNKNOWN'  }, synchronous=True)
 
         self.write('PWR?\r')
 
     def close(self):
         self._ser.close()
 
+    def queryStatus(self):
+        if self.properties['projPowerState'] == 'ON':
+            return 'SOURCE?'
+        else:
+            return 'PWR?'
+
+    def ready(self):
+        return True if self.properties['projPowerState'] in ['ON', 'OFF'] else False
+
     @PhysicalDevice.deviceToProperty('projPowerState', '^PWR=([0-9]{2})$')
     def toProjPowerState(self, property, value):
         assert (property == 'projPowerState'), 'Wrong property received: ' + property
-
-        return 'OFF' if value == '00' else 'ON'
-        if value == '00':
-            return 'OFF'
-        else:
-            return 'ON'
+        val = { '00': 'OFF', '01': 'ON', '02': 'WARMING', '03': 'COOLING', '04': 'STANDBY', '05': 'ABNORMAL' }.get(value)
+        if val:
+            return val
+        raise ValueError('{0} is not a valid value for property {1}'.format(value, property))
 
     @PhysicalDevice.deviceToProperty('projInput', '^SOURCE=([a-zA-Z0-9]{2})$')
     def toProjInput(self, property, value):
