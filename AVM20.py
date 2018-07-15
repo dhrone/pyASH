@@ -126,9 +126,7 @@ class PhysicalThing(object):
 
             ''' Process all received messages '''
             updatedProperties = dict()
-            print ('Processing received messages')
             for message in messages:
-                print (message)
                 if message['action'] == 'EXIT':
                     ''' If an EXIT message is received then stop processing messages and exit the main thing loop '''
                     return
@@ -151,6 +149,7 @@ class PhysicalThing(object):
             payloadDict = { 'state': { 'reported': {}, 'desired': {} } }
             for property, value in updatedProperties.items():
                 if self._localShadow[property] != value:
+                    print ('Thing: {0}:{1}'.format(property, value))
                     updateNeeded = True
                     payloadDict['state']['reported'] = updatedProperties
                     payloadDict['state']['desired'] = updatedProperties
@@ -252,9 +251,9 @@ class PhysicalDevice(ABC):
         while not self._exit:
             val = self.read(self._eol, self._timeout) # Read input.  Timeout periodically to make sure we are checking that an exit hasn't been commanded.
             if val:
-                print ('{0}:[{1}]'.format(self.__name__, val.replace('\r','\\r')))
                 ret = self._deviceToProperty(val) # Retrieve appropriate handler to translate device value into property value
                 if ret:
+                    print ('{0}:[{1}]'.format(self.__name__, val.replace('\r','\\r')))
                     (property, method, match) = ret
                     if type(property) is not list: property = [ property ]
 
@@ -267,9 +266,9 @@ class PhysicalDevice(ABC):
                             # Send updated property to Thing
                             self.updateThing(property[i], xval)
                         else:
-                            print ('Received {0}:{1}.  Property unchanged'.format(property[i], xval))
+                            print ('Thing: {0}:{1} Unchanged'.format(property[i], xval))
                 else:
-                    self._logger.warn('No method matches {0}'.format(val.replace('\r','\\r')))
+                    print ('{0}:[{1}] Ignored'.format(self.__name__, val.replace('\r','\\r')))
 
     def _writeLoop(self):
         ''' Main event loop for writing to device '''
@@ -368,6 +367,7 @@ class AVM(PhysicalDevice):
         if not self._ser:
             raise IOError('Unable to open serial connection on power {0}'.format(port))
         super(AVM, self).__init__(name = 'AVM', stream = self._ser, properties = { 'powerState': 'UNKNOWN', 'input':'UNKNOWN', 'volume': 'UNKNOWN', 'muted': 'UNKNOWN' })
+        self.volarray = [-50, -35, -25, -21, -18, -12, -8, -4, 0, 5, 10 ]
 
         self.write('P1P?')
 
@@ -387,7 +387,7 @@ class AVM(PhysicalDevice):
     @PhysicalDevice.deviceToProperty('input', '^P1S([0-9])$')
     def avmToInput(self, property, value):
         assert (property == 'input'), 'Wrong property received: ' + property
-        val = { '1': 'ON', '0': 'OFF' }.get(value)
+        val = { '0': 'CD', '3': 'TAPE', '5': 'DVD', '6': 'TV', '7': 'SAT', '8': 'VCR', '9': 'AUX' }.get(value)
         if val:
             return val
         raise ValueError('{0} is not a valid value for property {1}'.format(value, property))
@@ -395,7 +395,6 @@ class AVM(PhysicalDevice):
     @PhysicalDevice.deviceToProperty('volume', '^P1VM([+-][0-9]{1,2}(?:[\\.][0-9]{1,2})?)$')
     def avmToVolume(self, property, value):
         assert (property == 'volume'), 'Wrong property received: ' + property
-        volarray = [-50, -35, -25, -21, -18, -12, -8, -4, 0, 5, 10 ]
         try:
             rawvol = float(value)
         except:
