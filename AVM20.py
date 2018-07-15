@@ -136,7 +136,7 @@ class PhysicalThing(object):
                 if message['action'] == 'UPDATE':
                     if message['source'] == '__thing__':
                         ''' Update is from IOT service.  Determine which device supports the updated property and send an update request to it '''
-                        self._propertyHandlers[message['property']].update(message['property'], message['value'])
+                        self._propertyHandlers[message['property']].updateDevice(message['property'], message['value'])
                     else:
                         ''' Update is from device. Add it to updatedProperties '''
                         updatedProperties[message['property']] = message['value']
@@ -188,9 +188,13 @@ class PhysicalDevice(ABC):
         _threadWrite = Thread(target=self._writeLoop)
         _threadWrite.start()
 
-    def update(self, property, value):
-        ''' Change the physical state of the device by updating property to value '''
-        self._deviceQueue.put({'source': self.__name__, 'action': 'UPDATE', 'property': property, 'value': value })
+    def updateDevice(self, property, value):
+        ''' Send message to device to tell it to update one of its property values '''
+        self._deviceQueue.put({'source': '__thing__', 'action': 'UPDATE', 'property': property, 'value': value })
+
+    def updateThing(self, property, value):
+        ''' Send message to thing telling it to update its thing shadow to reflect the device's reported state '''
+        self._eventQueue.put({'source': self.__name__, 'action': 'UPDATE', 'property': property, 'value': value })
 
         # update local property value
         self.properties[property] = value
@@ -261,7 +265,7 @@ class PhysicalDevice(ABC):
 
                         if self.properties[property[i]] != xval:
                             # Send updated property to Thing
-                            self.update(property[i], xval)
+                            self.updateThing(property[i], xval)
                         else:
                             print ('Received {0}:{1}.  Property unchanged'.format(property[i], xval))
                 else:
@@ -345,8 +349,7 @@ class PhysicalDevice(ABC):
 
     ''' Methods for User to override if their device is not operate as a stream '''
     def read(self,eol='\n', timeout=5):
-        rval =  self._read(eol, timeout)
-        return rval
+        return self._read(eol, timeout)
 
     def write(self,value, eol='\n', timeout=5, synchronous=False):
         self._write(value, eol, timeout, synchronous)
