@@ -206,7 +206,6 @@ class PhysicalDevice(ABC):
         def decorateinterface(func):
             transform = getattr(func, '__deviceToProperty__', {})
             cre = re.compile(regex)
-            print ('Compiling {0} for property {1}: {2}'.format(regex, property, cre))
             transform[cre] = (property, func)
             func.__deviceToProperty__ = transform
             return func
@@ -231,7 +230,6 @@ class PhysicalDevice(ABC):
                 d2pList = getattr(method, '__deviceToProperty__', {})
                 for cre, (property, method) in d2pList.items():
                     match = cre.match(value)
-                    print ('Matching to {0} value {1}, match is {2}'.format(cre, value, match))
                     if match:
                         return (property, method, match)
         return None
@@ -246,11 +244,11 @@ class PhysicalDevice(ABC):
 
     def _readLoop(self):
         ''' Main event loop for reading from device '''
-        print ('Starting {0} readLoop with stream {1}'.format(self.__name__, _self._stream))
+        print ('Starting {0} readLoop'.format(self.__name__))
         while not self._exit:
             val = self.read(self._eol, self._timeout) # Read input.  Timeout periodically to make sure we are checking that an exit hasn't been commanded.
             if val:
-                print ('Received {0} from device {1}, stream {2}'.format(val, self.__name__, self._stream))
+                print ('{0}:[{1}]'.format(self.__name__, val.replace('\r','\\r')))
                 ret = self._deviceToProperty(val) # Retrieve appropriate handler to translate device value into property value
                 if ret:
                     (property, method, match) = ret
@@ -258,18 +256,16 @@ class PhysicalDevice(ABC):
 
                     for i in range(len(property)):
                         # Extract out each match group and send to method to get it translated from the value from the device to the property value
-                        mval = match(i+1)
+                        mval = match.group(i+1)
                         xval = method(self, property[i], mval)
 
                         if self.properties[property[i]] != xval:
-                            print ('Sending {0}:{1} to event queue'.format(property[i], xval))
-
                             # Send updated property to Thing
                             self.update(property[i], xval)
                         else:
                             print ('Received {0}:{1}.  Property unchanged'.format(property[i], xval))
                 else:
-                    self._logger.warn('No method matches {0}'.format(val))
+                    self._logger.warn('No method matches {0}'.format(val.replace('\r','\\r')))
 
     def _writeLoop(self):
         ''' Main event loop for writing to device '''
@@ -299,7 +295,6 @@ class PhysicalDevice(ABC):
                 continue
 
     def _read(self, eol=b'\n', timeout=5):
-        print ('_read with stream {0}'.format(self._stream))
         eol = eol.encode() if type(eol) is str else eol
 
         with self.readlock:
@@ -349,10 +344,11 @@ class PhysicalDevice(ABC):
         self._stream.close()
 
     ''' Methods for User to override if their device is not operate as a stream '''
-    def read(self,eol=b'\n', timeout=5):
-        return self._read(eol, timeout)
+    def read(self,eol='\n', timeout=5):
+        rval =  self._read(eol, timeout)
+        return rval
 
-    def write(self,value, eol=b'\n', timeout=5, synchronous=False):
+    def write(self,value, eol='\n', timeout=5, synchronous=False):
         self._write(value, eol, timeout, synchronous)
 
     def close(self):
@@ -457,7 +453,7 @@ class Epson1080UB(PhysicalDevice):
         self._timeout=0.25
         if not self._ser:
             raise IOError('Unable to open serial connection on power {0}'.format(port))
-        super(Epson1080UB, self).__init__(name = 'Epson1080UB', stream = self._ser, properties = { 'projPowerState': 'UNKNOWN', 'projInput':'UNKNOWN'  })
+        super(Epson1080UB, self).__init__(name = 'Epson1080UB', eol='\r', stream = self._ser, properties = { 'projPowerState': 'UNKNOWN', 'projInput':'UNKNOWN'  })
 
         self.write('PWR?\r')
 
@@ -502,6 +498,7 @@ class denTVThing(PhysicalThing):
         rv = []
         # Make sure AVM is always on and set to the Alexa input when not watching TV
         if updatedProperties.get('powerState') == 'OFF':
+            print ('Returning powerState to ON and input to Alexa')
             rv.append(('powerState','ON'))
             rv.append(('input', 'CD'))
         return rv
@@ -509,8 +506,8 @@ class denTVThing(PhysicalThing):
 if __name__ == u'__main__':
 
     try:
-        denAVM = AVM('/dev/ttyUSB0',9600)
-        denEpson = Epson1080UB('/dev/ttyUSB1',9600)
+        denAVM = AVM('/dev/ttyUSB1',9600)
+        denEpson = Epson1080UB('/dev/ttyUSB0',9600)
 
         denTV = denTVThing(endpoint='aamloz0nbas89.iot.us-east-1.amazonaws.com', thingName='denTVThing', rootCAPath='root-CA.crt', certificatePath='denTVThing.crt', privateKeyPath='denTVThing.private.key', region='us-east-1', devices=[denAVM,denEpson])
         denTV.start()
