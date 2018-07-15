@@ -2,6 +2,7 @@
 
 from abc import ABC, abstractmethod
 from threading import Timer, Lock, Thread
+import serial
 import io
 import logging
 import json
@@ -33,13 +34,11 @@ class PhysicalThing(object):
             for d in devices:
                 self.registerDevice(d)
 
-        self._main()
-
     def _iotConnect(self, endpoint, thingName, rootCAPath, certificatePath, privateKeyPath, region):
         ''' Establish connection to the AWS IOT service '''
         # Init AWSIoTMQTTShadowClient
         myAWSIoTMQTTShadowClient = None
-        myAWSIoTMQTTShadowClient = AWSIoTMQTTShadowClient('pyASH')
+        myAWSIoTMQTTShadowClient = AWSIoTMQTTShadowClient('pyASHdenTV')
         myAWSIoTMQTTShadowClient.configureEndpoint(endpoint, 8883)
         myAWSIoTMQTTShadowClient.configureCredentials(rootCAPath, privateKeyPath, certificatePath)
 
@@ -107,6 +106,9 @@ class PhysicalThing(object):
     def onChange(self, updatedProperties):
         return None
 
+    def start(self):
+        self._main()
+
     def _main(self):
 
         while True:
@@ -169,8 +171,12 @@ class PhysicalDevice(ABC):
         self.__name__ = name if name is not None else self.__class__.__name__
         self._deviceQueue = queue.Queue()
         self._ready = Lock()    # Is it safe to send a command to the device
+        self.readlock = Lock()
         self._waitFor = None # Are we waiting for a specific value from the device
         self._exit = False # Set when a request has been made to exit the device driver
+
+    def __del__(self):
+        self.close()
 
 
     def start(self, eventQueue):
@@ -193,7 +199,6 @@ class PhysicalDevice(ABC):
         ''' Shut down device driver '''
         self._exit = True
         self._deviceQueue.put({'action': 'EXIT'})
-        self._close()
 
     @classmethod
     def deviceToProperty(cls, property, regex):
@@ -201,6 +206,7 @@ class PhysicalDevice(ABC):
         def decorateinterface(func):
             transform = getattr(func, '__deviceToProperty__', {})
             cre = re.compile(regex)
+            print ('Compiling {0} for property {1}: {2}'.format(regex, property, cre))
             transform[cre] = (property, func)
             func.__deviceToProperty__ = transform
             return func
@@ -225,6 +231,7 @@ class PhysicalDevice(ABC):
                 d2pList = getattr(method, '__deviceToProperty__', {})
                 for cre, (property, method) in d2pList.items():
                     match = cre.match(value)
+                    print ('Matching to {0} value {1}, match is {2}'.format(cre, value, match))
                     if match:
                         return (property, method, match)
         return None
@@ -243,7 +250,7 @@ class PhysicalDevice(ABC):
         while not self._exit:
             val = self.read(self._eol, self._timeout) # Read input.  Timeout periodically to make sure we are checking that an exit hasn't been commanded.
             if val:
-                print ('Received {0} from device'.format(val))
+                print ('Received {0} from device {1}'.format(val, self.__name__))
                 ret = self._deviceToProperty(val) # Retrieve appropriate handler to translate device value into property value
                 if ret:
                     (property, method, match) = ret
@@ -303,9 +310,12 @@ class PhysicalDevice(ABC):
                     buffer += c
                     last_activity = time.time()
                     if buffer.find(eol)>=0:
-                        return buffer[:buffer.find(eol)]
+                        retval = buffer[:buffer.find(eol)]
+                        break
                 elif time.time() - last_activity > timeout:
-                    return buffer
+                    retval = buffer
+                    break
+        return retval.decode()
 
     def _write(self, value, eol=b'\n', timeout=5, synchronous=False):
         value = value.encode() if type(value) is str else value
@@ -324,25 +334,28 @@ class PhysicalDevice(ABC):
                         buffer += c
                         last_activity = time.time()
                         if buffer.find(eol)>=0:
-                            return buffer[:buffer.find(eol)]
+                            retval = buffer[:buffer.find(eol)]
+                            break
                     elif time.time() - last_activity > timeout:
-                        return buffer
+                        retval = buffer
+                        break
         else:
             self._stream.write(value)
-            return b''
+            retval = b''
+        return retval.decode()
 
     def _close(self):
         self._stream.close()
 
     ''' Methods for User to override if their device is not operate as a stream '''
     def read(self,eol=b'\n', timeout=5):
-        _read(eol, timeout)
+        return self._read(eol, timeout)
 
     def write(self,value, eol=b'\n', timeout=5, synchronous=False):
-        _write(value, eol, timeout, synchronous)
+        self._write(value, eol, timeout, synchronous)
 
     def close(self):
-        _close()
+        self._close()
 
 
 
@@ -351,10 +364,10 @@ class AVM(PhysicalDevice):
 
     def __init__(self, port, baud):
         self._ser = serial.Serial(port, baud, timeout=0.25)
-        self._timeout=timeout
+        self._timeout=0.25
         if not self._ser:
             raise IOError('Unable to open serial connection on power {0}'.format(port))
-        super(AVM20, self).__init__(name = 'AVM20', stream = self._ser, properties = { 'powerState': 'UNKNOWN', 'input':'UNKNOWN', 'volume': 'UNKNOWN', 'muted': 'UNKNOWN' })
+        super(AVM, self).__init__(name = 'AVM', stream = self._ser, properties = { 'powerState': 'UNKNOWN', 'input':'UNKNOWN', 'volume': 'UNKNOWN', 'muted': 'UNKNOWN' })
 
         self.write('P1P?')
 
@@ -408,21 +421,21 @@ class AVM(PhysicalDevice):
         return { 'input': self.avmToInput, 'volume': self.avmToVolume, 'muted': self.avmToMuted }.get(property)(property, value)
 
     @PhysicalDevice.propertyToDevice('powerState', 'P1P{0}')
-    def powerStateToAVM20(self, value):
+    def powerStateToAVM(self, value):
         val = { 'ON': '1', 'OFF': '0' }.get(value)
         if val:
             return val
         raise ValueError('{0} is not a valid powerState'.format(value))
 
     @PhysicalDevice.propertyToDevice('input', 'P1S{0}')
-    def inputToAVM20(self, value):
+    def inputToAVM(self, value):
         val = { 'CD': '0', 'TAPE': '3', 'DVD': '5', 'TV': '6', 'SAT': '7', 'VCR': '8', 'AUX': '9' }.get(value)
         if val:
             return val
         raise ValueError('{0} is not a valid input'.format(value))
 
     @PhysicalDevice.propertyToDevice('volume', 'P1VM{0}')
-    def inputToAVM20(self, value):
+    def inputToAVM(self, value):
         if type(value) is int:
             value = int(value)/10
             value = 0 if value < 0 else 10 if value > 10 else value
@@ -430,7 +443,7 @@ class AVM(PhysicalDevice):
         raise ValueError('{0} is not a valid volume'.format(value))
 
     @PhysicalDevice.propertyToDevice('muted', 'P1M{0}')
-    def powerStateToAVM20(self, value):
+    def powerStateToAVM(self, value):
         val = { True: '1', False: '0' }.get(value)
         if val:
             return val
@@ -440,10 +453,10 @@ class Epson1080UB(PhysicalDevice):
 
     def __init__(self, port, baud):
         self._ser = serial.Serial(port, baud, timeout=0.25)
-        self._timeout=timeout
+        self._timeout=0.25
         if not self._ser:
             raise IOError('Unable to open serial connection on power {0}'.format(port))
-        super(Epson, self).__init__(name = 'Epson1080UB', stream = self._ser, properties = { 'projPowerState': 'UNKNOWN', 'projInput':'UNKNOWN'  })
+        super(Epson1080UB, self).__init__(name = 'Epson1080UB', stream = self._ser, properties = { 'projPowerState': 'UNKNOWN', 'projInput':'UNKNOWN'  })
 
         self.write('PWR?\r')
 
@@ -499,5 +512,7 @@ if __name__ == u'__main__':
         denEpson = Epson1080UB('/dev/ttyUSB1',9600)
 
         denTV = denTVThing(endpoint='aamloz0nbas89.iot.us-east-1.amazonaws.com', thingName='denTVThing', rootCAPath='root-CA.crt', certificatePath='denTVThing.crt', privateKeyPath='denTVThing.private.key', region='us-east-1', devices=[denAVM,denEpson])
+        denTV.start()
     except KeyboardInterrupt:
-        denTV.exit()
+        denAVM.exit()
+        denEpson.exit()
