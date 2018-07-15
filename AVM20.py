@@ -246,11 +246,11 @@ class PhysicalDevice(ABC):
 
     def _readLoop(self):
         ''' Main event loop for reading from device '''
-        print ('Starting {0} readLoop'.format(self.__name__))
+        print ('Starting {0} readLoop with stream {1}'.format(self.__name__, _self._stream))
         while not self._exit:
             val = self.read(self._eol, self._timeout) # Read input.  Timeout periodically to make sure we are checking that an exit hasn't been commanded.
             if val:
-                print ('Received {0} from device {1}'.format(val, self.__name__))
+                print ('Received {0} from device {1}, stream {2}'.format(val, self.__name__, self._stream))
                 ret = self._deviceToProperty(val) # Retrieve appropriate handler to translate device value into property value
                 if ret:
                     (property, method, match) = ret
@@ -299,6 +299,7 @@ class PhysicalDevice(ABC):
                 continue
 
     def _read(self, eol=b'\n', timeout=5):
+		print ('_read with stream {0}'.format(self._stream))
         eol = eol.encode() if type(eol) is str else eol
 
         with self.readlock:
