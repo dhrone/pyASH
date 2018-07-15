@@ -104,6 +104,9 @@ class PhysicalThing(object):
             self._logger.info('Delta Message: processing item [{0}][{1}]'.format(property, payloadDict['state'][property]))
             self._eventQueue.put({'source': '__thing__', 'action': 'UPDATE', 'property': property, 'value': payloadDict['state'][property] })
 
+    def onChange(self, updatedProperties):
+        return None
+
     def _main(self):
 
         while True:
@@ -135,6 +138,11 @@ class PhysicalThing(object):
                     else:
                         ''' Update is from device. Add it to updatedProperties '''
                         updatedProperties[message['property']] = message['value']
+
+                        localPropertyChanges = self.onChange(updatedProperties)
+                        if localPropertyChanges:
+                            for k, v in localPropertyChanges:
+                                self._propertyHandlers[k].update(k,v)
 
             ''' If there are properties to report to the IOT service, send an update message '''
             updateNeeded = False
@@ -251,14 +259,6 @@ class PhysicalDevice(ABC):
 
                             # Send updated property to Thing
                             self.update(property[i], xval)
-
-                            # Take any actions required due to new property state
-                            changedProperties = self.onStateChange(property[i], xval)
-
-                            # If _onStateChange called for additional property updates...
-                            for prop in changedProperties:
-                                # Send updated property to Thing
-                                self.update(prop, self.properties[prop])
                         else:
                             print ('Received {0}:{1}.  Property unchanged'.format(property[i], xval))
                 else:
@@ -290,9 +290,6 @@ class PhysicalDevice(ABC):
 
             except queue.Empty:
                 continue
-
-    def onStateChange(self, property, value):
-        return []
 
     def _read(self, eol=b'\n', timeout=5):
         eol = eol.encode() if type(eol) is str else eol
@@ -348,7 +345,9 @@ class PhysicalDevice(ABC):
         _close()
 
 
-class AVM20(PhysicalDevice):
+
+
+class AVM(PhysicalDevice):
 
     def __init__(self, port, baud):
         self._ser = serial.Serial(port, baud, timeout=0.25)
@@ -363,19 +362,9 @@ class AVM20(PhysicalDevice):
     def close(self):
         self._ser.close()
 
-    def onStateChange(self, property, value):
-        if property == 'powerState':
-            if value == 'ON':
-                self.write('P1P?')
-            else:
-                self.properties['input'] = 'UNKNOWN'
-                self.properties['volume'] = 'UNKNOWN'
-                self.properties['muted'] = 'UNKNOWN'
-                return ['input', 'volume', 'muted']
-        return []
 
     @PhysicalDevice.deviceToProperty('powerState', '^P1P([0-1])$')
-    def avm20ToPowerState(self, property, value):
+    def avmToPowerState(self, property, value):
         assert (property == 'powerState'), 'Wrong property received: ' + property
         val = { '1': 'ON', '0': 'OFF' }.get(value)
         if val:
@@ -383,7 +372,7 @@ class AVM20(PhysicalDevice):
         raise ValueError('{0} is not a valid value for property {1}'.format(value, property))
 
     @PhysicalDevice.deviceToProperty('input', '^P1S([0-9])$')
-    def avm20ToInput(self, property, value):
+    def avmToInput(self, property, value):
         assert (property == 'input'), 'Wrong property received: ' + property
         val = { '1': 'ON', '0': 'OFF' }.get(value)
         if val:
@@ -391,7 +380,7 @@ class AVM20(PhysicalDevice):
         raise ValueError('{0} is not a valid value for property {1}'.format(value, property))
 
     @PhysicalDevice.deviceToProperty('volume', '^P1VM([+-][0-9]{1,2}(?:[\\.][0-9]{1,2})?)$')
-    def avm20ToVolume(self, property, value):
+    def avmToVolume(self, property, value):
         assert (property == 'volume'), 'Wrong property received: ' + property
         volarray = [-50, -35, -25, -21, -18, -12, -8, -4, 0, 5, 10 ]
         try:
@@ -406,7 +395,7 @@ class AVM20(PhysicalDevice):
             return len(volstr)*10
 
     @PhysicalDevice.deviceToProperty('muted', '^P1M([0-9])$')
-    def avm20ToMuted(self, property, value):
+    def avmToMuted(self, property, value):
         assert (property == 'muted'), 'Wrong property received: ' + property
         val = { '1': True, '0': False }.get(value)
         if val:
@@ -414,9 +403,9 @@ class AVM20(PhysicalDevice):
         raise ValueError('{0} is not a valid value for property {1}'.format(value, property))
 
     @PhysicalDevice.deviceToProperty(['input', 'volume', 'muted'], '^P1S([0-9])V([+-][0-9]{2}[\\.][0-9])M([0-1])D[0-9]E[0-9]$')
-    def avm20combinedResponse(self, property, value):
+    def avmcombinedResponse(self, property, value):
         assert (property in ['input','volume', 'muted']), 'Wrong property received: {0}'.format(property)
-        return { 'input': self.avm20ToInput, 'volume': self.avm20ToVolume, 'muted': self.avm20ToMuted }.get(property)(property, value)
+        return { 'input': self.avmToInput, 'volume': self.avmToVolume, 'muted': self.avmToMuted }.get(property)(property, value)
 
     @PhysicalDevice.propertyToDevice('powerState', 'P1P{0}')
     def powerStateToAVM20(self, value):
@@ -447,31 +436,68 @@ class AVM20(PhysicalDevice):
             return val
         raise ValueError('{0} is not a valid muted value'.format(value))
 
+class Epson1080UB(PhysicalDevice):
+
+    def __init__(self, port, baud):
+        self._ser = serial.Serial(port, baud, timeout=0.25)
+        self._timeout=timeout
+        if not self._ser:
+            raise IOError('Unable to open serial connection on power {0}'.format(port))
+        super(Epson, self).__init__(name = 'Epson1080UB', stream = self._ser, properties = { 'projPowerState': 'UNKNOWN', 'projInput':'UNKNOWN'  })
+
+        self.write('PWR?\r')
+
+    def close(self):
+        self._ser.close()
+
+    @PhysicalDevice.deviceToProperty('projPowerState', '^PWR=([0-9]{2})$')
+    def toProjPowerState(self, property, value):
+        assert (property == 'projPowerState'), 'Wrong property received: ' + property
+
+        return 'OFF' if value == '00' else 'ON'
+        if value == '00':
+            return 'OFF'
+        else:
+            return 'ON'
+
+    @PhysicalDevice.deviceToProperty('projInput', '^SOURCE=([a-zA-Z0-9]{2})$')
+    def toProjInput(self, property, value):
+        assert (property == 'projInput'), 'Wrong property received: ' + property
+        val = { '30': 'HDMI1', 'A0': 'HDMI2', '41': 'VIDEO', '42': 'S-VIDEO' }.get(value)
+        if val:
+            return val
+        raise ValueError('{0} is not a valid value for property {1}'.format(value, property))
+
+    @PhysicalDevice.propertyToDevice('projPowerState', 'PWR {0}\r')
+    def projPowerStateToProj(self, value):
+        if value in ['ON', 'OFF']:
+            return value
+        raise ValueError('{0} is not a valid powerState'.format(value))
+
+    @PhysicalDevice.propertyToDevice('projInput', 'SOURCE {0}\r')
+    def projInputToProj(self, value):
+        val = { 'HDMI1': '30', 'HDMI2': 'A0', 'VIDEO': '41', 'S-VIDEO': '42' }.get(value)
+        if val:
+            return val
+        raise ValueError('{0} is not a valid input'.format(value))
+
+
+class denTVThing(PhysicalThing):
+
+    def onChange(self, updatedProperties):
+        rv = []
+        # Make sure AVM is always on and set to the Alexa input when not watching TV
+        if updatedProperties.get('powerState') == 'OFF':
+            rv.append(('powerState','ON'))
+            rv.append(('input', 'CD'))
+        return rv
 
 if __name__ == u'__main__':
-    import getopt, sys
 
     try:
-        opts, args = getopt.getopt(sys.argv[1:], u'p:b:', [u'baud=',u'port='])
-    except getopt.GetoptError:
-        print (u'avm20 -b <baud> --baud <baud> -p <port> --port <port>')
-        sys.exit(2)
+        denAVM = AVM('/dev/ttyUSB0',9600)
+        denEpson = Epson1080UB('/dev/ttyUSB1',9600)
 
-    port = None
-    baud = None
-    for opt, arg in opts:
-        if opt in (u'-b',u'--baud'):
-            baud = int(arg)
-        elif opt in (u'-p', u'--port'):
-            port = arg
-
-    if not port or not baud:
-        print ('You must provide the port the device is attached to and what baud rate to communicate with it on')
-        sys.exit(2)
-
-    try:
-        condoAVM30 = AVM20(port, baud)
-
-        condoAVM20Thing = PhysicalThing(endpoint='aamloz0nbas89.iot.us-east-1.amazonaws.com', thingName='condoAVM', rootCAPath='root-CA.crt', certificatePath='condoAVM.pem.crt', privateKeyPath='condoAVM.private.key', region='us-east-1', device=condoAVM30)
+        denTV = denTVThing(endpoint='aamloz0nbas89.iot.us-east-1.amazonaws.com', thingName='denTVThing', rootCAPath='root-CA.crt', certificatePath='denTVThing.crt', privateKeyPath='denTVThing.private.key', region='us-east-1', devices=[denAVM,denEpson])
     except KeyboardInterrupt:
-        condoAVM30.exit()
+        denTV.exit()

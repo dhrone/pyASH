@@ -4,3 +4,5 @@ __pycache__*
 *.csv
 iot*json
 *.pem
+*.crt
+*.key
