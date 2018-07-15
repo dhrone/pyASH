@@ -299,7 +299,7 @@ class PhysicalDevice(ABC):
                 continue
 
     def _read(self, eol=b'\n', timeout=5):
-		print ('_read with stream {0}'.format(self._stream))
+        print ('_read with stream {0}'.format(self._stream))
         eol = eol.encode() if type(eol) is str else eol
 
         with self.readlock:
