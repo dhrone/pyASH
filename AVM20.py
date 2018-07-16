@@ -142,14 +142,14 @@ class PhysicalThing(object):
                         localPropertyChanges = self.onChange(updatedProperties)
                         if localPropertyChanges:
                             for k, v in localPropertyChanges:
-                                self._propertyHandlers[k].update(k,v)
+                                self._propertyHandlers[k].updateDevice(k,v)
 
             ''' If there are properties to report to the IOT service, send an update message '''
             updateNeeded = False
             payloadDict = { 'state': { 'reported': {}, 'desired': {} } }
             for property, value in updatedProperties.items():
                 if self._localShadow[property] != value:
-                    print ('Thing: {0}:{1}'.format(property, value))
+                    print ('IOT UPDATED: [{0}:{1}]'.format(property, value))
                     updateNeeded = True
                     payloadDict['state']['reported'] = updatedProperties
                     payloadDict['state']['desired'] = updatedProperties
@@ -170,7 +170,6 @@ class PhysicalDevice(ABC):
         self.properties = properties # dictionary of the properties and starting values for device
         self.__name__ = name if name is not None else self.__class__.__name__
         self._deviceQueue = queue.Queue()
-        self._ready = Lock()    # Is it safe to send a command to the device
         self.readlock = Lock()
         self._waitFor = None # Are we waiting for a specific value from the device
         self._exit = False # Set when a request has been made to exit the device driver
@@ -255,10 +254,10 @@ class PhysicalDevice(ABC):
         while not self._exit:
             val = self.read()
             if val:
-                print ('{0}:[{1}]'.format(self.__name__, val.replace('\r','\\r')))
+                #print ('{0}:[{1}]'.format(self.__name__, val.replace('\r','\\r')))
                 self._processDeviceResponse(val)
 
-    def _processDeviceResponse(val):
+    def _processDeviceResponse(self, val):
         ret = self._deviceToProperty(val) # Retrieve appropriate handler to translate device value into property value
         if ret:
             (property, method, match) = ret
@@ -281,22 +280,20 @@ class PhysicalDevice(ABC):
         print ('Starting {0} writeLoop'.format(self.__name__))
 
         while not self._exit:
-            # Wait for ready state to be reached
-            now = time.time()
-            while not self.ready():
-                sleep(1)
-                if time.time() > now + 10:
-                    # Hmmm.  Device sure has been busy a long time...
-                    print ('Device busy\n  Device state is {0}')
-                    continue
             try:
-                message = self._deviceQueue.get(5)
+                # Wait for ready state to be reached
+                while not self.ready():
+                    print ('{0} Sleeping ...'.format(self.__name__))
+                    time.sleep(5)
+                    raise queue.Empty
+
+                message = self._deviceQueue.get(block=True, timeout=5)
                 self._deviceQueue.task_done()
 
                 if message['action'].upper() == 'EXIT':
                     return
                 elif message['action'].upper() == 'UPDATE':
-                    print ('THING [{0}:{1}]'.format(message['property'], message['value']))
+                    print ('IOT requests [{0}:{1}]'.format(message['property'], message['value']))
                     ret = self._propertyToDevice(message['property'])
                     if ret:
                         (cmd, method) = ret
@@ -309,10 +306,10 @@ class PhysicalDevice(ABC):
                             # If so, process it
                             self._processDeviceResponse(val)
                     else:
-                        self._logger.warn('No property matches {0}'.format(message['property']))
+                        self._logger.warn('{0} has no property that matches {1}'.format(self.__name__,message['property']))
 
             except queue.Empty:
-                # If nothing waiting to be written, send a query to get current device status
+                # If nothing waiting to be written or the device is not ready, send a query to get current device status
                 qs = self.queryStatus()
                 if qs:
                     # Get the query to send.  If the query is a list, process each query individually
@@ -414,6 +411,11 @@ class AVM(PhysicalDevice):
     def close(self):
         self._ser.close()
 
+    def queryStatus(self):
+        if self.properties['powerState'] == 'ON':
+            return 'P1?\n'
+        else:
+            return 'P1P?\n'
 
     @PhysicalDevice.deviceToProperty('powerState', '^P1P([0-1])$')
     def avmToPowerState(self, property, value):
@@ -445,11 +447,11 @@ class AVM(PhysicalDevice):
             # volume greater than max array value
             return len(volstr)*10
 
-    @PhysicalDevice.deviceToProperty('muted', '^P1M([0-9])$')
+    @PhysicalDevice.deviceToProperty('muted', '^P1M([0-1])$')
     def avmToMuted(self, property, value):
         assert (property == 'muted'), 'Wrong property received: ' + property
-        val = { '1': True, '0': False }.get(value)
-        if val:
+        val = { '1': True, '0': False }.get(value, 'BAD')
+        if not val=='BAD':
             return val
         raise ValueError('{0} is not a valid value for property {1}'.format(value, property))
 
@@ -473,15 +475,15 @@ class AVM(PhysicalDevice):
         raise ValueError('{0} is not a valid input'.format(value))
 
     @PhysicalDevice.propertyToDevice('volume', 'P1VM{0}')
-    def inputToAVM(self, value):
+    def volumeToAVM(self, value):
         if type(value) is int:
-            value = int(value)/10
+            value = int(value/10)
             value = 0 if value < 0 else 10 if value > 10 else value
             return self.volarray[value]
         raise ValueError('{0} is not a valid volume'.format(value))
 
     @PhysicalDevice.propertyToDevice('muted', 'P1M{0}')
-    def powerStateToAVM(self, value):
+    def muteToAVM(self, value):
         val = { True: '1', False: '0' }.get(value)
         if val:
             return val
@@ -494,7 +496,7 @@ class Epson1080UB(PhysicalDevice):
         self._timeout=0.25
         if not self._ser:
             raise IOError('Unable to open serial connection on power {0}'.format(port))
-        super(Epson1080UB, self).__init__(name = 'Epson1080UB', eol='\r', stream = self._ser, properties = { 'projPowerState': 'UNKNOWN', 'projInput':'UNKNOWN'  }, synchronous=True)
+        super(Epson1080UB, self).__init__(name = 'Epson1080UB', eol='\r:', stream = self._ser, properties = { 'projPowerState': 'UNKNOWN', 'projInput':'UNKNOWN'  }, synchronous=True)
 
         self.write('PWR?\r')
 
@@ -503,12 +505,12 @@ class Epson1080UB(PhysicalDevice):
 
     def queryStatus(self):
         if self.properties['projPowerState'] == 'ON':
-            return 'SOURCE?'
+            return ['PWR?\r','SOURCE?\r']
         else:
-            return 'PWR?'
+            return 'PWR?\r'
 
     def ready(self):
-        return True if self.properties['projPowerState'] in ['ON', 'OFF'] else False
+        return True if self.properties['projPowerState'] in ['ON', 'OFF', 'UNKNOWN'] else False
 
     @PhysicalDevice.deviceToProperty('projPowerState', '^PWR=([0-9]{2})$')
     def toProjPowerState(self, property, value):
